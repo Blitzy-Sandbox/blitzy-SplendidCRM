@@ -41,6 +41,7 @@
 || SplendidCRM.Security.AdminUserAccess("Pardot"         , "access") >= 0 
 || SplendidCRM.Security.AdminUserAccess("Watson"         , "access") >= 0 
 || SplendidCRM.Security.AdminUserAccess("PhoneBurner"    , "access") >= 0 
+|| SplendidCRM.Security.AdminUserAccess("DuoUniversal"   , "access") >= 0 
 ) %>' runat="server">
 	<%@ Register TagPrefix="SplendidCRM" Tagname="ListHeader" Src="~/_controls/ListHeader.ascx" %>
 	<SplendidCRM:ListHeader Title="Administration.LBL_CLOUD_SERVICES_TITLE" Runat="Server" />
@@ -217,8 +218,12 @@
 				<asp:Label ID="lblPhoneBurner" Text='<%# L10n.Term("PhoneBurner.LBL_MANAGE_PHONEBURNER") %>' runat="server" />
 			</asp:TableCell>
 			<asp:TableCell Width="20%" CssClass="tabDetailViewDL2">
+				<asp:Image ID="imgDuoUniversal" SkinID="DuoUniversal" AlternateText='<%# L10n.Term("DuoUniversal.LBL_MANAGE_DUO_UNIVERSAL_TITLE") %>' Runat="server" />
+				&nbsp;
+				<asp:HyperLink ID="lnkDuoUniversal" Text='<%# L10n.Term("DuoUniversal.LBL_MANAGE_DUO_UNIVERSAL_TITLE") %>' NavigateUrl="~/Administration/DuoUniversal/default.aspx" CssClass="tabDetailViewDL2Link" Runat="server" />
 			</asp:TableCell>
 			<asp:TableCell Width="30%" CssClass="tabDetailViewDF2">
+				<asp:Label ID="lblDuoUniversal" Text='<%# L10n.Term("DuoUniversal.LBL_MANAGE_DUO_UNIVERSAL") %>' runat="server" />
 			</asp:TableCell>
 		</asp:TableRow>
 	</asp:Table>

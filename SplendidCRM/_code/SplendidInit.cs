@@ -1554,6 +1554,66 @@ namespace SplendidCRM
 			return false;
 		}
 
+		// 08/07/2025 Paul.  DuoUniversal needs to verify login without initializing. 
+		public static Guid VerifyUser(string sUSER_NAME, string sPASSWORD, string sUSER_DOMAIN)
+		{
+			HttpContext          Context     = HttpContext.Current;
+			HttpApplicationState Application = Context.Application;
+
+			Guid gUSER_ID = Guid.Empty;
+			DbProviderFactory dbf = DbProviderFactories.GetFactory(Application);
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				string sSQL;
+				// 03/22/2006 Paul.  The user name should be case-insignificant.  The password is case-significant. 
+				// 03/22/2006 Paul.  DB2 does not like lower(USER_NAME) = lower(@USER_NAME).  It returns the following error. 
+				// ERROR [42610] [IBM][DB2/NT] SQL0418N A statement contains a use of a parameter marker that is not valid. SQLSTATE=42610 
+				// 05/23/2006 Paul.  Use vwUSERS_Login so that USER_HASH can be removed from vwUSERS to prevent its use in reports. 
+				// 11/25/2006 Paul.  Include TEAM_ID and TEAM_NAME as they will be used everywhere. 
+				// 03/16/2010 Paul.  Add IS_ADMIN_DELEGATE. 
+				// 03/16/2010 Paul.  Retrieve all fields to allow field errors to be caught and reported. 
+				sSQL = "select *            " + ControlChars.CrLf
+				     + "  from vwUSERS_Login" + ControlChars.CrLf;
+				// 03/16/2010 Paul.  Stop using lower() on SQL Server to increase performance. 
+				if ( Sql.IsOracle(con) || Sql.IsDB2(con) || Sql.IsPostgreSQL(con) )
+					sSQL += " where lower(USER_NAME) = @USER_NAME" + ControlChars.CrLf;
+				else
+					sSQL += " where USER_NAME = @USER_NAME" + ControlChars.CrLf;
+				using ( IDbCommand cmd = con.CreateCommand() )
+				{
+					cmd.CommandText = sSQL;
+					// 01/15/2009 Paul.  On slow systems running Express, the first login event can take longer than expected, so just wait forever.
+					cmd.CommandTimeout = 0;
+					// 03/22/2006 Paul.  Convert the name to lowercase here. 
+					Sql.AddParameter(cmd, "@USER_NAME", sUSER_NAME.ToLower());
+					// 11/19/2005 Paul.  sUSER_DOMAIN is used to determine if NTLM is enabled. 
+					if ( Sql.IsEmptyString(sUSER_DOMAIN) )
+					{
+						if ( !Sql.IsEmptyString(sPASSWORD) )
+						{
+							string sUSER_HASH = Security.HashPassword(sPASSWORD);
+							cmd.CommandText += "   and USER_HASH = @USER_HASH" + ControlChars.CrLf;
+							Sql.AddParameter(cmd, "@USER_HASH", sUSER_HASH);
+						}
+						else
+						{
+							// 11/19/2005 Paul.  Handle the special case of the password stored as NULL or empty string. 
+							cmd.CommandText += "   and (USER_HASH = '' or USER_HASH is null)" + ControlChars.CrLf;
+						}
+					}
+					using ( IDataReader rdr = cmd.ExecuteReader() )
+					{
+						if ( rdr.Read() )
+						{
+							gUSER_ID = Sql.ToGuid(rdr["ID"]);
+						}
+					}
+				}
+			}
+			return gUSER_ID;
+		}
+
 		public static bool LoginUser(string sUSER_NAME, string sPASSWORD, string sTHEME, string sLANGUAGE, string sUSER_DOMAIN, bool bIS_ADMIN)
 		{
 			HttpContext          Context     = HttpContext.Current;

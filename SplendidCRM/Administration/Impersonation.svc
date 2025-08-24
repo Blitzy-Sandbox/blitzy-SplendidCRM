@@ -1,0 +1,1 @@
+<%@ ServiceHost Language="C#" Service="SplendidCRM.Administration.Impersonation" CodeBehind="Impersonation.svc.cs" Factory="System.ServiceModel.Activation.WebScriptServiceHostFactory" %>

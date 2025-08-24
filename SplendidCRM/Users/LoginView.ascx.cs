@@ -29,7 +29,10 @@ using System.Web.UI.HtmlControls;
 using System.Globalization;
 using System.Threading;
 using System.Net.Mail;
+using System.Threading.Tasks;
 using System.Diagnostics;
+
+using DuoUniversal;
 
 namespace SplendidCRM.Users
 {
@@ -66,6 +69,28 @@ namespace SplendidCRM.Users
 
 		// 02/18/2020 Paul.  Allow React Client to forget password. 
 		// 10/30/2021 Paul.  Move SendForgotPasswordNotice to ModuleUtils. 
+
+		// 08/07/2025 Paul.  Add support for DuoUniversal. 
+		private string GetDuoRedirectUrl()
+		{
+			string sServerScheme    = Sql.ToString(Application["ServerScheme"   ]);
+			string sServerName      = Sql.ToString(Application["ServerName"     ]);
+			string sApplicationPath = Sql.ToString(Application["ApplicationPath"]);
+			string sServerPort      = Sql.ToString(Application["ServerPort"     ]);
+			string sSiteURL         = sServerScheme + "://" + sServerName + sServerPort + sApplicationPath;
+			if ( !sSiteURL.StartsWith("http") )
+				sSiteURL = "http://" + sSiteURL;
+			if ( !sSiteURL.EndsWith("/") )
+				sSiteURL += "/";
+
+			string sRedirectURL = sSiteURL;
+			if ( sServerName != "localhost" )
+			{
+				sRedirectURL  = Crm.Config.SiteURL(Application);
+			}
+			sRedirectURL += "Users/Login.aspx";
+			return sRedirectURL;
+		}
 
 		protected void Page_Command(Object sender, CommandEventArgs e)
 		{
@@ -136,7 +161,45 @@ namespace SplendidCRM.Users
 									L10N L10n = new L10N("en-US");
 									throw(new Exception(L10n.Term("Users.ERR_INVALID_IP_ADDRESS")));
 								}
-								bValidUser = SplendidInit.LoginUser(txtUSER_NAME.Text, txtPASSWORD.Text, String.Empty, String.Empty);
+								if ( Sql.ToBoolean(Application["CONFIG.DuoUniversal.Enabled"]) )
+								{
+									string sDuoUniversalClientID     = Sql.ToString (Application["CONFIG.DuoUniversal.ClientID"    ]);
+									string sDuoUniversalClientSecret = Sql.ToString (Application["CONFIG.DuoUniversal.ClientSecret"]);
+									string sDuoUniversalApiHostURL   = Sql.ToString (Application["CONFIG.DuoUniversal.ApiHostURL"  ]);
+									if ( !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientSecret) && !Sql.IsEmptyString(sDuoUniversalApiHostURL) )
+									{
+										Guid gUSER_ID = SplendidInit.VerifyUser(txtUSER_NAME.Text, txtPASSWORD.Text, String.Empty);
+										if ( !Sql.IsEmptyGuid(gUSER_ID) )
+										{
+											string sRedirectURL = GetDuoRedirectUrl();
+											Client duoClient = new DuoUniversal.ClientBuilder(sDuoUniversalClientID, sDuoUniversalClientSecret, sDuoUniversalApiHostURL, sRedirectURL).Build();
+											Task<bool> resultTask = Task.Run(() => duoClient.DoHealthCheck());
+											if ( resultTask.Result )
+											{
+												string state = DuoUniversal.Client.GenerateState();
+												Session["DuoUniversal.state"   ] = state;
+												Session["DuoUniversal.username"] = txtUSER_NAME.Text;
+												Session["DuoUniversal.UserID"  ] = gUSER_ID.ToString();
+												string sDuoUniversalLoginURL = duoClient.GenerateAuthUri(txtUSER_NAME.Text, state);
+												Response.Redirect(sDuoUniversalLoginURL);
+											}
+											else
+											{
+												trError.Visible = true;
+												lblError.Text = L10n.Term("DuoUniversal.ERR_FAILED_HEALTH_CHECK");
+											}
+										}
+									}
+									else
+									{
+										trError.Visible = true;
+										lblError.Text = L10n.Term("DuoUniversal.ERR_NOT_CONFIGURED");
+									}
+								}
+								else
+								{
+									bValidUser = SplendidInit.LoginUser(txtUSER_NAME.Text, txtPASSWORD.Text, String.Empty, String.Empty);
+								}
 							}
 						}
 					}
@@ -307,6 +370,58 @@ namespace SplendidCRM.Users
 						{
 							trError.Visible = true;
 							lblError.Text = Sql.ToString(Request["error_description"]);
+						}
+					}
+					else if ( Sql.ToBoolean(Application["CONFIG.DuoUniversal.Enabled"]) )
+					{
+						// 08/07/2025 Paul.  Add support for Duo Universal 2-factor authentication. 
+						string sDuoUniversalClientID     = Sql.ToString (Application["CONFIG.DuoUniversal.ClientID"    ]);
+						string sDuoUniversalClientSecret = Sql.ToString (Application["CONFIG.DuoUniversal.ClientSecret"]);
+						string sDuoUniversalApiHostURL   = Sql.ToString (Application["CONFIG.DuoUniversal.ApiHostURL"  ]);
+						if ( !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientSecret) && !Sql.IsEmptyString(sDuoUniversalApiHostURL) )
+						{
+							string sDuoUniversalReceievedState = Sql.ToString(Request.QueryString["state"]);
+							string sDuoUniversalReceivedCode   = Sql.ToString(Request.QueryString["code" ]);
+							if ( !Sql.IsEmptyString(sDuoUniversalReceievedState) && !Sql.IsEmptyString(sDuoUniversalReceivedCode) )
+							{
+								string sDuoUniversalSessionState    = Sql.ToString(Session["DuoUniversal.state"   ]);
+								string sDuoUniversalSessionUsername = Sql.ToString(Session["DuoUniversal.username"]);
+								string sDuoUniversalSessionUserID   = Sql.ToString(Session["DuoUniversal.UserID"  ]);
+								if ( !Sql.IsEmptyString(sDuoUniversalSessionUsername) && !Sql.IsEmptyString(sDuoUniversalSessionState) && !Sql.IsEmptyGuid(sDuoUniversalSessionUserID) )
+								{
+									if ( sDuoUniversalSessionState == sDuoUniversalReceievedState )
+									{
+										string sRedirectURL = GetDuoRedirectUrl();
+										Client duoClient = new DuoUniversal.ClientBuilder(sDuoUniversalClientID, sDuoUniversalClientSecret, sDuoUniversalApiHostURL, sRedirectURL).Build();
+										Task<IdToken> resultTask = Task.Run(() => duoClient.ExchangeAuthorizationCodeFor2faResult(sDuoUniversalReceivedCode, sDuoUniversalSessionUsername));
+										IdToken token = resultTask.Result;
+										if ( token.AuthResult.Result == "allow" )
+										{
+											Guid gUSER_ID = Sql.ToGuid(sDuoUniversalSessionUserID);
+											SplendidInit.LoginUser(gUSER_ID, "DuoUniversal");
+											LoginRedirect();
+										}
+										else
+										{
+											trError.Visible = true;
+											lblError.Text = L10n.Term("DuoUniversal.ERR_LOGIN_DENIED");
+										}
+									}
+									else
+									{
+										trError.Visible = true;
+										lblError.Text = L10n.Term("DuoUniversal.ERR_INVALID_SESSION_STATE");
+									}
+								}
+								else
+								{
+									trError.Visible = true;
+									lblError.Text = L10n.Term("DuoUniversal.ERR_LOGIN_SESSION_HAS_EXPIRED");
+								}
+							}
+							Session.Remove("DuoUniversal.state"   );
+							Session.Remove("DuoUniversal.username");
+							Session.Remove("DuoUniversal.UserID"  );
 						}
 					}
 				}

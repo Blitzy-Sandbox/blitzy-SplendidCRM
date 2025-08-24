@@ -78,6 +78,10 @@ namespace SplendidCRM.Administration
 		protected HyperLink lnkPhoneBurner;
 		protected Label     lblPhoneBurner;
 
+		protected Image     imgDuoUniversal;
+		protected HyperLink lnkDuoUniversal;
+		protected Label     lblDuoUniversal;
+
 		private void Page_Load(object sender, System.EventArgs e)
 		{
 			if ( !IsPostBack )
@@ -130,6 +134,10 @@ namespace SplendidCRM.Administration
 				imgPhoneBurner.Visible = Utils.CachedFileExists(Context, lnkPhoneBurner.NavigateUrl);
 				lnkPhoneBurner.Visible = imgPhoneBurner.Visible;
 				lblPhoneBurner.Visible = imgPhoneBurner.Visible;
+				// 08/07/2025 Paul.  Add support DuoUniversal. 
+				imgDuoUniversal.Visible = Utils.CachedFileExists(Context, lnkDuoUniversal.NavigateUrl);
+				lnkDuoUniversal.Visible = imgDuoUniversal.Visible;
+				lblDuoUniversal.Visible = imgDuoUniversal.Visible;
 			}
 		}
 

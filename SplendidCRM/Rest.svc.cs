@@ -33,7 +33,10 @@ using System.ServiceModel;
 using System.ServiceModel.Web;
 using System.ServiceModel.Activation;
 using System.Web.Script.Serialization;
+using System.Threading.Tasks;
 using System.Diagnostics;
+
+using DuoUniversal;
 
 namespace SplendidCRM
 {
@@ -319,15 +322,39 @@ namespace SplendidCRM
 		// 04/01/2020 Paul.  Move json utils to RestUtil. 
 
 		#region Login
+		private string GetDuoRedirectUrl()
+		{
+			HttpApplicationState Application = HttpContext.Current.Application;
+
+			string sServerScheme    = Sql.ToString(Application["ServerScheme"   ]);
+			string sServerName      = Sql.ToString(Application["ServerName"     ]);
+			string sApplicationPath = Sql.ToString(Application["ApplicationPath"]);
+			string sServerPort      = Sql.ToString(Application["ServerPort"     ]);
+			string sSiteURL         = sServerScheme + "://" + sServerName + sServerPort + sApplicationPath;
+			if ( !sSiteURL.StartsWith("http") )
+				sSiteURL = "http://" + sSiteURL;
+			if ( !sSiteURL.EndsWith("/") )
+				sSiteURL += "/";
+
+			string sRedirectURL = sSiteURL;
+			if ( sServerName != "localhost" )
+			{
+				sRedirectURL  = Crm.Config.SiteURL(Application);
+			}
+			sRedirectURL += "React/Login";
+			return sRedirectURL;
+		}
+
 		[OperationContract]
 		[WebInvoke(Method="POST", BodyStyle=WebMessageBodyStyle.WrappedRequest, RequestFormat=WebMessageFormat.Json, ResponseFormat=WebMessageFormat.Json)]
 		// 05/02/2017 Paul.  Need a separate flag for the mobile client. 
-		public Guid Login(string UserName, string Password, string Version, string MobileClient)
+		public string Login(string UserName, string Password, string Version, string MobileClient)
 		{
 			HttpContext          Context     = HttpContext.Current;
 			HttpApplicationState Application = HttpContext.Current.Application;
 			HttpSessionState     Session     = HttpContext.Current.Session    ;
 			HttpRequest          Request     = HttpContext.Current.Request    ;
+			HttpResponse         Response    = HttpContext.Current.Response   ;
 			
 			// 11/05/2018 Paul.  Protect against null inputs. 
 			string sUSER_NAME   = Sql.ToString(UserName);
@@ -367,6 +394,41 @@ namespace SplendidCRM
 				if ( !Sql.IsEmptyGuid(gUSER_ID) )
 				{
 					SplendidInit.LoginUser(gUSER_ID, "Azure AD");
+				}
+			}
+			// 08/07/2025 Paul.  Add support for DuoUniversal. 
+			else if ( Sql.ToBoolean(Application["CONFIG.DuoUniversal.Enabled"]) )
+			{
+				L10N L10n = new L10N("en-US");
+				string sDuoUniversalClientID     = Sql.ToString (Application["CONFIG.DuoUniversal.ClientID"    ]);
+				string sDuoUniversalClientSecret = Sql.ToString (Application["CONFIG.DuoUniversal.ClientSecret"]);
+				string sDuoUniversalApiHostURL   = Sql.ToString (Application["CONFIG.DuoUniversal.ApiHostURL"  ]);
+				if ( !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientSecret) && !Sql.IsEmptyString(sDuoUniversalApiHostURL) )
+				{
+					gUSER_ID = SplendidInit.VerifyUser(sUSER_NAME, sPASSWORD, String.Empty);
+					if ( !Sql.IsEmptyGuid(gUSER_ID) )
+					{
+						string sRedirectURL = GetDuoRedirectUrl();
+						Client duoClient = new DuoUniversal.ClientBuilder(sDuoUniversalClientID, sDuoUniversalClientSecret, sDuoUniversalApiHostURL, sRedirectURL).Build();
+						Task<bool> resultTask = Task.Run(() => duoClient.DoHealthCheck());
+						if ( resultTask.Result )
+						{
+							string state = DuoUniversal.Client.GenerateState();
+							Session["DuoUniversal.state"   ] = state;
+							Session["DuoUniversal.username"] = sUSER_NAME;
+							Session["DuoUniversal.UserID"  ] = gUSER_ID.ToString();
+							string sDuoUniversalLoginURL = duoClient.GenerateAuthUri(sUSER_NAME, state);
+							return sDuoUniversalLoginURL;
+						}
+						else
+						{
+							throw(new Exception(L10n.Term("DuoUniversal.ERR_FAILED_HEALTH_CHECK")));
+						}
+					}
+				}
+				else
+				{
+					throw(new Exception(L10n.Term("DuoUniversal.ERR_NOT_CONFIGURED")));
 				}
 			}
 			// 05/16/2020 Paul.  Allow Windows Authentication using same login method. 
@@ -455,7 +517,83 @@ namespace SplendidCRM
 				SplendidError.SystemWarning(new StackTrace(true).GetFrame(0), "Invalid username and/or password for " + sUSER_NAME);
 				throw(new Exception("Invalid username and/or password for " + sUSER_NAME));
 			}
-			return gUSER_ID;
+			return gUSER_ID.ToString();
+		}
+
+		[OperationContract]
+		[WebInvoke(Method="POST", BodyStyle=WebMessageBodyStyle.WrappedRequest, RequestFormat=WebMessageFormat.Json, ResponseFormat=WebMessageFormat.Json)]
+		// 08/07/2025 Paul.  Add support for DuoUniversal. 
+		public string LoginDuoUniversal(string code, string state, string Version, string MobileClient)
+		{
+			HttpContext          Context     = HttpContext.Current;
+			HttpApplicationState Application = HttpContext.Current.Application;
+			HttpSessionState     Session     = HttpContext.Current.Session    ;
+			HttpRequest          Request     = HttpContext.Current.Request    ;
+			HttpResponse         Response    = HttpContext.Current.Response   ;
+			
+			string sDuoUniversalReceievedState = Sql.ToString(state);
+			string sDuoUniversalReceivedCode   = Sql.ToString(code);
+			string sUSER_NAME   = Sql.ToString(Session["DuoUniversal.username"]);
+			string sVERSION     = Sql.ToString(Version );
+			Guid gUSER_ID       = Guid.Empty;
+			bool bMOBILE_CLIENT = Sql.ToBoolean(MobileClient);
+			
+			if ( Sql.ToBoolean(Application["CONFIG.DuoUniversal.Enabled"]) )
+			{
+				L10N L10n = new L10N("en-US");
+				string sDuoUniversalClientID     = Sql.ToString (Application["CONFIG.DuoUniversal.ClientID"    ]);
+				string sDuoUniversalClientSecret = Sql.ToString (Application["CONFIG.DuoUniversal.ClientSecret"]);
+				string sDuoUniversalApiHostURL   = Sql.ToString (Application["CONFIG.DuoUniversal.ApiHostURL"  ]);
+				if ( !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientID) && !Sql.IsEmptyString(sDuoUniversalClientSecret) && !Sql.IsEmptyString(sDuoUniversalApiHostURL) )
+				{
+					if ( !Sql.IsEmptyString(sDuoUniversalReceievedState) && !Sql.IsEmptyString(sDuoUniversalReceivedCode) )
+					{
+						string sDuoUniversalSessionState    = Sql.ToString(Session["DuoUniversal.state"   ]);
+						string sDuoUniversalSessionUsername = Sql.ToString(Session["DuoUniversal.username"]);
+						string sDuoUniversalSessionUserID   = Sql.ToString(Session["DuoUniversal.UserID"  ]);
+						if ( !Sql.IsEmptyString(sDuoUniversalSessionUsername) && !Sql.IsEmptyString(sDuoUniversalSessionState) && !Sql.IsEmptyGuid(sDuoUniversalSessionUserID) )
+						{
+							if ( sDuoUniversalSessionState == sDuoUniversalReceievedState )
+							{
+								string sRedirectURL = GetDuoRedirectUrl();
+								Client duoClient = new DuoUniversal.ClientBuilder(sDuoUniversalClientID, sDuoUniversalClientSecret, sDuoUniversalApiHostURL, sRedirectURL).Build();
+								Task<IdToken> resultTask = Task.Run(() => duoClient.ExchangeAuthorizationCodeFor2faResult(sDuoUniversalReceivedCode, sDuoUniversalSessionUsername));
+								IdToken token = resultTask.Result;
+								if ( token.AuthResult.Result == "allow" )
+								{
+									gUSER_ID = Sql.ToGuid(sDuoUniversalSessionUserID);
+									SplendidInit.LoginUser(gUSER_ID, "DuoUniversal");
+								}
+								else
+								{
+									throw(new Exception(L10n.Term("DuoUniversal.ERR_LOGIN_DENIED")));
+								}
+							}
+							else
+							{
+								throw(new Exception(L10n.Term("DuoUniversal.ERR_INVALID_SESSION_STATE")));
+							}
+						}
+						else
+						{
+							throw(new Exception(L10n.Term("DuoUniversal.ERR_LOGIN_SESSION_HAS_EXPIRED")));
+						}
+					}
+					Session.Remove("DuoUniversal.state"   );
+					Session.Remove("DuoUniversal.username");
+					Session.Remove("DuoUniversal.UserID"  );
+				}
+				else
+				{
+					throw(new Exception(L10n.Term("DuoUniversal.ERR_NOT_CONFIGURED")));
+				}
+			}
+			if ( Sql.IsEmptyGuid(gUSER_ID) )
+			{
+				SplendidError.SystemWarning(new StackTrace(true).GetFrame(0), "Invalid username and/or password for " + sUSER_NAME);
+				throw(new Exception("Invalid username and/or password for " + sUSER_NAME));
+			}
+			return gUSER_ID.ToString();
 		}
 
 		// 02/18/2020 Paul.  Allow React Client to forget password. 
@@ -5766,7 +5904,8 @@ namespace SplendidCRM
 			if ( Sql.IsEmptyString(sRELATED_TABLE) )
 				throw(new Exception("Unknown module: " + RelatedModule));
 			// 08/22/2011 Paul.  Add admin control to REST API. 
-			nACLACCESS = Security.GetUserAccess(RelatedModule, "edit");
+			// 07/08/2025 Paul.  Adding a related record should not require edit access of related. 
+			nACLACCESS = Security.GetUserAccess(RelatedModule, "view");
 			if ( !Security.IsAuthenticated() || !Sql.ToBoolean(Application["Modules." + RelatedModule + ".RestEnabled"]) || nACLACCESS < 0 )
 			{
 				// 09/06/2017 Paul.  Include module name in error. 

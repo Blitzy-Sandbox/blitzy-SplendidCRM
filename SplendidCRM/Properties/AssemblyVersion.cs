@@ -1,7 +1,7 @@
 using System.Reflection;
 
 [assembly: AssemblyCompany("SplendidCRM Software, Inc.")]
-[assembly: AssemblyCopyright("Copyright (C) 2005-2022 SplendidCRM, Inc.  All rights reserved.")]
+[assembly: AssemblyCopyright("Copyright (C) 2005-2025 SplendidCRM, Inc.  All rights reserved.")]
 [assembly: AssemblyTrademark("SplendidCRM")]
 
 //
@@ -70,5 +70,7 @@ using System.Reflection;
 // 07/31/2022 Paul.  Version 14.6 includes experimental Angular code. 
 // 10/09/2022 Paul.  Version 14.7 Add support for Invoices in Payments.EditView. 
 // 02/17/2024 Paul.  Version 15.0 Upgrades React to version 18 and most react packages. 
-[assembly: AssemblyVersion("15.0.*")]
+// 08/07/2025 Paul.  Version 15.1 Add support for DuoUniversal 2-factor authentication. 
+// 08/22/2025 Paul.  Version 15.2 Add impersonation to React Client. 
+[assembly: AssemblyVersion("15.2.*")]
 
