@@ -166,8 +166,8 @@ src/
     ├── Program.cs                 Entry point, DI container, middleware pipeline
     ├── appsettings.json           Base configuration defaults
     ├── Controllers/
-    │   ├── RestController.cs      Main REST API (152 endpoints)
-    │   ├── AdminRestController.cs Admin REST API (65 endpoints)
+    │   ├── RestController.cs      Main REST API (81 endpoints)
+    │   ├── AdminRestController.cs Admin REST API (41 endpoints)
     │   ├── ImpersonationController.cs
     │   ├── HealthCheckController.cs   GET /api/health
     │   ├── CampaignTrackerController.cs
@@ -180,7 +180,7 @@ src/
     │   ├── ArchiveHostedService.cs        IHostedService — archive processing
     │   └── CacheInvalidationService.cs    Cache invalidation monitor
     ├── Soap/
-    │   ├── ISugarSoapService.cs   SOAP service interface (84 methods)
+    │   ├── ISugarSoapService.cs   SOAP service interface (45 methods)
     │   ├── SugarSoapService.cs    SOAP implementation
     │   └── DataCarriers.cs        SOAP DTOs (contact_detail, entry_value, etc.)
     ├── Hubs/
@@ -195,8 +195,8 @@ src/
 
 ### Key Components
 
-- **REST API** — All 152 main REST endpoints and 65 admin endpoints are served via ASP.NET Core Web API controllers. Routes are preserved at `/Rest.svc/{operation}` and `/Administration/Rest.svc/{operation}` for backward compatibility.
-- **SOAP Service** — The 84-method SOAP interface is hosted via SoapCore middleware, preserving the `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`) and WSDL contract.
+- **REST API** — All 81 main REST endpoints and 41 admin endpoints are served via ASP.NET Core Web API controllers. Routes are preserved at `/Rest.svc/{operation}` and `/Administration/Rest.svc/{operation}` for backward compatibility.
+- **SOAP Service** — The 45-method SOAP interface is hosted via SoapCore middleware, preserving the `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`) and WSDL contract.
 - **SignalR** — Real-time hubs for Chat, Twilio, and PhoneBurner are implemented using ASP.NET Core SignalR.
 - **Background Services** — Three `IHostedService` implementations handle scheduled jobs, email polling, and archive processing with configurable intervals and reentrancy guards.
 - **Authentication** — Supports Windows (Negotiate/NTLM), Forms (cookie-based), and SSO (OIDC/SAML) authentication modes, selectable via the `AUTH_MODE` environment variable. Optional DuoUniversal 2FA integration is available.
@@ -266,7 +266,17 @@ All REST API routes are preserved at their original paths (`/Rest.svc/{operation
 
 ### SOAP WSDL Contract Preserved
 
-The SOAP service WSDL contract is preserved with the original `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`). All 84 SOAP methods and data carriers (`contact_detail`, `entry_value`, `name_value`, `document_revision`, etc.) maintain byte-comparable serialization.
+The SOAP service WSDL contract is preserved with the original `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`). All 45 SOAP methods and data carriers (`contact_detail`, `entry_value`, `name_value`, `document_revision`, etc.) maintain byte-comparable serialization.
+
+### JSON Serialization
+
+API controller responses use **Newtonsoft.Json 13.x** as the primary JSON serializer, configured via `AddNewtonsoftJson()` in `Program.cs`. This preserves backward compatibility with the legacy .NET Framework 4.8 serialization behavior. Key serialization settings:
+
+- **DateTime handling**: `DateTimeZoneHandling.Utc` — all `DateTime` values are serialized in UTC format
+- **Null handling**: `NullValueHandling.Include` — properties with `null` values are included in the JSON output
+- **Property naming**: Default camelCase convention (`CamelCasePropertyNamesContractResolver`)
+
+> **Note for frontend developers (Prompt 2):** The serializer is Newtonsoft.Json, not System.Text.Json. If migrating API client code, ensure date parsing and null handling align with the Newtonsoft.Json defaults described above.
 
 ### SignalR Hub Endpoints
 
