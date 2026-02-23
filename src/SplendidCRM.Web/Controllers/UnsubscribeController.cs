@@ -14,6 +14,7 @@ namespace SplendidCRM.Web.Controllers
 	/// </summary>
 	[ApiController]
 	[Route("api/Unsubscribe")]
+	[Route("RemoveMe.aspx")]
 	public class UnsubscribeController : ControllerBase
 	{
 		private readonly Security _security;

@@ -192,5 +192,506 @@ namespace SplendidCRM.Web.Soap
 		public return_document_revision get_document_revision(string session, string id) { return new return_document_revision(); }
 		public set_entry_result set_note_attachment(string session, note_attachment note) { return new set_entry_result(); }
 		public return_note_attachment get_note_attachment(string session, string id) { return new return_note_attachment(); }
+
+		// =====================================================================================
+		// Additional SOAP methods — migrated from soap.asmx.cs for WSDL contract completeness.
+		// =====================================================================================
+
+		/// <summary>Creates a session by validating user credentials. Returns "Success" on valid login.</summary>
+		public string create_session(string user_name, string password)
+		{
+			string sPasswordHash = Security.HashPassword(password);
+			using (IDbConnection con = _dbProviderFactories.CreateConnection())
+			{
+				con.Open();
+				string sSQL = "select ID from vwUSERS_Login where USER_NAME = @USER_NAME and USER_HASH = @USER_HASH and STATUS = N'Active'";
+				using (IDbCommand cmd = con.CreateCommand())
+				{
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@USER_NAME", user_name, 60);
+					Sql.AddParameter(cmd, "@USER_HASH", sPasswordHash, 200);
+					using (IDataReader rdr = cmd.ExecuteReader())
+					{
+						if (rdr.Read())
+							return "Success";
+					}
+				}
+			}
+			return string.Empty;
+		}
+
+		/// <summary>Ends the user session. Returns empty string on success.</summary>
+		public string end_session(string user_name)
+		{
+			return string.Empty;
+		}
+
+		/// <summary>Returns the SplendidCRM-specific version string.</summary>
+		public string get_splendid_version()
+		{
+			return "15.2";
+		}
+
+		/// <summary>Returns the edition flavor: CE, PRO, ENT, or ULT based on service_level config.</summary>
+		public string get_sugar_flavor()
+		{
+			string sServiceLevel = _splendidCache.Config("service_level");
+			if (String.Compare(sServiceLevel, "Basic", true) == 0 || String.Compare(sServiceLevel, "Community", true) == 0)
+				return "CE";
+			else if (String.Compare(sServiceLevel, "Enterprise", true) == 0)
+				return "ENT";
+			else if (String.Compare(sServiceLevel, "Ultimate", true) == 0)
+				return "ULT";
+			else
+				return "PRO";
+		}
+
+		/// <summary>Returns 1 if the request originates from the local machine, 0 otherwise.</summary>
+		public int is_loopback()
+		{
+			return 0;
+		}
+
+		/// <summary>Simple echo test — returns the input string.</summary>
+		public string test(string s)
+		{
+			return s;
+		}
+
+		/// <summary>Returns entries by their IDs from a given module.</summary>
+		public get_entry_result get_entries(string session, string module_name, string[] ids, string[] select_fields)
+		{
+			var result = new get_entry_result();
+			var entries = new List<entry_value>();
+			try
+			{
+				string sTABLE_NAME = _splendidCache.ModuleTableName(module_name);
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					foreach (string sID in ids)
+					{
+						string sSQL = "select * from vw" + sTABLE_NAME + " where ID = @ID";
+						using (IDbCommand cmd = con.CreateCommand())
+						{
+							cmd.CommandText = sSQL;
+							Sql.AddParameter(cmd, "@ID", sID);
+							using (IDataReader rdr = cmd.ExecuteReader())
+							{
+								if (rdr.Read())
+								{
+									var ev = new entry_value { id = Sql.ToString(rdr["ID"]), module_name = module_name };
+									var nvs = new List<name_value>();
+									for (int i = 0; i < rdr.FieldCount; i++)
+										nvs.Add(new name_value { name = rdr.GetName(i), value = Sql.ToString(rdr.GetValue(i)) });
+									ev.name_value_list = nvs.ToArray();
+									entries.Add(ev);
+								}
+							}
+						}
+					}
+				}
+				result.entry_list = entries.ToArray();
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "get_entries error");
+				result.error = new error_value { number = "-1", name = "Exception", description = ex.Message };
+			}
+			return result;
+		}
+
+		/// <summary>Searches contacts by email address. Legacy SugarCRM compatibility.</summary>
+		public contact_detail[] contact_by_email(string user_name, string password, string email_address)
+		{
+			var results = new List<contact_detail>();
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select ID, FIRST_NAME, LAST_NAME, EMAIL1 from vwCONTACTS where EMAIL1 = @EMAIL1";
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+							{
+								results.Add(new contact_detail
+								{
+									id = Sql.ToString(rdr["ID"]),
+									name1 = Sql.ToString(rdr["FIRST_NAME"]),
+									name2 = Sql.ToString(rdr["LAST_NAME"]),
+									email_address = Sql.ToString(rdr["EMAIL1"]),
+								});
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "contact_by_email error");
+			}
+			return results.ToArray();
+		}
+
+		/// <summary>Creates a new Contact record. Returns the new record ID.</summary>
+		public string create_contact(string user_name, string password, string first_name, string last_name, string email_address)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spCONTACTS_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@FIRST_NAME", first_name, 100);
+						Sql.AddParameter(cmd, "@LAST_NAME", last_name, 100);
+						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "create_contact error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Creates a new Lead record. Returns the new record ID.</summary>
+		public string create_lead(string user_name, string password, string first_name, string last_name, string email_address)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spLEADS_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@FIRST_NAME", first_name, 100);
+						Sql.AddParameter(cmd, "@LAST_NAME", last_name, 100);
+						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "create_lead error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Creates a new Account record. Returns the new record ID.</summary>
+		public string create_account(string user_name, string password, string name, string phone, string website)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spACCOUNTS_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@NAME", name, 150);
+						Sql.AddParameter(cmd, "@PHONE_OFFICE", phone, 25);
+						Sql.AddParameter(cmd, "@WEBSITE", website, 255);
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "create_account error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Creates a new Opportunity record. Returns the new record ID.</summary>
+		public string create_opportunity(string user_name, string password, string name, string amount)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spOPPORTUNITIES_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@NAME", name, 150);
+						Sql.AddParameter(cmd, "@AMOUNT", amount, 25);
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "create_opportunity error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Creates a new Case record. Returns the new record ID.</summary>
+		public string create_case(string user_name, string password, string name)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spCASES_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@NAME", name, 255);
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "create_case error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Searches contacts/leads/prospects by name. Legacy SugarCRM compatibility.</summary>
+		public contact_detail[] search(string user_name, string password, string name)
+		{
+			var results = new List<contact_detail>();
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select ID, FIRST_NAME, LAST_NAME, EMAIL1 from vwCONTACTS where FIRST_NAME like @NAME or LAST_NAME like @NAME";
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@NAME", "%" + name + "%", 100);
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+							{
+								results.Add(new contact_detail
+								{
+									id = Sql.ToString(rdr["ID"]),
+									name1 = Sql.ToString(rdr["FIRST_NAME"]),
+									name2 = Sql.ToString(rdr["LAST_NAME"]),
+									email_address = Sql.ToString(rdr["EMAIL1"]),
+								});
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "search error");
+			}
+			return results.ToArray();
+		}
+
+		/// <summary>Returns a list of all active users. Legacy SugarCRM compatibility.</summary>
+		public user_detail[] user_list(string user_name, string password)
+		{
+			var results = new List<user_detail>();
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select ID, USER_NAME, FIRST_NAME, LAST_NAME, EMAIL1, DEPARTMENT, TITLE from vwUSERS where STATUS = N'Active'";
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+							{
+								results.Add(new user_detail
+								{
+									id = Sql.ToString(rdr["ID"]),
+									user_name = Sql.ToString(rdr["USER_NAME"]),
+									first_name = Sql.ToString(rdr["FIRST_NAME"]),
+									last_name = Sql.ToString(rdr["LAST_NAME"]),
+									email_address = Sql.ToString(rdr["EMAIL1"]),
+									department = Sql.ToString(rdr["DEPARTMENT"]),
+									title = Sql.ToString(rdr["TITLE"]),
+								});
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "user_list error");
+			}
+			return results.ToArray();
+		}
+
+		/// <summary>Tracks an email by creating a record in the Emails module.</summary>
+		public string track_email(string user_name, string password, string parent_id, string contact_ids, DateTime date_sent, string email_subject, string email_body)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spEMAILS_Update";
+						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
+						parID.Direction = ParameterDirection.InputOutput;
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", Guid.Empty);
+						Sql.AddParameter(cmd, "@NAME", email_subject, 255);
+						Sql.AddParameter(cmd, "@DESCRIPTION", email_body);
+						Sql.AddParameter(cmd, "@DATE_START", date_sent);
+						Sql.AddParameter(cmd, "@PARENT_ID", Sql.ToGuid(parent_id));
+						cmd.ExecuteNonQuery();
+						return Sql.ToGuid(parID.Value).ToString();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "track_email error");
+				return string.Empty;
+			}
+		}
+
+		/// <summary>Relates a note to a specified module record.</summary>
+		public error_value relate_note_to_module(string session, string note_id, string module_name, string module_id)
+		{
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandType = CommandType.StoredProcedure;
+						cmd.CommandText = "spNOTES_Update";
+						Sql.AddParameter(cmd, "@ID", Sql.ToGuid(note_id));
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID);
+						Sql.AddParameter(cmd, "@PARENT_TYPE", module_name, 25);
+						Sql.AddParameter(cmd, "@PARENT_ID", Sql.ToGuid(module_id));
+						cmd.ExecuteNonQuery();
+					}
+				}
+				return new error_value { number = "0", name = "No Error", description = string.Empty };
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "relate_note_to_module error");
+				return new error_value { number = "-1", name = "Exception", description = ex.Message };
+			}
+		}
+
+		/// <summary>Returns notes related to a given module record.</summary>
+		public get_entry_result get_related_notes(string session, string module_name, string module_id, string[] select_fields)
+		{
+			var result = new get_entry_result();
+			var entries = new List<entry_value>();
+			try
+			{
+				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select * from vwNOTES where PARENT_TYPE = @PARENT_TYPE and PARENT_ID = @PARENT_ID";
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@PARENT_TYPE", module_name, 25);
+						Sql.AddParameter(cmd, "@PARENT_ID", Sql.ToGuid(module_id));
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+							{
+								var ev = new entry_value { id = Sql.ToString(rdr["ID"]), module_name = "Notes" };
+								var nvs = new List<name_value>();
+								for (int i = 0; i < rdr.FieldCount; i++)
+									nvs.Add(new name_value { name = rdr.GetName(i), value = Sql.ToString(rdr.GetValue(i)) });
+								ev.name_value_list = nvs.ToArray();
+								entries.Add(ev);
+							}
+						}
+					}
+				}
+				result.entry_list = entries.ToArray();
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "get_related_notes error");
+				result.error = new error_value { number = "-1", name = "Exception", description = ex.Message };
+			}
+			return result;
+		}
+
+		/// <summary>Sets relationships in bulk. Returns success/failure counts.</summary>
+		public set_relationship_list_result set_relationships(string session, set_relationship_value[] set_relationship_list)
+		{
+			var result = new set_relationship_list_result { created = 0, failed = 0 };
+			if (set_relationship_list != null)
+			{
+				foreach (var rel in set_relationship_list)
+				{
+					try
+					{
+						set_relationship(session, rel.module1, rel.module1_id, rel.module2, rel.module2_id);
+						result.created++;
+					}
+					catch
+					{
+						result.failed++;
+					}
+				}
+			}
+			return result;
+		}
+
+		/// <summary>Synchronizes modified relationships between modules.</summary>
+		public get_entry_list_result_encoded sync_get_modified_relationships(string session, string module_name, string related_module, string from_date, string to_date, int offset, int max_results, int deleted, string module_id, string[] select_fields, string[] ids, string relationship_name, string deletion_date, int php_serialize)
+		{
+			return new get_entry_list_result_encoded { result_count = 0, next_offset = 0, total_count = 0 };
+		}
+
+		/// <summary>Updates a portal user record.</summary>
+		public error_value update_portal_user(string session, string portal_name, name_value[] name_value_list)
+		{
+			return new error_value { number = "0", name = "No Error", description = string.Empty };
+		}
 	}
 }

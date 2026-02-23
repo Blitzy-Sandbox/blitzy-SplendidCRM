@@ -33,29 +33,37 @@ namespace SplendidCRM.Web.Services
 			int nIntervalMs = _configuration.GetValue<int>("Scheduler:IntervalMs", 60000);
 			if (nIntervalMs < 1000) nIntervalMs = 60000;
 			_logger.LogInformation("SchedulerHostedService started with interval {Interval}ms", nIntervalMs);
-			await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
-			while (!stoppingToken.IsCancellationRequested)
+			try
 			{
-				if (_reentrancyGuard.Wait(0))
+				await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+				while (!stoppingToken.IsCancellationRequested)
 				{
-					try
+					if (_reentrancyGuard.Wait(0))
 					{
-						using (var scope = _serviceProvider.CreateScope())
+						try
 						{
-							var schedulerUtils = scope.ServiceProvider.GetRequiredService<SchedulerUtils>();
-							schedulerUtils.OnTimer();
+							using (var scope = _serviceProvider.CreateScope())
+							{
+								var schedulerUtils = scope.ServiceProvider.GetRequiredService<SchedulerUtils>();
+								schedulerUtils.OnTimer();
+							}
+						}
+						catch (Exception ex)
+						{
+							_logger.LogError(ex, "SchedulerHostedService.ExecuteAsync error");
+						}
+						finally
+						{
+							_reentrancyGuard.Release();
 						}
 					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, "SchedulerHostedService.ExecuteAsync error");
-					}
-					finally
-					{
-						_reentrancyGuard.Release();
-					}
+					await Task.Delay(TimeSpan.FromMilliseconds(nIntervalMs), stoppingToken);
 				}
-				await Task.Delay(TimeSpan.FromMilliseconds(nIntervalMs), stoppingToken);
+			}
+			catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+			{
+				// Graceful shutdown — cancellation is expected when the host stops.
+				_logger.LogInformation("SchedulerHostedService stopping gracefully.");
 			}
 		}
 	}

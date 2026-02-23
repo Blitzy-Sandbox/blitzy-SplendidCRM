@@ -14,6 +14,7 @@ namespace SplendidCRM.Web.Controllers
 	/// </summary>
 	[ApiController]
 	[Route("api/Images")]
+	[Route("image.aspx")]
 	public class ImageController : ControllerBase
 	{
 		private readonly Security _security;

@@ -184,7 +184,8 @@ builder.Services.AddSingleton<SecurityFilterMiddleware>();
 builder.Services.AddSingleton<Sql>();
 builder.Services.AddSingleton<SqlProcs>();
 builder.Services.AddSingleton<DbProviderFactories>();
-builder.Services.AddSingleton<DbProviderFactory>();
+// NOTE: DbProviderFactory (singular) is NOT registered — it has a legacy 7-string-parameter constructor
+// incompatible with DI. DbProviderFactories (plural) provides all DI-friendly DB operations.
 builder.Services.AddSingleton<SqlClientFactory>();
 builder.Services.AddSingleton<SplendidError>();
 builder.Services.AddSingleton<SplendidDefaults>();

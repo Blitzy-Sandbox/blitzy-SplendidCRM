@@ -31,43 +31,51 @@ namespace SplendidCRM.Web.Services
 		protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 		{
 			_logger.LogInformation("CacheInvalidationService started.");
-			await Task.Delay(TimeSpan.FromSeconds(120), stoppingToken);
-			while (!stoppingToken.IsCancellationRequested)
+			try
 			{
-				try
+				await Task.Delay(TimeSpan.FromSeconds(120), stoppingToken);
+				while (!stoppingToken.IsCancellationRequested)
 				{
-					using (var scope = _serviceProvider.CreateScope())
+					try
 					{
-						var dbFactory = scope.ServiceProvider.GetRequiredService<DbProviderFactories>();
-						string sConnectionString = dbFactory.ConnectionString;
-						if (!Sql.IsEmptyString(sConnectionString))
+						using (var scope = _serviceProvider.CreateScope())
 						{
-							using (IDbConnection con = dbFactory.CreateConnection())
+							var dbFactory = scope.ServiceProvider.GetRequiredService<DbProviderFactories>();
+							string sConnectionString = dbFactory.ConnectionString;
+							if (!Sql.IsEmptyString(sConnectionString))
 							{
-								con.Open();
-								string sSQL = "select TABLE_NAME from vwSYSTEM_EVENTS where DATE_ENTERED > @LAST_CHECK";
-								using (IDbCommand cmd = con.CreateCommand())
+								using (IDbConnection con = dbFactory.CreateConnection())
 								{
-									cmd.CommandText = sSQL;
-									Sql.AddParameter(cmd, "@LAST_CHECK", DateTime.UtcNow.AddMinutes(-5));
-									using (IDataReader rdr = cmd.ExecuteReader())
+									con.Open();
+									string sSQL = "select TABLE_NAME from vwSYSTEM_EVENTS where DATE_ENTERED > @LAST_CHECK";
+									using (IDbCommand cmd = con.CreateCommand())
 									{
-										while (rdr.Read())
+										cmd.CommandText = sSQL;
+										Sql.AddParameter(cmd, "@LAST_CHECK", DateTime.UtcNow.AddMinutes(-5));
+										using (IDataReader rdr = cmd.ExecuteReader())
 										{
-											string sTableName = Sql.ToString(rdr["TABLE_NAME"]);
-											_logger.LogDebug("CacheInvalidationService: Invalidating cache for {Table}", sTableName);
+											while (rdr.Read())
+											{
+												string sTableName = Sql.ToString(rdr["TABLE_NAME"]);
+												_logger.LogDebug("CacheInvalidationService: Invalidating cache for {Table}", sTableName);
+											}
 										}
 									}
 								}
 							}
 						}
 					}
+					catch (Exception ex)
+					{
+						_logger.LogWarning(ex, "CacheInvalidationService: Error checking system events (non-fatal)");
+					}
+					await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
 				}
-				catch (Exception ex)
-				{
-					_logger.LogWarning(ex, "CacheInvalidationService: Error checking system events (non-fatal)");
-				}
-				await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+			}
+			catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+			{
+				// Graceful shutdown — cancellation is expected when the host stops.
+				_logger.LogInformation("CacheInvalidationService stopping gracefully.");
 			}
 		}
 	}

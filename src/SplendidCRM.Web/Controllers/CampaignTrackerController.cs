@@ -14,6 +14,7 @@ namespace SplendidCRM.Web.Controllers
 	/// </summary>
 	[ApiController]
 	[Route("api/CampaignTracker")]
+	[Route("campaign_trackerv2.aspx")]
 	public class CampaignTrackerController : ControllerBase
 	{
 		private readonly Security _security;

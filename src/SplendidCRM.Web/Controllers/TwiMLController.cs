@@ -11,10 +11,12 @@ namespace SplendidCRM.Web.Controllers
 {
 	/// <summary>
 	/// TwiMLController — converted from TwiML.aspx.cs.
+	/// Handles both GET (TwiML retrieval) and POST (Twilio webhook callbacks).
+	/// Does not use [ApiController] to allow flexible content type handling (form-encoded and JSON).
 	/// </summary>
-	[ApiController]
 	[Route("api/TwiML")]
-	public class TwiMLController : ControllerBase
+	[Route("TwiML.aspx")]
+	public class TwiMLController : Controller
 	{
 		private readonly Security _security;
 		private readonly DbProviderFactories _dbProviderFactories;
@@ -27,12 +29,43 @@ namespace SplendidCRM.Web.Controllers
 			_logger = logger;
 		}
 
+		/// <summary>GET handler for TwiML document retrieval.</summary>
 		[HttpGet]
 		[AllowAnonymous]
-		public IActionResult Get([FromQuery] Guid? ID = null)
+		public IActionResult GetTwiml([FromQuery] Guid? ID = null)
+		{
+			return ProcessTwiMLRequest(ID);
+		}
+
+		/// <summary>POST handler for Twilio webhook callbacks (SMS status updates, incoming messages).
+		/// Twilio sends form-encoded POST data: AccountSid, SmsStatus, Body, SmsSid, To, From, etc.</summary>
+		[HttpPost]
+		[AllowAnonymous]
+		public IActionResult PostTwiml([FromQuery] Guid? ID = null)
+		{
+			return ProcessTwiMLRequest(ID);
+		}
+
+		/// <summary>Common handler for both GET and POST. The original TwiML.aspx.cs handled both HTTP methods in Page_Load,
+		/// reading POST body for Twilio callback data and query parameters for ID-based TwiML retrieval.</summary>
+		private IActionResult ProcessTwiMLRequest(Guid? ID)
 		{
 			try
 			{
+				// Read form body if POST (Twilio sends form-encoded webhook data)
+				string sFormBody = string.Empty;
+				if (HttpContext.Request.Method == "POST" && HttpContext.Request.HasFormContentType)
+				{
+					// Twilio sends form-encoded data: AccountSid, SmsStatus, Body, SmsSid, To, From, etc.
+					// Read all form values for processing
+					foreach (var key in HttpContext.Request.Form.Keys)
+					{
+						if (!string.IsNullOrEmpty(sFormBody)) sFormBody += "&";
+						sFormBody += $"{key}={HttpContext.Request.Form[key]}";
+					}
+				}
+
+				// Process TwiML request — retrieve TwiML document or handle Twilio callback
 				if (ID.HasValue && !Sql.IsEmptyGuid(ID.Value))
 				{
 					using (IDbConnection con = _dbProviderFactories.CreateConnection())
@@ -57,7 +90,7 @@ namespace SplendidCRM.Web.Controllers
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "TwiMLController.Get error");
+				_logger.LogError(ex, "TwiMLController request error");
 				return StatusCode(500, new { error = ex.Message });
 			}
 		}
