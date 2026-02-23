@@ -35,7 +35,9 @@ namespace SplendidCRM.Web.Controllers
 		private readonly SplendidCache       _splendidCache;
 		private readonly SplendidInit        _splendidInit;
 		private readonly RestUtil            _restUtil;
-		private readonly SearchBuilder       _searchBuilder;
+		// SearchBuilder is NOT a DI service — it is instantiated per-query with (string, IDbCommand)
+		// constructor arguments. The $select, $orderby, $filter OData parameters are handled inline
+		// in each controller action, matching the original Rest.svc.cs pattern.
 		private readonly ModuleUtils         _moduleUtils;
 		private readonly DbProviderFactories _dbProviderFactories;
 		private readonly IMemoryCache        _memoryCache;
@@ -51,7 +53,7 @@ namespace SplendidCRM.Web.Controllers
 
 		public RestController(
 			Security security, SplendidCache splendidCache, SplendidInit splendidInit,
-			RestUtil restUtil, SearchBuilder searchBuilder, ModuleUtils moduleUtils,
+			RestUtil restUtil, ModuleUtils moduleUtils,
 			DbProviderFactories dbProviderFactories, IMemoryCache memoryCache,
 			IConfiguration configuration, ILogger<RestController> logger, Crm crm,
 			EmailUtils emailUtils, SplendidExport splendidExport, SplendidDynamic splendidDynamic,
@@ -61,7 +63,6 @@ namespace SplendidCRM.Web.Controllers
 			_splendidCache       = splendidCache;
 			_splendidInit        = splendidInit;
 			_restUtil            = restUtil;
-			_searchBuilder       = searchBuilder;
 			_moduleUtils         = moduleUtils;
 			_dbProviderFactories = dbProviderFactories;
 			_memoryCache         = memoryCache;
@@ -1030,8 +1031,11 @@ namespace SplendidCRM.Web.Controllers
 					return StatusCode(403, new { error = "Access denied to module " + ModuleName });
 				string sTABLE_NAME = _splendidCache.ModuleTableName(ModuleName);
 				string sVIEW_NAME = "vw" + sTABLE_NAME + "_List";
-				string sSelectClause = _searchBuilder.BuildSelectClause(select);
-				string sOrderByClause = _searchBuilder.BuildOrderByClause(orderby);
+				// $select: pass through directly (comma-separated column list), default to * if empty.
+				// This matches the original Rest.svc.cs pattern where sSELECT is used inline.
+				string sSelectClause  = Sql.IsEmptyString(select)  ? "*"                          : select;
+				// $orderby: prepend "order by" if provided, otherwise no ordering.
+				string sOrderByClause = Sql.IsEmptyString(orderby) ? ""                           : " order by " + orderby;
 				using (IDbConnection con = _dbProviderFactories.CreateConnection())
 				{
 					con.Open();
@@ -1041,9 +1045,11 @@ namespace SplendidCRM.Web.Controllers
 						cmd.CommandText = sSQL;
 						sSQL += _security.Filter(_security.USER_ID, ModuleName, "list");
 						sSQL += _security.FilterByTeam(ModuleName);
+						// $filter: already a WHERE clause fragment (e.g. "ACCOUNT_NAME = 'Acme'").
+						// In the original code, sFILTER is appended directly after security predicates.
 						if (!Sql.IsEmptyString(filter))
 						{
-							sSQL += " and " + _searchBuilder.BuildWhereClause(filter, cmd).Replace(" where ", "");
+							sSQL += " and " + filter;
 						}
 						sSQL += sOrderByClause;
 						cmd.CommandText = sSQL;

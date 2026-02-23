@@ -467,5 +467,207 @@ namespace SplendidCRM
 				return string.Empty;
 			return " and " + sFieldName + " = '" + gValue.ToString() + "'";
 		}
+
+		// =====================================================================================
+		// Database Provider Detection Methods
+		// Migrated from SplendidCRM/_code/Sql.cs for .NET 10 ASP.NET Core.
+		// IsSQLServer checks for Microsoft.Data.SqlClient (replaces System.Data.SqlClient).
+		// All other providers retain their original FullName checks — these are dormant
+		// in the .NET 10 migration (only SQL Server is supported) but must compile.
+		// =====================================================================================
+
+		/// <summary>
+		/// Returns true if the command is a Microsoft SQL Server command.
+		/// Checks for Microsoft.Data.SqlClient.SqlCommand (the .NET 10 replacement for
+		/// System.Data.SqlClient.SqlCommand) as well as the legacy System.Data.SqlClient name
+		/// for backward compatibility in test/mock contexts.
+		/// </summary>
+		public static bool IsSQLServer(IDbCommand cmd)
+		{
+			return (cmd != null) &&
+			       (cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand" ||
+			        cmd.GetType().FullName == "System.Data.SqlClient.SqlCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is a Microsoft SQL Server connection.
+		/// </summary>
+		public static bool IsSQLServer(IDbConnection con)
+		{
+			return (con != null) &&
+			       (con.GetType().FullName == "Microsoft.Data.SqlClient.SqlConnection" ||
+			        con.GetType().FullName == "System.Data.SqlClient.SqlConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is an Oracle DataAccess command.
+		/// </summary>
+		public static bool IsOracleDataAccess(IDbCommand cmd)
+		{
+			// 08/15/2005 Paul.  Type.GetType("Oracle.DataAccess.Client.OracleCommand") is returning NULL.  Use FullName instead. 
+			return (cmd != null) && (cmd.GetType().FullName == "Oracle.DataAccess.Client.OracleCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is an Oracle DataAccess connection.
+		/// </summary>
+		public static bool IsOracleDataAccess(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "Oracle.DataAccess.Client.OracleConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is an Oracle System.Data command.
+		/// </summary>
+		public static bool IsOracleSystemData(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "System.Data.OracleClient.OracleCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is an Oracle System.Data connection.
+		/// </summary>
+		public static bool IsOracleSystemData(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "System.Data.OracleClient.OracleConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is an Oracle command (either DataAccess or System.Data provider).
+		/// </summary>
+		public static bool IsOracle(IDbCommand cmd)
+		{
+			return IsOracleDataAccess(cmd) || IsOracleSystemData(cmd);
+		}
+
+		/// <summary>
+		/// Returns true if the connection is an Oracle connection (either DataAccess or System.Data provider).
+		/// </summary>
+		public static bool IsOracle(IDbConnection con)
+		{
+			return IsOracleDataAccess(con) || IsOracleSystemData(con);
+		}
+
+		/// <summary>
+		/// Returns true if the command is a PostgreSQL (Npgsql) command.
+		/// </summary>
+		public static bool IsPostgreSQL(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "Npgsql.NpgsqlCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is a PostgreSQL (Npgsql) connection.
+		/// </summary>
+		public static bool IsPostgreSQL(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "Npgsql.NpgsqlConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is a MySQL command.
+		/// </summary>
+		public static bool IsMySQL(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "MySql.Data.MySqlClient.MySqlCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is a MySQL connection.
+		/// </summary>
+		public static bool IsMySQL(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "MySql.Data.MySqlClient.MySqlConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is an IBM DB2 command.
+		/// </summary>
+		public static bool IsDB2(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "IBM.Data.DB2.DB2Command");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is an IBM DB2 connection.
+		/// </summary>
+		public static bool IsDB2(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "IBM.Data.DB2.DB2Connection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is a SAP/iAnywhere SQL Anywhere command.
+		/// </summary>
+		public static bool IsSqlAnywhere(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "iAnywhere.Data.AsaClient.AsaCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is a SAP/iAnywhere SQL Anywhere connection.
+		/// </summary>
+		public static bool IsSqlAnywhere(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "iAnywhere.Data.AsaClient.AsaConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is a Sybase Adaptive Server command.
+		/// </summary>
+		public static bool IsSybase(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "Sybase.Data.AseClient.AseCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is a Sybase Adaptive Server connection.
+		/// </summary>
+		public static bool IsSybase(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "Sybase.Data.AseClient.AseConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the command is an EffiProz command.
+		/// </summary>
+		public static bool IsEffiProz(IDbCommand cmd)
+		{
+			return (cmd != null) && (cmd.GetType().FullName == "System.Data.EffiProz.EfzCommand");
+		}
+
+		/// <summary>
+		/// Returns true if the connection is an EffiProz connection.
+		/// </summary>
+		public static bool IsEffiProz(IDbConnection con)
+		{
+			return (con != null) && (con.GetType().FullName == "System.Data.EffiProz.EfzConnection");
+		}
+
+		/// <summary>
+		/// Returns true if the provider requires streaming of binary (BLOB) fields.
+		/// SQL Server, PostgreSQL, and EffiProz do not require streaming.
+		/// Oracle and DB2 require streaming.
+		/// </summary>
+		public static bool StreamBlobs(IDbConnection con)
+		{
+			if      ( IsPostgreSQL      (con) ) return false;
+			else if ( IsSQLServer       (con) ) return false;
+			else if ( IsEffiProz        (con) ) return false;
+			else if ( IsOracleDataAccess(con) ) return true;
+			else if ( IsOracleSystemData(con) ) return true;
+			else if ( IsDB2             (con) ) return true;
+			return false;
+		}
+
+		/// <summary>
+		/// Returns the case-sensitive collation suffix for a LIKE clause, or empty string if not needed.
+		/// Only relevant for SQL Server and MySQL — other providers use collation at the database level.
+		/// </summary>
+		public static string CaseSensitiveCollation(IDbConnection con)
+		{
+			// 07/24/2010 Paul.  Instead of managing collation in code, it is better to change the collation on the field in the database. 
+			return String.Empty;
+		}
 	}
 }
