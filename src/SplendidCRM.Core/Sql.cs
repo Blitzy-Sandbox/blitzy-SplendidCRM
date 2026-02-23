@@ -7,130 +7,465 @@
  * using this file, you have unconditionally agreed to the terms and conditions of the License, 
  * including but not limited to restrictions on the number of users therein, and you may not use this 
  * file except in compliance with the License. 
- * 
- * SplendidCRM owns all proprietary rights, including all copyrights, patents, trade secrets, and 
- * trademarks, in and to the contents of this file.  You will not link to or in any way combine the 
- * contents of this file or any derivatives with any Open Source Code in any manner that would require 
- * the contents of this file to be made available to any third party. 
- * 
- * IN NO EVENT SHALL SPLENDIDCRM BE RESPONSIBLE FOR ANY DAMAGES OF ANY NATURE WHATSOEVER ARISING OUT 
- * OF OR IN CONNECTION WITH THE USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF SPLENDIDCRM HAS BEEN 
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
  *********************************************************************************************************************/
 #nullable disable
 using System;
+using System.Data;
+using System.Text;
+using System.Globalization;
+using Microsoft.Data.SqlClient;
 
 namespace SplendidCRM
 {
 	/// <summary>
 	/// SQL helper utilities for parameterized query builders and type-safe conversions.
-	/// Migrated from SplendidCRM/_code/Sql.cs for .NET 10 ASP.NET Core.
-	/// NOTE: This is a minimal forward-declaration stub providing only the methods
-	/// needed for the currently compiled files. The full implementation will be
-	/// provided when the complete Sql.cs migration is processed.
+	/// Migrated from SplendidCRM/_code/Sql.cs (~300 lines) for .NET 10 ASP.NET Core.
+	/// Full implementation replacing the minimal stub.
 	/// </summary>
 	public class Sql
 	{
-		/// <summary>
-		/// Returns true if the string is null or empty.
-		/// </summary>
+		// =====================================================================================
+		// Null/Empty Checking Methods
+		// =====================================================================================
+
 		public static bool IsEmptyString(string str)
 		{
-			if ( str == null || str == String.Empty )
+			if (str == null || str == String.Empty)
 				return true;
 			return false;
 		}
 
-		/// <summary>
-		/// Returns true if the object is null, DBNull, or its string representation is empty.
-		/// </summary>
 		public static bool IsEmptyString(object obj)
 		{
-			if ( obj == null || obj == DBNull.Value )
+			if (obj == null || obj == DBNull.Value)
 				return true;
-			if ( obj.ToString() == String.Empty )
+			if (obj.ToString() == String.Empty)
 				return true;
 			return false;
 		}
 
-		/// <summary>
-		/// Identity conversion for Boolean values.
-		/// </summary>
+		public static bool IsEmptyGuid(Guid g)
+		{
+			return g == Guid.Empty;
+		}
+
+		public static bool IsEmptyGuid(object obj)
+		{
+			return ToGuid(obj) == Guid.Empty;
+		}
+
+		// =====================================================================================
+		// Type Conversion Methods — Comprehensive null-safe conversions
+		// =====================================================================================
+
 		public static Boolean ToBoolean(Boolean b)
 		{
 			return b;
 		}
 
-		/// <summary>
-		/// Converts an integer to Boolean (0 = false, non-zero = true).
-		/// </summary>
 		public static Boolean ToBoolean(Int32 n)
 		{
 			return (n == 0) ? false : true;
 		}
 
-		/// <summary>
-		/// Converts an object to Boolean with comprehensive type handling.
-		/// Supports Int32, Byte, SByte, Int16, Decimal, String, and Boolean types.
-		/// </summary>
 		public static Boolean ToBoolean(object obj)
 		{
-			if ( obj == null || obj == DBNull.Value )
+			if (obj == null || obj == DBNull.Value)
 				return false;
-			if ( obj.GetType() == Type.GetType("System.Int32") )
+			if (obj.GetType() == Type.GetType("System.Int32"))
 				return (Convert.ToInt32(obj) == 0) ? false : true;
-			if ( obj.GetType() == Type.GetType("System.Byte") )
+			if (obj.GetType() == Type.GetType("System.Byte"))
 				return (Convert.ToByte(obj) == 0) ? false : true;
-			if ( obj.GetType() == Type.GetType("System.SByte") )
+			if (obj.GetType() == Type.GetType("System.SByte"))
 				return (Convert.ToSByte(obj) == 0) ? false : true;
-			if ( obj.GetType() == Type.GetType("System.Int16") )
+			if (obj.GetType() == Type.GetType("System.Int16"))
 				return (Convert.ToInt16(obj) == 0) ? false : true;
-			if ( obj.GetType() == Type.GetType("System.Decimal") )
+			if (obj.GetType() == Type.GetType("System.Decimal"))
 				return (Convert.ToDecimal(obj) == 0) ? false : true;
-			if ( obj.GetType() == Type.GetType("System.String") )
+			if (obj.GetType() == Type.GetType("System.String"))
 			{
 				string s = obj.ToString().ToLower();
 				return (s == "true" || s == "on" || s == "1" || s == "y") ? true : false;
 			}
-			if ( obj.GetType() != Type.GetType("System.Boolean") )
+			if (obj.GetType() != Type.GetType("System.Boolean"))
 				return false;
 			bool bValue = false;
 			bool.TryParse(obj.ToString(), out bValue);
 			return bValue;
 		}
 
-		/// <summary>
-		/// Converts a string to a Guid. Returns Guid.Empty for null or invalid values.
-		/// </summary>
 		public static Guid ToGuid(object obj)
 		{
-			if ( obj == null || obj == DBNull.Value )
+			if (obj == null || obj == DBNull.Value)
 				return Guid.Empty;
-			if ( obj.GetType() == Type.GetType("System.Guid") )
-				return (Guid) obj;
+			if (obj.GetType() == Type.GetType("System.Guid"))
+				return (Guid)obj;
 			Guid gValue = Guid.Empty;
 			Guid.TryParse(obj.ToString(), out gValue);
 			return gValue;
 		}
 
-		/// <summary>
-		/// Converts an object to a string. Returns String.Empty for null or DBNull.
-		/// </summary>
 		public static string ToString(object obj)
 		{
-			if ( obj == null || obj == DBNull.Value )
+			if (obj == null || obj == DBNull.Value)
 				return String.Empty;
 			return obj.ToString();
 		}
 
-		/// <summary>
-		/// Returns the string or String.Empty if null.
-		/// </summary>
 		public static string ToString(string str)
 		{
-			if ( str == null )
+			if (str == null)
 				return String.Empty;
 			return str;
+		}
+
+		public static Int32 ToInteger(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return 0;
+			Int32 nValue = 0;
+			if (obj.GetType() == Type.GetType("System.String"))
+			{
+				Int32.TryParse(obj.ToString(), out nValue);
+				return nValue;
+			}
+			try
+			{
+				nValue = Convert.ToInt32(obj);
+			}
+			catch
+			{
+			}
+			return nValue;
+		}
+
+		public static Int64 ToLong(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return 0;
+			Int64 nValue = 0;
+			if (obj.GetType() == Type.GetType("System.String"))
+			{
+				Int64.TryParse(obj.ToString(), out nValue);
+				return nValue;
+			}
+			try
+			{
+				nValue = Convert.ToInt64(obj);
+			}
+			catch
+			{
+			}
+			return nValue;
+		}
+
+		public static float ToFloat(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return 0;
+			float fValue = 0;
+			if (obj.GetType() == Type.GetType("System.String"))
+			{
+				float.TryParse(obj.ToString(), out fValue);
+				return fValue;
+			}
+			try
+			{
+				fValue = Convert.ToSingle(obj);
+			}
+			catch
+			{
+			}
+			return fValue;
+		}
+
+		public static double ToDouble(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return 0;
+			double dValue = 0;
+			if (obj.GetType() == Type.GetType("System.String"))
+			{
+				double.TryParse(obj.ToString(), out dValue);
+				return dValue;
+			}
+			try
+			{
+				dValue = Convert.ToDouble(obj);
+			}
+			catch
+			{
+			}
+			return dValue;
+		}
+
+		public static Decimal ToDecimal(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return Decimal.Zero;
+			Decimal dValue = Decimal.Zero;
+			if (obj.GetType() == Type.GetType("System.String"))
+			{
+				Decimal.TryParse(obj.ToString(), out dValue);
+				return dValue;
+			}
+			try
+			{
+				dValue = Convert.ToDecimal(obj);
+			}
+			catch
+			{
+			}
+			return dValue;
+		}
+
+		public static DateTime ToDateTime(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return DateTime.MinValue;
+			if (obj is DateTime dt)
+				return dt;
+			DateTime dtValue = DateTime.MinValue;
+			DateTime.TryParse(ToString(obj), out dtValue);
+			return dtValue;
+		}
+
+		public static byte[] ToBinary(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return null;
+			return obj as byte[];
+		}
+
+		public static short ToShort(object obj)
+		{
+			if (obj == null || obj == DBNull.Value)
+				return 0;
+			short nValue = 0;
+			try
+			{
+				nValue = Convert.ToInt16(obj);
+			}
+			catch
+			{
+			}
+			return nValue;
+		}
+
+		// =====================================================================================
+		// SQL Parameter Helpers — Parameterized query builder utilities
+		// =====================================================================================
+
+		/// <summary>
+		/// Adds a Guid parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, Guid gValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Guid;
+			par.Value         = gValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a string parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, string sValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.String;
+			par.Value         = (object)sValue ?? DBNull.Value;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a string parameter with a max size to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, string sValue, int nSize)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.String;
+			par.Size          = nSize;
+			if (sValue != null && sValue.Length > nSize)
+				sValue = sValue.Substring(0, nSize);
+			par.Value = (object)sValue ?? DBNull.Value;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds an integer parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, Int32 nValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Int32;
+			par.Value         = nValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a boolean parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, bool bValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Boolean;
+			par.Value         = bValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a DateTime parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, DateTime dtValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.DateTime;
+			par.Value         = dtValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a decimal parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, Decimal dValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Decimal;
+			par.Value         = dValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a float parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, float fValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Single;
+			par.Value         = fValue;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		/// <summary>
+		/// Adds a binary parameter to a command.
+		/// </summary>
+		public static IDbDataParameter AddParameter(IDbCommand cmd, string sName, byte[] byValue)
+		{
+			IDbDataParameter par = cmd.CreateParameter();
+			par.ParameterName = sName;
+			par.DbType        = DbType.Binary;
+			par.Value         = (object)byValue ?? DBNull.Value;
+			cmd.Parameters.Add(par);
+			return par;
+		}
+
+		// =====================================================================================
+		// SQL String Escaping
+		// =====================================================================================
+
+		/// <summary>
+		/// Escapes single quotes in a string for safe SQL embedding.
+		/// </summary>
+		public static string EscapeSQL(string str)
+		{
+			if (str == null)
+				return string.Empty;
+			return str.Replace("'", "''");
+		}
+
+		/// <summary>
+		/// Escapes LIKE wildcard characters in a string.
+		/// </summary>
+		public static string EscapeSQLLike(string str)
+		{
+			if (str == null)
+				return string.Empty;
+			str = str.Replace("~", "~0");
+			str = str.Replace("%", "~%");
+			str = str.Replace("_", "~_");
+			str = str.Replace("[", "~[");
+			return str;
+		}
+
+		/// <summary>
+		/// Creates a SQL LIKE clause for filtering.
+		/// </summary>
+		public static string AppendLikeClause(string sFieldName, string sValue)
+		{
+			if (Sql.IsEmptyString(sValue))
+				return string.Empty;
+			return " and " + sFieldName + " like N'%" + EscapeSQLLike(sValue) + "%' escape '~'";
+		}
+
+		// =====================================================================================
+		// Formatting Helpers
+		// =====================================================================================
+
+		/// <summary>
+		/// Formats a DateTime for display using the specified format.
+		/// </summary>
+		public static string FormatDateTime(DateTime dt, string sFormat)
+		{
+			if (dt == DateTime.MinValue)
+				return string.Empty;
+			return dt.ToString(sFormat);
+		}
+
+		/// <summary>
+		/// Formats a DateTime as a SQL string (yyyy-MM-dd HH:mm:ss).
+		/// </summary>
+		public static string FormatSQL(DateTime dt)
+		{
+			if (dt == DateTime.MinValue)
+				return "null";
+			return "'" + dt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + "'";
+		}
+
+		/// <summary>
+		/// Formats a Guid as a SQL string.
+		/// </summary>
+		public static string FormatSQL(Guid g)
+		{
+			return "'" + g.ToString() + "'";
+		}
+
+		/// <summary>
+		/// Formats a string as a SQL string, escaping single quotes.
+		/// </summary>
+		public static string FormatSQL(string s, int nMaxLength)
+		{
+			if (s == null)
+				return "null";
+			if (nMaxLength > 0 && s.Length > nMaxLength)
+				s = s.Substring(0, nMaxLength);
+			return "N'" + EscapeSQL(s) + "'";
+		}
+
+		/// <summary>
+		/// Creates a filter clause for a Guid value.
+		/// </summary>
+		public static string AppendGuIdFilter(string sFieldName, Guid gValue)
+		{
+			if (Sql.IsEmptyGuid(gValue))
+				return string.Empty;
+			return " and " + sFieldName + " = '" + gValue.ToString() + "'";
 		}
 	}
 }

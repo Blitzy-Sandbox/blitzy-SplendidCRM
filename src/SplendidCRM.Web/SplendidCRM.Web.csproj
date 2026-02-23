@@ -35,6 +35,9 @@
 
     <!-- AWS Config Provider: Systems Manager Parameter Store (tier 3) -->
     <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="3.7.405.5" />
+
+    <!-- JSON serialization: Newtonsoft.Json integration for ASP.NET Core MVC -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.0" />
   </ItemGroup>
 
 </Project>
