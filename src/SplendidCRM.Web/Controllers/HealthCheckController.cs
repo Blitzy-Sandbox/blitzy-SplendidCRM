@@ -1,9 +1,11 @@
 #nullable disable
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Data.SqlClient;
 
 namespace SplendidCRM.Web.Controllers
@@ -20,11 +22,13 @@ namespace SplendidCRM.Web.Controllers
 	{
 		private readonly IConfiguration _configuration;
 		private readonly DbProviderFactories _dbProviderFactories;
+		private readonly IWebHostEnvironment _env;
 
-		public HealthCheckController(IConfiguration configuration, DbProviderFactories dbProviderFactories)
+		public HealthCheckController(IConfiguration configuration, DbProviderFactories dbProviderFactories, IWebHostEnvironment env)
 		{
 			_configuration = configuration;
 			_dbProviderFactories = dbProviderFactories;
+			_env = env;
 		}
 
 		/// <summary>
@@ -64,7 +68,8 @@ namespace SplendidCRM.Web.Controllers
 			}
 			catch (Exception ex)
 			{
-				result["database"] = "Error: " + ex.Message;
+				// Sanitize error message — do not expose SQL Server connection details in Production.
+				result["database"] = _env.IsDevelopment() ? "Error: " + ex.Message : "Error: Database connection failed";
 				result["status"] = "Unhealthy";
 				return StatusCode(503, result);
 			}

@@ -5,11 +5,13 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
@@ -45,6 +47,7 @@ namespace SplendidCRM.Web.Controllers
 		private readonly SplendidDynamic     _splendidDynamic;
 		private readonly SplendidError       _splendidError;
 		private readonly SchedulerUtils      _schedulerUtils;
+		private readonly IWebHostEnvironment _env;
 
 		public RestController(
 			Security security, SplendidCache splendidCache, SplendidInit splendidInit,
@@ -52,7 +55,7 @@ namespace SplendidCRM.Web.Controllers
 			DbProviderFactories dbProviderFactories, IMemoryCache memoryCache,
 			IConfiguration configuration, ILogger<RestController> logger, Crm crm,
 			EmailUtils emailUtils, SplendidExport splendidExport, SplendidDynamic splendidDynamic,
-			SplendidError splendidError, SchedulerUtils schedulerUtils)
+			SplendidError splendidError, SchedulerUtils schedulerUtils, IWebHostEnvironment env)
 		{
 			_security            = security;
 			_splendidCache       = splendidCache;
@@ -70,6 +73,17 @@ namespace SplendidCRM.Web.Controllers
 			_splendidDynamic     = splendidDynamic;
 			_splendidError       = splendidError;
 			_schedulerUtils      = schedulerUtils;
+			_env                 = env;
+		}
+
+		/// <summary>
+		/// Returns a sanitized error message for API responses.
+		/// In Development mode, returns the full exception message for debugging.
+		/// In Production mode, returns a generic error to prevent sensitive data exposure.
+		/// </summary>
+		private string SanitizeErrorMessage(Exception ex)
+		{
+			return _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later.";
 		}
 
 		// =====================================================================================
@@ -184,7 +198,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetMyUserProfile error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -220,7 +234,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.SingleSignOnSettings error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -268,7 +282,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.Login error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -287,7 +301,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.LoginDuoUniversal error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -305,7 +319,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ForgotPassword error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -356,7 +370,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ChangePassword error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -390,7 +404,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllGridViewsColumns error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -420,7 +434,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllDetailViewsFields error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -450,7 +464,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllEditViewsFields error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -480,7 +494,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllDetailViewsRelationships error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -510,7 +524,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllEditViewsRelationships error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -540,7 +554,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllDynamicButtons error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -572,7 +586,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllTerminology error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -604,7 +618,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllTerminologyLists error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -634,7 +648,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllTaxRates error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -664,7 +678,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllDiscounts error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -717,7 +731,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllLayouts error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -761,7 +775,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetReactLoginState error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -937,7 +951,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetReactState error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -967,7 +981,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetAllReactCustomViews error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1001,7 +1015,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleTable error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1046,7 +1060,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleList error for module {Module}", ModuleName);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1084,7 +1098,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1116,7 +1130,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.PostModuleTable error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1155,7 +1169,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.PostModuleList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1191,7 +1205,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1223,7 +1237,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateModuleTable error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1243,7 +1257,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.MassUpdateModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1277,7 +1291,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DeleteModuleItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1318,7 +1332,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.MassDeleteModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1356,7 +1370,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ExportModuleList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1400,7 +1414,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleAudit error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1434,7 +1448,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleItemByAudit error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1468,7 +1482,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModulePersonal error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1483,7 +1497,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ConvertModuleItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1517,7 +1531,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetSqlColumns error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1549,7 +1563,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetModuleStream error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1582,7 +1596,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.InsertModuleStreamPost error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1597,7 +1611,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetRelationshipInsights error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1632,7 +1646,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetCalendar error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1664,7 +1678,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetActivitiesList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1700,7 +1714,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetInviteesList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1715,7 +1729,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetInviteesActivities error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1734,7 +1748,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateActivityStatus error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1752,7 +1766,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.SendActivityInvites error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1792,7 +1806,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateRelatedItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1808,7 +1822,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateRelatedList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1824,7 +1838,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateRelatedValues error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1844,7 +1858,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DeleteRelatedItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1860,7 +1874,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DeleteRelatedValue error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1880,7 +1894,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.SendEmail error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1896,7 +1910,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.SendText error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1914,7 +1928,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateEmailReadStatus error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1950,7 +1964,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.PhoneSearch error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1981,7 +1995,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.GetCustomList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2017,7 +2031,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.AddToFavorites error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2049,7 +2063,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.RemoveFromFavorites error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2067,7 +2081,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.AddSubscription error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2083,7 +2097,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.RemoveSubscription error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2103,7 +2117,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.UpdateSavedSearch error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2120,7 +2134,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DeleteSavedSearch error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2136,7 +2150,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DashboardAddReport error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2152,7 +2166,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.DeleteModuleRecurrences error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2171,7 +2185,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ExecProcedure error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2191,7 +2205,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.MassSync error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2207,7 +2221,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.MassUnsync error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2226,7 +2240,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ArchiveViewExists error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2242,7 +2256,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ArchiveMoveData error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -2258,7 +2272,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "RestController.ArchiveRecoverData error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 	}

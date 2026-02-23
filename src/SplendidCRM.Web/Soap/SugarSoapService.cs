@@ -2,6 +2,8 @@
 using System;
 using System.Data;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
 
@@ -20,14 +22,16 @@ namespace SplendidCRM.Web.Soap
 		private readonly SplendidInit _splendidInit;
 		private readonly DbProviderFactories _dbProviderFactories;
 		private readonly ILogger<SugarSoapService> _logger;
+		private readonly IWebHostEnvironment _env;
 
-		public SugarSoapService(Security security, SplendidCache splendidCache, SplendidInit splendidInit, DbProviderFactories dbProviderFactories, ILogger<SugarSoapService> logger)
+		public SugarSoapService(Security security, SplendidCache splendidCache, SplendidInit splendidInit, DbProviderFactories dbProviderFactories, ILogger<SugarSoapService> logger, IWebHostEnvironment env)
 		{
 			_security = security;
 			_splendidCache = splendidCache;
 			_splendidInit = splendidInit;
 			_dbProviderFactories = dbProviderFactories;
 			_logger = logger;
+			_env = env;
 		}
 
 		public string login(string user_name, string password, string version)
@@ -296,7 +300,7 @@ namespace SplendidCRM.Web.Soap
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "get_entries error");
-				result.error = new error_value { number = "-1", name = "Exception", description = ex.Message };
+				result.error = new error_value { number = "-1", name = "Exception", description = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." };
 			}
 			return result;
 		}
@@ -616,7 +620,7 @@ namespace SplendidCRM.Web.Soap
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "relate_note_to_module error");
-				return new error_value { number = "-1", name = "Exception", description = ex.Message };
+				return new error_value { number = "-1", name = "Exception", description = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." };
 			}
 		}
 
@@ -655,7 +659,7 @@ namespace SplendidCRM.Web.Soap
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "get_related_notes error");
-				result.error = new error_value { number = "-1", name = "Exception", description = ex.Message };
+				result.error = new error_value { number = "-1", name = "Exception", description = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." };
 			}
 			return result;
 		}

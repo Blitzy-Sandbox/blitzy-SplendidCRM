@@ -2,8 +2,10 @@
 using System;
 using System.Data;
 using System.IO;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
 
@@ -21,12 +23,14 @@ namespace SplendidCRM.Web.Controllers
 		private readonly Security _security;
 		private readonly DbProviderFactories _dbProviderFactories;
 		private readonly ILogger<TwiMLController> _logger;
+		private readonly IWebHostEnvironment _env;
 
-		public TwiMLController(Security security, DbProviderFactories dbProviderFactories, ILogger<TwiMLController> logger)
+		public TwiMLController(Security security, DbProviderFactories dbProviderFactories, ILogger<TwiMLController> logger, IWebHostEnvironment env)
 		{
 			_security = security;
 			_dbProviderFactories = dbProviderFactories;
 			_logger = logger;
+			_env = env;
 		}
 
 		/// <summary>GET handler for TwiML document retrieval.</summary>
@@ -91,7 +95,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "TwiMLController request error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." });
 			}
 		}
 	}

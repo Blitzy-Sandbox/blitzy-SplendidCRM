@@ -1,7 +1,9 @@
 #nullable disable
 using System;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace SplendidCRM.Web.Controllers
@@ -18,13 +20,15 @@ namespace SplendidCRM.Web.Controllers
 		private readonly SplendidInit _splendidInit;
 		private readonly SqlProcs _sqlProcs;
 		private readonly ILogger<ImpersonationController> _logger;
+		private readonly IWebHostEnvironment _env;
 
-		public ImpersonationController(Security security, SplendidInit splendidInit, SqlProcs sqlProcs, ILogger<ImpersonationController> logger)
+		public ImpersonationController(Security security, SplendidInit splendidInit, SqlProcs sqlProcs, ILogger<ImpersonationController> logger, IWebHostEnvironment env)
 		{
 			_security = security;
 			_splendidInit = splendidInit;
 			_sqlProcs = sqlProcs;
 			_logger = logger;
+			_env = env;
 		}
 
 		/// <summary>
@@ -47,7 +51,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "ImpersonationController.Impersonate error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." });
 			}
 		}
 	}

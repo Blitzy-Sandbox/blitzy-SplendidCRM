@@ -55,6 +55,12 @@ using SoapCore;
 // =====================================================================================
 var builder = WebApplication.CreateBuilder(args);
 
+// Security hardening: suppress Kestrel Server header to prevent technology disclosure (Issue 4).
+builder.WebHost.ConfigureKestrel(options =>
+{
+	options.AddServerHeader = false;
+});
+
 // Tier 5 (lowest priority): appsettings.json — already loaded by default.
 // Tier 4: appsettings.{Environment}.json — already loaded by default.
 // Tier 3: AWS Systems Manager Parameter Store — environment-specific non-secret config.
@@ -153,6 +159,9 @@ builder.Services.AddSession(options =>
 	options.Cookie.IsEssential = true;
 	options.Cookie.SameSite = SameSiteMode.Lax;
 	options.Cookie.Name = "SplendidCRM.Session";
+	// Security hardening: set Secure flag based on request scheme (Issue 6).
+	// SameAsRequest ensures Secure flag is sent when accessed via HTTPS, absent when HTTP (dev).
+	options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
 // Authentication scheme selection (per AAP §0.8.2: AUTH_MODE env var).
@@ -258,24 +267,36 @@ builder.Services.AddControllers()
 		options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Include;
 	});
 
-// CORS configuration (per AAP §0.8.2: CORS_ORIGINS env var).
-string corsOrigins = builder.Configuration["Cors:AllowedOrigins"] ?? "*";
+// CORS configuration (per AAP §0.8.2: CORS_ORIGINS env var — Required).
+// Defense-in-depth: no wildcard fallback. If CORS_ORIGINS is not configured, fail-fast
+// (StartupValidator also enforces this, but the CORS code itself must not have a permissive default).
+string corsOrigins = builder.Configuration["Cors:AllowedOrigins"];
+if (string.IsNullOrWhiteSpace(corsOrigins))
+{
+	throw new InvalidOperationException(
+		"CORS_ORIGINS configuration is required. Set the CORS_ORIGINS environment variable or Cors:AllowedOrigins in appsettings.");
+}
 builder.Services.AddCors(options =>
 {
 	options.AddDefaultPolicy(policy =>
 	{
-		if (corsOrigins == "*")
-		{
-			policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
-		}
-		else
-		{
-			policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-				.AllowAnyMethod()
-				.AllowAnyHeader()
-				.AllowCredentials();
-		}
+		policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+			.AllowAnyMethod()
+			.AllowAnyHeader()
+			.AllowCredentials();
 	});
+});
+
+// Antiforgery protection for state-changing endpoints (Issue 8).
+// JSON Content-Type + CORS restrictions provide baseline CSRF mitigation for SPA consumption;
+// antiforgery tokens add defense-in-depth for form-based submissions.
+builder.Services.AddAntiforgery(options =>
+{
+	options.HeaderName = "X-XSRF-TOKEN";
+	options.Cookie.Name = "SplendidCRM.Antiforgery";
+	options.Cookie.HttpOnly = true;
+	options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+	options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
 // SoapCore SOAP middleware for SugarCRM SOAP API (replaces soap.asmx.cs).
@@ -317,6 +338,31 @@ if (app.Environment.IsDevelopment())
 {
 	app.UseDeveloperExceptionPage();
 }
+else
+{
+	// HSTS and HTTPS redirection for non-Development environments (Issue 7).
+	// In container deployments where TLS terminates at the load balancer (Prompt 3),
+	// UseHsts ensures Strict-Transport-Security headers are sent and UseHttpsRedirection
+	// redirects HTTP to HTTPS.
+	app.UseHsts();
+}
+app.UseHttpsRedirection();
+
+// Security headers middleware (Issues 2, 3) — sets standard security headers on ALL responses.
+// X-Content-Type-Options: nosniff — prevents MIME-type sniffing attacks.
+// X-Frame-Options: DENY — prevents clickjacking via iframe embedding.
+// X-XSS-Protection: 0 — modern approach; CSP is preferred over legacy XSS auditor.
+// Referrer-Policy: strict-origin-when-cross-origin — limits referrer information leakage.
+// Permissions-Policy — disables common browser features not used by the CRM.
+app.Use(async (context, next) =>
+{
+	context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+	context.Response.Headers["X-Frame-Options"] = "DENY";
+	context.Response.Headers["X-XSS-Protection"] = "0";
+	context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+	context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+	await next();
+});
 
 // CORS must come before authentication/authorization.
 app.UseCors();

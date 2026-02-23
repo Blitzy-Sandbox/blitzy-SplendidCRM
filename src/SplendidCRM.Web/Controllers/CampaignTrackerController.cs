@@ -2,8 +2,10 @@
 using System;
 using System.Data;
 using System.IO;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
 
@@ -20,12 +22,14 @@ namespace SplendidCRM.Web.Controllers
 		private readonly Security _security;
 		private readonly DbProviderFactories _dbProviderFactories;
 		private readonly ILogger<CampaignTrackerController> _logger;
+		private readonly IWebHostEnvironment _env;
 
-		public CampaignTrackerController(Security security, DbProviderFactories dbProviderFactories, ILogger<CampaignTrackerController> logger)
+		public CampaignTrackerController(Security security, DbProviderFactories dbProviderFactories, ILogger<CampaignTrackerController> logger, IWebHostEnvironment env)
 		{
 			_security = security;
 			_dbProviderFactories = dbProviderFactories;
 			_logger = logger;
+			_env = env;
 		}
 
 		[HttpGet]
@@ -59,7 +63,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "CampaignTrackerController.Get error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later." });
 			}
 		}
 	}

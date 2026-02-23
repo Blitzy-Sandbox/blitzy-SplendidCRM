@@ -5,11 +5,13 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
@@ -34,10 +36,11 @@ namespace SplendidCRM.Web.Controllers
 		private readonly IConfiguration _configuration;
 		private readonly ILogger<AdminRestController> _logger;
 		private readonly SearchBuilder _searchBuilder;
+		private readonly IWebHostEnvironment _env;
 
 		public AdminRestController(Security security, SplendidCache splendidCache, RestUtil restUtil,
 			DbProviderFactories dbProviderFactories, IMemoryCache memoryCache, IConfiguration configuration,
-			ILogger<AdminRestController> logger, SearchBuilder searchBuilder)
+			ILogger<AdminRestController> logger, SearchBuilder searchBuilder, IWebHostEnvironment env)
 		{
 			_security = security;
 			_splendidCache = splendidCache;
@@ -47,6 +50,17 @@ namespace SplendidCRM.Web.Controllers
 			_configuration = configuration;
 			_logger = logger;
 			_searchBuilder = searchBuilder;
+			_env = env;
+		}
+
+		/// <summary>
+		/// Returns a sanitized error message for API responses.
+		/// In Development mode, returns the full exception message for debugging.
+		/// In Production mode, returns a generic error to prevent sensitive data exposure.
+		/// </summary>
+		private string SanitizeErrorMessage(Exception ex)
+		{
+			return _env.IsDevelopment() ? ex.Message : "An internal error occurred. Please try again later.";
 		}
 
 		// Helper: Read JSON body from POST requests.
@@ -96,7 +110,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminLayoutModules error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -130,7 +144,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminLayoutModuleFields error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -162,7 +176,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminLayoutRelationshipFields error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -193,7 +207,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminLayoutTerminologyLists error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -225,7 +239,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminLayoutTerminology error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -242,7 +256,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAdminLayout error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -259,7 +273,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.DeleteAdminLayout error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -304,7 +318,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.BuildModuleArchive error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -339,7 +353,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminTable error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -372,7 +386,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.PostAdminTable error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -390,7 +404,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.ExportAdminModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -422,7 +436,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetTeamTree error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -457,7 +471,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetModuleItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -523,7 +537,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAllLayouts error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -573,7 +587,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetReactState error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -604,7 +618,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetReactMenu error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -635,7 +649,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAllReactCustomViews error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -671,7 +685,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAdminModuleList error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -705,7 +719,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAdminModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -722,7 +736,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.MassUpdateAdminModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -754,7 +768,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.DeleteAdminModuleItem error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -771,7 +785,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.MassDeleteAdminModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -788,7 +802,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UndeleteModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -826,7 +840,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAdminConfig error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -843,7 +857,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.AdminProcedure error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -860,7 +874,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UserRoleMakeDefault error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -890,7 +904,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.InsertAdminEditCustomField error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -907,7 +921,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAdminEditCustomField error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -924,7 +938,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.DeleteAdminEditCustomField error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -960,7 +974,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAclAccessByUser error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -992,7 +1006,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAclAccessByRole error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1023,7 +1037,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAclAccessByModule error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1040,7 +1054,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAclAccess error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1073,7 +1087,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAclAccessFieldSecurity error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1090,7 +1104,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.UpdateAclAccessFieldSecurity error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 
@@ -1121,7 +1135,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "AdminRestController.GetAclFieldAliases error");
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = SanitizeErrorMessage(ex) });
 			}
 		}
 	}
