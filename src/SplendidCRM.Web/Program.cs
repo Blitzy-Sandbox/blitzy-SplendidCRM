@@ -301,7 +301,7 @@ builder.Services.AddAntiforgery(options =>
 
 // SoapCore SOAP middleware for SugarCRM SOAP API (replaces soap.asmx.cs).
 builder.Services.AddSoapCore();
-builder.Services.AddScoped<SplendidCRM.Web.Soap.ISugarSoapService, SplendidCRM.Web.Soap.SugarSoapService>();
+builder.Services.AddScoped<SplendidCRM.ISugarSoapService, SplendidCRM.SugarSoapService>();
 
 // Background hosted services (replaces Global.asax.cs timer-based approach).
 builder.Services.AddHostedService<SchedulerHostedService>();
@@ -387,7 +387,7 @@ app.UseAuthorization();
 app.UseSession();
 
 // SoapCore endpoint for SugarCRM SOAP API (preserves /soap.asmx path).
-((IApplicationBuilder)app).UseSoapEndpoint<SplendidCRM.Web.Soap.ISugarSoapService>(
+((IApplicationBuilder)app).UseSoapEndpoint<SplendidCRM.ISugarSoapService>(
 	path: "/soap.asmx",
 	encoder: new SoapEncoderOptions(),
 	serializer: SoapSerializer.XmlSerializer,
