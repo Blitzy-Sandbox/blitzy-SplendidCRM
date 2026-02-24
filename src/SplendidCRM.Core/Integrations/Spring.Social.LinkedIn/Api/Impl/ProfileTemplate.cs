@@ -19,101 +19,173 @@
 #endregion
 
 // MIGRATION: Migrated from .NET Framework 4.8 to .NET 10 ASP.NET Core.
-// Spring.Rest.Client (RestTemplate, RestOperationCanceler) and Spring.Http (HttpUtils)
-// have no .NET 10 equivalents and have been replaced with dormant stub implementations
-// (Task.FromResult(default)) to satisfy the IProfileOperations contract while keeping
-// this Enterprise Edition integration stub compilable.
-// The #if NET_4_0 || SILVERLIGHT_5 / #else conditional blocks have been removed;
-// only the Task-based async paths are preserved, made unconditional.
+// Removed conditional #if NET_4_0 || SILVERLIGHT_5 / #else blocks.
+// Kept ONLY the Task-based async code path (previously under #if NET_4_0 || SILVERLIGHT_5).
+// Removed the #else branch containing:
+//   - Synchronous methods (GetUserProfile, GetUserProfileById, GetUserProfileByPublicUrl,
+//     GetUserFullProfile, GetUserFullProfileById, GetUserFullProfileByPublicUrl, Search)
+//     guarded by #if !SILVERLIGHT
+//   - Callback-based async methods using Spring.Rest.Client.RestOperationCanceler
+//   - Nested #if !WINDOWS_PHONE guards for public URL callback overloads
+// System.Threading.Tasks import is now unconditional (was previously conditional under
+// #if NET_4_0 || SILVERLIGHT_5).
+// System.Collections.Specialized import is now unconditional (was previously guarded by
+// #if SILVERLIGHT / #else — the desktop path #else branch is kept, Silverlight path removed).
+// Spring.Collections.Specialized import (Silverlight path) removed — desktop path only.
+// Spring.Rest.Client.RestTemplate field and constructor preserved for structural fidelity.
+// Method bodies stub via Task.FromResult — Spring.Rest.Client.RestTemplate.GetForObjectAsync
+// is not available on .NET 10; stubs ensure dormant Enterprise Edition integration compiles.
+// This is a dormant Enterprise Edition stub — compile only, not activated.
 
+#nullable disable
 using System;
 using System.Collections.Specialized;
 using System.Threading.Tasks;
-using Spring.Social.LinkedIn.Api;
+
+using Spring.Http;
+using Spring.Rest.Client;
 
 namespace Spring.Social.LinkedIn.Api.Impl
 {
     /// <summary>
-    /// Implementation of <see cref="IProfileOperations"/>, providing a binding to LinkedIn's
-    /// profiles-oriented REST resources.
+    /// Implementation of <see cref="IProfileOperations"/>, providing a binding to LinkedIn's profiles-oriented REST resources.
     /// </summary>
     /// <author>Bruno Baia</author>
-    // MIGRATION: Spring.Rest.Client RestTemplate replaced with dormant stubs for .NET 10 compilation.
-    // This is a dormant Enterprise Edition integration stub — compile only, not executed.
     class ProfileTemplate : AbstractLinkedInOperations, IProfileOperations
     {
-        #region Constants
-
         private const string ProfileUrl = "people/{id}:(id,first-name,last-name,headline,industry,public-profile-url,picture-url,summary,site-standard-profile-request,api-standard-profile-request)?format=json";
         private const string FullProfileUrl = "people/{id}:(id,first-name,last-name,headline,industry,public-profile-url,picture-url,summary,site-standard-profile-request,api-standard-profile-request,location,distance,num-connections,num-connections-capped,specialties,proposal-comments,associations,honors,interests,positions,skills,educations,num-recommenders,recommendations-received,phone-numbers,im-accounts,twitter-accounts,date-of-birth,main-address,member-url-resources)?format=json";
         private const string SearchUrl = "https://api.linkedin.com/v1/people-search:(people:(id,first-name,last-name,headline,industry,public-profile-url,picture-url,summary,site-standard-profile-request,api-standard-profile-request))?format=json";
 
-        #endregion
+        private RestTemplate restTemplate;
 
-        #region Constructor
-
-        public ProfileTemplate()
+        public ProfileTemplate(RestTemplate restTemplate)
         {
-            // MIGRATION: RestTemplate dependency removed — dormant stub.
+            this.restTemplate = restTemplate;
         }
-
-        #endregion
 
         #region IProfileOperations Members
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves the authenticated user's LinkedIn profile details.
+        /// </summary>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInProfile"/> object representing the user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInProfile> GetUserProfileAsync()
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            // This Enterprise Edition integration is dormant — not executed at runtime.
-            return Task.FromResult(default(LinkedInProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfile>(ProfileUrl, "~");
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            return Task.FromResult(new LinkedInProfile());
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves a specific user's LinkedIn profile details by its ID.
+        /// </summary>
+        /// <param name="id">The user ID for the user whose details are to be retrieved.</param>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInProfile"/> object representing the user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInProfile> GetUserProfileByIdAsync(string id)
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            return Task.FromResult(default(LinkedInProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfile>(ProfileUrl, "id=" + id);
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            return Task.FromResult(new LinkedInProfile());
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves a specific user's LinkedIn profile details by its public url.
+        /// </summary>
+        /// <param name="url">The user public url for the user whose details are to be retrieved.</param>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInProfile"/> object representing the user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInProfile> GetUserProfileByPublicUrlAsync(string url)
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            return Task.FromResult(default(LinkedInProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfile>(ProfileUrl, "url=" + HttpUtils.UrlEncode(url));
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            _ = url; // suppress unused parameter warning; preserved for Enterprise Edition activation
+            return Task.FromResult(new LinkedInProfile());
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves the authenticated user's LinkedIn full profile details.
+        /// </summary>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInFullProfile"/> object representing the full user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInFullProfile> GetUserFullProfileAsync()
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            return Task.FromResult(default(LinkedInFullProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInFullProfile>(FullProfileUrl, "~");
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            return Task.FromResult(new LinkedInFullProfile());
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves a specific user's LinkedIn full profile details by its ID.
+        /// </summary>
+        /// <param name="id">The user ID for the user whose details are to be retrieved.</param>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInFullProfile"/> object representing the full user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInFullProfile> GetUserFullProfileByIdAsync(string id)
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            return Task.FromResult(default(LinkedInFullProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInFullProfile>(FullProfileUrl, "id=" + id);
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            return Task.FromResult(new LinkedInFullProfile());
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Asynchronously retrieves a specific user's LinkedIn full profile details by its public url.
+        /// </summary>
+        /// <param name="url">The user public url for the user whose details are to be retrieved.</param>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInFullProfile"/> object representing the full user's profile.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInFullProfile> GetUserFullProfileByPublicUrlAsync(string url)
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            return Task.FromResult(default(LinkedInFullProfile));
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInFullProfile>(FullProfileUrl, "url=" + HttpUtils.UrlEncode(url));
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            _ = url; // suppress unused parameter warning; preserved for Enterprise Edition activation
+            return Task.FromResult(new LinkedInFullProfile());
         }
 
-        /// <inheritdoc/>
-        public Task<LinkedInProfiles> SearchAsync(SearchParameters parameters)
+        /// <summary>
+        /// Asynchronously searches for LinkedIn profiles based on provided parameters.
+        /// </summary>
+        /// <param name="searchParams">The profile search parameters.</param>
+        /// <returns>
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// an object containing the search results metadata and a list of matching <see cref="LinkedInProfile"/>s.
+        /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
+        public Task<LinkedInProfiles> SearchAsync(SearchParameters searchParams)
         {
-            // MIGRATION: Spring RestTemplate.GetForObjectAsync replaced with stub for .NET 10.
-            // BuildSearchParameters logic preserved below for Enterprise Edition activation reference.
-            if (parameters != null)
-            {
-                NameValueCollection searchParams = BuildSearchParameters(parameters);
-            }
-            return Task.FromResult(default(LinkedInProfiles));
+            NameValueCollection parameters = BuildSearchParameters(searchParams);
+            string url = this.BuildUrl(SearchUrl, parameters);
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfiles>(this.BuildUrl(SearchUrl, parameters));
+            // Returns empty result — dormant Enterprise Edition stub, not activated.
+            _ = url; // suppress unused variable warning; url preserved for Enterprise Edition activation
+            return Task.FromResult(new LinkedInProfiles());
         }
 
         #endregion
