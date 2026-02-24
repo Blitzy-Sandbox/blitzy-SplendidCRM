@@ -20,16 +20,26 @@
 
 // MIGRATION: Migrated from .NET Framework 4.8 to .NET 10 ASP.NET Core.
 // Removed conditional #if NET_4_0 || SILVERLIGHT_5 / #else blocks.
-// Kept ONLY the Task-based async method implementations (previously under #if NET_4_0 || SILVERLIGHT_5).
-// Removed synchronous methods (GetConnections, GetNetworkStatistics) and callback-based async methods.
-// Removed Spring.Rest.Client and Spring.Http imports — RestTemplate replaced with stub Task.FromResult returns.
+// Kept ONLY the Task-based async code path (previously under #if NET_4_0 || SILVERLIGHT_5).
+// Removed the #else branch containing:
+//   - Synchronous methods (GetConnections, GetNetworkStatistics) guarded by #if !SILVERLIGHT
+//   - Callback-based async methods using Spring.Rest.Client.RestOperationCanceler
+// System.Threading.Tasks import is now unconditional (was previously conditional).
+// System.Collections.Specialized import is now unconditional (was previously guarded by #if SILVERLIGHT).
+// Spring.Collections.Specialized import (Silverlight path) removed — desktop path only.
+// Spring.Rest.Client.RestTemplate field and constructor preserved for structural fidelity.
+// Method bodies stub via Task.FromResult — Spring.Rest.Client.RestTemplate.GetForObjectAsync
+// is not available on .NET 10; stubs ensure dormant Enterprise Edition integration compiles.
 // This is a dormant Enterprise Edition stub — compile only, not activated.
 
+#nullable disable
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Threading.Tasks;
-using Spring.Social.LinkedIn.Api;
+
+using Spring.Http;
+using Spring.Rest.Client;
 
 namespace Spring.Social.LinkedIn.Api.Impl
 {
@@ -43,17 +53,26 @@ namespace Spring.Social.LinkedIn.Api.Impl
         private const string ConnectionsUrl = "people/~/connections:(id,first-name,last-name,headline,industry,site-standard-profile-request,public-profile-url,picture-url,summary)?format=json";
         private const string NetworkStatsUrl = "people/~/network/network-stats?format=json";
 
+        private RestTemplate restTemplate;
+
+        public ConnectionTemplate(RestTemplate restTemplate)
+        {
+            this.restTemplate = restTemplate;
+        }
+
         #region IConnectionOperations Members
 
         /// <summary>
         /// Asynchronously retrieves up to 500 of the 1st-degree connections from the authenticated user's network.
         /// </summary>
         /// <returns>
-        /// A <see cref="Task{T}"/> that represents the asynchronous operation returning a <see cref="LinkedInProfiles"/> object.
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInProfiles"/> object representing the user's connections.
         /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInProfiles> GetConnectionsAsync()
         {
-            // MIGRATION STUB: Spring.Rest.Client.RestTemplate not available on .NET 10.
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
             // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfiles>(ConnectionsUrl);
             // Returns empty result — dormant Enterprise Edition stub, not activated.
             return Task.FromResult(new LinkedInProfiles());
@@ -65,13 +84,20 @@ namespace Spring.Social.LinkedIn.Api.Impl
         /// <param name="start">The starting location in the result set. Used with count for pagination.</param>
         /// <param name="count">The number of connections to return. The maximum value is 500. Used with start for pagination.</param>
         /// <returns>
-        /// A <see cref="Task{T}"/> that represents the asynchronous operation returning a <see cref="LinkedInProfiles"/> object.
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="LinkedInProfiles"/> object representing the user's connections.
         /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<LinkedInProfiles> GetConnectionsAsync(int start, int count)
         {
-            // MIGRATION STUB: Spring.Rest.Client.RestTemplate not available on .NET 10.
-            // Original: parameters built and passed to restTemplate.GetForObjectAsync.
+            NameValueCollection parameters = new NameValueCollection();
+            parameters.Add("start", start.ToString());
+            parameters.Add("count", count.ToString());
+            string url = this.BuildUrl(ConnectionsUrl, parameters);
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
+            // Original: return this.restTemplate.GetForObjectAsync<LinkedInProfiles>(url);
             // Returns empty result — dormant Enterprise Edition stub, not activated.
+            _ = url; // suppress unused variable warning; url preserved for Enterprise Edition activation
             return Task.FromResult(new LinkedInProfiles());
         }
 
@@ -79,11 +105,13 @@ namespace Spring.Social.LinkedIn.Api.Impl
         /// Asynchronously retrieves network statistics for the authenticated user.
         /// </summary>
         /// <returns>
-        /// A <see cref="Task{T}"/> that represents the asynchronous operation returning a <see cref="NetworkStatistics"/> object.
+        /// A <code>Task</code> that represents the asynchronous operation that can return 
+        /// a <see cref="NetworkStatistics"/> that contains count of 1st-degree and second degree connections.
         /// </returns>
+        /// <exception cref="LinkedInApiException">If there is an error while communicating with LinkedIn.</exception>
         public Task<NetworkStatistics> GetNetworkStatisticsAsync()
         {
-            // MIGRATION STUB: Spring.Rest.Client.RestTemplate not available on .NET 10.
+            // MIGRATION STUB: Spring.Rest.Client.RestTemplate.GetForObjectAsync not available on .NET 10.
             // Original: return this.restTemplate.GetForObjectAsync<NetworkStatistics>(NetworkStatsUrl);
             // Returns empty result — dormant Enterprise Edition stub, not activated.
             return Task.FromResult(new NetworkStatistics());
