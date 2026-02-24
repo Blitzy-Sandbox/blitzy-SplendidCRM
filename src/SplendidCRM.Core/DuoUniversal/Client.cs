@@ -24,6 +24,11 @@ namespace DuoUniversal
         private const int STATE_LENGTH = 36;
         private const int DEFAULT_STATE_LENGTH = 36;
 
+        // Length constants used by Utils.ValidateRequiredParameters for Duo credential validation
+        // Preserved from source: SplendidCRM/_code/DuoUniversal/Client.cs
+        internal const int CLIENT_ID_LENGTH = 20;
+        internal const int CLIENT_SECRET_LENGTH = 40;
+
         private readonly string _clientId;
         private readonly string _clientSecret;
         private readonly string _apiHost;
