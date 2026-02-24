@@ -19,36 +19,27 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
 
 namespace Spring.Social.Twitter.Api
 {
     /// <summary>
-    /// Represents a list of trending topics at a specific point in time.
+    /// Represents a single trending topic.
     /// </summary>
     /// <author>Craig Walls</author>
     /// <author>Bruno Baia (.NET)</author>
 #if !SILVERLIGHT
     [Serializable]
 #endif
-    public class Trends
+    public class Trend
     {
         /// <summary>
-        /// Gets or sets the time of trending topics.
+        /// Gets or sets the name of the trending topic.
         /// </summary>
-        public DateTime? Time { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
-        /// Gets or sets the list of trending topics.
+        /// Gets or sets the query of the trending topic.
         /// </summary>
-        public IList<Trend> Items { get; set; }
-
-        /// <summary>
-        /// Creates a new instance of <see cref="Trends"/>.
-        /// </summary>
-        public Trends()
-        {
-            this.Items = new List<Trend>();
-        }
+        public string Query { get; set; }
     }
 }
