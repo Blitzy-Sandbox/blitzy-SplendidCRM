@@ -43,6 +43,10 @@
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.7.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.7.0" />
 
+    <!-- Serialization Security: [SecurityPermission] attribute for binary serialization compatibility -->
+    <!-- Used in Spring.Social integration stubs for GetObjectData overrides -->
+    <PackageReference Include="System.Security.Permissions" Version="10.0.0" />
+
   </ItemGroup>
 
 </Project>
