@@ -171,6 +171,34 @@ namespace Spring.Http.Client.Interceptor
 namespace Spring.Rest.Client
 {
     /// <summary>
+    /// Stub replacement for Spring.Social.Api.IApiBinding from Spring.Social.Core.dll.
+    /// Base interface for all Spring.Social API bindings — provides IsAuthorized contract.
+    /// Used by ITwitter : IApiBinding (and other Spring.Social.* master interfaces) to indicate
+    /// whether the API binding is configured with OAuth credentials.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public interface IApiBinding
+    {
+        /// <summary>
+        /// Gets a value indicating whether this API binding is configured with credentials.
+        /// Returns <c>true</c> if the binding is authorized; <c>false</c> for anonymous bindings.
+        /// </summary>
+        bool IsAuthorized { get; }
+    }
+
+    /// <summary>
+    /// Stub replacement for Spring.Rest.Client.IRestOperations from Spring.Rest.dll.
+    /// Marker interface representing the set of REST operations exposed by a RestTemplate.
+    /// Used as the return type of the <c>RestOperations</c> property on ITwitter (and similar
+    /// Spring.Social.* master interfaces) to allow direct HTTP access to API endpoints not
+    /// covered by the typed operation sub-interfaces.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public interface IRestOperations
+    {
+    }
+
+    /// <summary>
     /// Stub replacement for Spring.Rest.Client.IResponseErrorHandler from Spring.Rest.dll.
     /// Interface for handling HTTP response errors in Spring.Social integration stubs.
     /// Dormant stub — not executed at runtime.
