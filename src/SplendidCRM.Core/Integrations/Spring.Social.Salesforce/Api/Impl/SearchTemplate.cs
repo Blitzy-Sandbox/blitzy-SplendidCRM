@@ -1,3 +1,5 @@
+#nullable disable
+
 #region License
 
 /*
@@ -25,6 +27,7 @@
 // This is a dormant integration stub — compiles but is NOT expected to execute at runtime.
 
 using System;
+using System.Net;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 
