@@ -148,6 +148,63 @@ namespace Spring.Rest.Client
         /// </summary>
         void HandleError(Uri requestUri, Spring.Http.HttpMethod requestMethod, Spring.Http.HttpResponseMessage<byte[]> response);
     }
+
+    /// <summary>
+    /// Stub replacement for Spring.Rest.Client.RestOperationCanceler from Spring.Rest.dll.
+    /// Allows cancellation of an asynchronous REST operation.
+    /// Used as the return type for callback-based async methods in dormant Spring.Social.Twitter
+    /// integration interfaces (IGeoOperations, ITimelineOperations, etc.).
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public class RestOperationCanceler
+    {
+    }
+
+    /// <summary>
+    /// Stub replacement for Spring.Rest.Client.RestOperationCompletedEventArgs&lt;T&gt; from Spring.Rest.dll.
+    /// Provides data for the asynchronous REST operation completed event.
+    /// Used as the type parameter for Action&lt;T&gt; callback parameters in dormant Spring.Social.Twitter
+    /// integration interfaces (IGeoOperations, ITimelineOperations, etc.).
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    /// <typeparam name="T">The type of the response.</typeparam>
+    public class RestOperationCompletedEventArgs<T> : EventArgs
+    {
+        /// <summary>
+        /// Gets the response returned by the REST operation.
+        /// </summary>
+        public T Response { get; }
+
+        /// <summary>
+        /// Gets the error that occurred during the REST operation, if any.
+        /// </summary>
+        public Exception Error { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether the REST operation was cancelled.
+        /// </summary>
+        public bool Cancelled { get; }
+
+        /// <summary>
+        /// Gets the user state associated with the REST operation.
+        /// </summary>
+        public object UserState { get; }
+
+        /// <summary>
+        /// Creates a new instance of <see cref="RestOperationCompletedEventArgs{T}"/>.
+        /// </summary>
+        /// <param name="response">The response from the REST operation.</param>
+        /// <param name="error">The error that occurred, if any.</param>
+        /// <param name="cancelled">Whether the operation was cancelled.</param>
+        /// <param name="userState">The user state associated with the operation.</param>
+        public RestOperationCompletedEventArgs(T response, Exception error, bool cancelled, object userState)
+        {
+            Response  = response;
+            Error     = error;
+            Cancelled = cancelled;
+            UserState = userState;
+        }
+    }
 }
 
 namespace Spring.Rest.Client.Support
