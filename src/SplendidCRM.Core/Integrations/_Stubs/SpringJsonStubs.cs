@@ -24,12 +24,37 @@ namespace Spring.Json
     }
 
     /// <summary>
+    /// Stub replacement for Spring.Json.IJsonSerializer.
+    /// Interface for JSON serialization used by Spring.Social integration stubs.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public interface IJsonSerializer
+    {
+        /// <summary>
+        /// Serializes the given object into a JSON value using the provided mapper.
+        /// </summary>
+        JsonValue Serialize(object obj, JsonMapper mapper);
+    }
+
+    /// <summary>
     /// Stub replacement for Spring.Json.JsonValue.
     /// Represents a JSON value node used by Spring.Social deserializers.
     /// Dormant stub — not executed at runtime.
     /// </summary>
     public class JsonValue
     {
+        /// <summary>
+        /// Initializes a new empty JsonValue stub.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public JsonValue() { }
+
+        /// <summary>
+        /// Initializes a new JsonValue stub with a string value.
+        /// Supports Spring.Social serializers that create JsonValue nodes from string data.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public JsonValue(string value) { }
         /// <summary>Gets whether this value represents a JSON object.</summary>
         public bool IsObject { get { return false; } }
 
@@ -136,5 +161,49 @@ namespace Spring.Json
         {
             return default(T)!;
         }
+    }
+
+    /// <summary>
+    /// Stub replacement for Spring.Json.JsonObject.
+    /// Represents a JSON object node with named child values.
+    /// Used by Spring.Social serializers to build JSON request payloads.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public class JsonObject : JsonValue
+    {
+        /// <summary>
+        /// Initializes a new empty JsonObject stub.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public JsonObject() : base(null!) { }
+
+        /// <summary>
+        /// Adds a named JSON value to this object.
+        /// Supports Spring.Social serializers building JSON object trees.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public void AddValue(string name, JsonValue value) { }
+    }
+
+    /// <summary>
+    /// Stub replacement for Spring.Json.JsonArray.
+    /// Represents a JSON array node containing ordered JSON values.
+    /// Used by Spring.Social serializers to build JSON array payloads.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public class JsonArray : JsonValue
+    {
+        /// <summary>
+        /// Initializes a new empty JsonArray stub.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public JsonArray() : base(null!) { }
+
+        /// <summary>
+        /// Appends a JSON value to this array.
+        /// Supports Spring.Social serializers building JSON arrays of objects.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public void AddValue(JsonValue value) { }
     }
 }
