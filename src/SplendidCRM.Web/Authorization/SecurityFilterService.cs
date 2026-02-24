@@ -8,15 +8,19 @@ using Microsoft.Extensions.Logging;
 namespace SplendidCRM.Web.Authorization
 {
 	/// <summary>
-	/// SecurityFilterMiddleware — implements part of the 4-tier ACL model (Module→Team→Field→Record).
+	/// SecurityFilterService — service wrapper for Security.Filter() SQL predicate injection,
+	/// implementing part of the 4-tier ACL model (Module→Team→Field→Record).
 	/// Migrated from SplendidCRM/_code/Security.cs for .NET 10 ASP.NET Core.
+	///
+	/// Note: This is a DI-registered service, not an ASP.NET Core IMiddleware implementation.
+	/// It is consumed by controllers and other services to apply security-filtered SQL predicates.
 	/// </summary>
-	public class SecurityFilterMiddleware
+	public class SecurityFilterService
 	{
 		private readonly Security _security;
-		private readonly ILogger<SecurityFilterMiddleware> _logger;
+		private readonly ILogger<SecurityFilterService> _logger;
 
-		public SecurityFilterMiddleware(Security security, ILogger<SecurityFilterMiddleware> logger)
+		public SecurityFilterService(Security security, ILogger<SecurityFilterService> logger)
 		{
 			_security = security;
 			_logger = logger;

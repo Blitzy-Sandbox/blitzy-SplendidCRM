@@ -57,7 +57,7 @@ namespace SplendidCRM
 		private readonly Security _security;
 		private readonly SplendidCache _splendidCache;
 		private readonly SplendidInit _splendidInit;
-		private readonly DbProviderFactory _dbProviderFactories;
+		private readonly DbProviderFactory _dbProviderFactory;
 		private readonly IMemoryCache _memoryCache;
 		private readonly IHttpContextAccessor _httpContextAccessor;
 		private readonly ILogger<SugarSoapService> _logger;
@@ -67,7 +67,7 @@ namespace SplendidCRM
 			Security security,
 			SplendidCache splendidCache,
 			SplendidInit splendidInit,
-			DbProviderFactory dbProviderFactories,
+			DbProviderFactory dbProviderFactory,
 			IMemoryCache memoryCache,
 			IHttpContextAccessor httpContextAccessor,
 			ILogger<SugarSoapService> logger,
@@ -76,7 +76,7 @@ namespace SplendidCRM
 			_security            = security;
 			_splendidCache       = splendidCache;
 			_splendidInit        = splendidInit;
-			_dbProviderFactories = dbProviderFactories;
+			_dbProviderFactory = dbProviderFactory;
 			_memoryCache         = memoryCache;
 			_httpContextAccessor = httpContextAccessor;
 			_logger              = logger;
@@ -166,7 +166,7 @@ namespace SplendidCRM
 			{
 				// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
 				string sPasswordHash = Security.HashPassword(password);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select ID from vwUSERS_Login where lower(USER_NAME) = @USER_NAME and USER_HASH = @USER_HASH and STATUS = N'Active'";
@@ -263,7 +263,7 @@ namespace SplendidCRM
 				int nACLACCESS = _security.GetUserAccess("Contacts", "edit");
 				if (nACLACCESS < 0)
 					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -297,7 +297,7 @@ namespace SplendidCRM
 				int nACLACCESS = _security.GetUserAccess("Leads", "edit");
 				if (nACLACCESS < 0)
 					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -331,7 +331,7 @@ namespace SplendidCRM
 				int nACLACCESS = _security.GetUserAccess("Accounts", "edit");
 				if (nACLACCESS < 0)
 					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -365,7 +365,7 @@ namespace SplendidCRM
 				int nACLACCESS = _security.GetUserAccess("Opportunities", "edit");
 				if (nACLACCESS < 0)
 					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -398,7 +398,7 @@ namespace SplendidCRM
 				int nACLACCESS = _security.GetUserAccess("Cases", "edit");
 				if (nACLACCESS < 0)
 					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -428,7 +428,7 @@ namespace SplendidCRM
 			try
 			{
 				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select ID, FIRST_NAME, LAST_NAME, ACCOUNT_NAME, EMAIL1, N'Contact' as TYPE from vwCONTACTS_List where EMAIL1 = @EMAIL1 or EMAIL2 = @EMAIL1";
@@ -469,7 +469,7 @@ namespace SplendidCRM
 			try
 			{
 				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select ID, USER_NAME, FIRST_NAME, LAST_NAME, EMAIL1, DEPARTMENT, TITLE from vwSOAP_User_List where 1 = 1";
@@ -510,7 +510,7 @@ namespace SplendidCRM
 			try
 			{
 				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -574,7 +574,7 @@ namespace SplendidCRM
 				if (modules == null || modules.Length == 0)
 					modules = new string[] { "Accounts" };
 				var entries = new List<entry_value>();
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					foreach (string sModule in modules)
@@ -587,7 +587,7 @@ namespace SplendidCRM
 							{
 								cmd.CommandText = sSQL;
 								Sql.AddParameter(cmd, "@NAME", "%" + search_string + "%", 200);
-								using (DbDataAdapter da = _dbProviderFactories.CreateDataAdapter())
+								using (DbDataAdapter da = _dbProviderFactory.CreateDataAdapter())
 								{
 									((IDbDataAdapter)da).SelectCommand = cmd;
 									using (DataTable dt = new DataTable())
@@ -667,7 +667,7 @@ namespace SplendidCRM
 				order_by = (order_by ?? string.Empty).ToUpper();
 				query    = query   .Replace(sTABLE_NAME + ".", string.Empty);
 				order_by = order_by.Replace(sTABLE_NAME + ".", string.Empty);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select * from vw" + sTABLE_NAME + "_List where 1 = 1";
@@ -679,7 +679,7 @@ namespace SplendidCRM
 					using (IDbCommand cmd = con.CreateCommand())
 					{
 						cmd.CommandText = sSQL;
-						using (DbDataAdapter da = _dbProviderFactories.CreateDataAdapter())
+						using (DbDataAdapter da = _dbProviderFactory.CreateDataAdapter())
 						{
 							((IDbDataAdapter)da).SelectCommand = cmd;
 							using (DataTable dt = new DataTable())
@@ -748,7 +748,7 @@ namespace SplendidCRM
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
 				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select * from vw" + sTABLE_NAME + " where ID = @ID";
@@ -792,7 +792,7 @@ namespace SplendidCRM
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
 				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					foreach (string sID in ids)
@@ -912,7 +912,7 @@ namespace SplendidCRM
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					using (IDbCommand cmd = con.CreateCommand())
@@ -943,7 +943,7 @@ namespace SplendidCRM
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select * from vwNOTES where PARENT_TYPE = @PARENT_TYPE and PARENT_ID = @PARENT_ID";
@@ -987,7 +987,7 @@ namespace SplendidCRM
 				result.module_name = module_name;
 				var fields = new List<field>();
 				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select top 0 * from vw" + sTABLE_NAME + "_List";
@@ -1019,7 +1019,7 @@ namespace SplendidCRM
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
 				var modules = new List<string>();
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select MODULE_NAME from vwMODULES where IS_ADMIN = 0 order by MODULE_NAME";
@@ -1085,7 +1085,7 @@ namespace SplendidCRM
 				var ids_list = new List<id_mod>();
 				string sTABLE_NAME        = Regex.Replace(module_name,   @"[^A-Za-z0-9_]", "");
 				string sRELATED_TABLE_NAME = Regex.Replace(related_module, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					// Generic relationship lookup via the module relationships view
@@ -1251,7 +1251,7 @@ namespace SplendidCRM
 		public Guid LoginUserByPassword(ref string sUSER_NAME, string sPASSWORD)
 		{
 			Guid gUSER_ID = Guid.Empty;
-			using (IDbConnection con = _dbProviderFactories.CreateConnection())
+			using (IDbConnection con = _dbProviderFactory.CreateConnection())
 			{
 				con.Open();
 				string sSQL =
@@ -1299,7 +1299,7 @@ namespace SplendidCRM
 		{
 			try
 			{
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using (IDbConnection con = _dbProviderFactory.CreateConnection())
 				{
 					con.Open();
 					string sSQL = "select TIMEZONE_ID, CURRENCY_ID from vwUSERS_Edit where ID = @ID";

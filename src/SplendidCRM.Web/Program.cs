@@ -186,7 +186,7 @@ builder.Services.AddSingleton<ModuleAuthorizationHandler>();
 builder.Services.AddSingleton<TeamAuthorizationHandler>();
 builder.Services.AddSingleton<FieldAuthorizationHandler>();
 builder.Services.AddSingleton<RecordAuthorizationHandler>();
-builder.Services.AddSingleton<SecurityFilterMiddleware>();
+builder.Services.AddSingleton<SecurityFilterService>();
 
 // Register SplendidCRM core business logic services via DI.
 // These replace the static-class access patterns from .NET Framework (HttpContext.Current, Application[], etc.)

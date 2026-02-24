@@ -137,7 +137,7 @@ namespace SplendidCRM.Web.Authentication
                     OnTokenValidated = context =>
                     {
                         // The OIDC token has been validated and claims are available on context.Principal.
-                        // Downstream middleware (e.g., SecurityFilterMiddleware) or the first API call
+                        // Downstream services (e.g., SecurityFilterService) or the first API call
                         // will use the authenticated principal's preferred_username claim to look up
                         // the SplendidCRM user and populate session keys via SplendidInit.LoginUser.
                         //

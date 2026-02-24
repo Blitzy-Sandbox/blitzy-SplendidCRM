@@ -8,8 +8,15 @@ using Microsoft.Extensions.Logging;
 namespace SplendidCRM.Web.Authorization
 {
 	/// <summary>
-	/// TeamAuthorizationHandler — implements part of the 4-tier ACL model (Module→Team→Field→Record).
+	/// TeamAuthorizationHandler — ASP.NET Core authorization pipeline entry point for the Team tier
+	/// of the 4-tier ACL model (Module→Team→Field→Record).
 	/// Migrated from SplendidCRM/_code/Security.cs for .NET 10 ASP.NET Core.
+	///
+	/// This handler delegates to Security.GetUserAccess for access-level checks.
+	/// The actual team hierarchy SQL predicate injection (filtering query results by team membership)
+	/// is performed by Security.Filter() overloads, which append team-aware WHERE clauses to queries.
+	/// This separation keeps centralized enforcement in Security.cs while providing the ASP.NET Core
+	/// authorization pipeline integration point here.
 	/// </summary>
 	public class TeamAuthorizationHandler
 	{
