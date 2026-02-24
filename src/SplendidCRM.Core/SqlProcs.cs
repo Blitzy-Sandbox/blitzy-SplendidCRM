@@ -22,7 +22,7 @@
 // .NET 10 ASP.NET Core Migration Notes:
 //   - REMOVED: using System.Web; (not used in this file)
 //   - CHANGED: Security.USER_ID (static property) → _security?.USER_ID ?? Guid.Empty (instance via ambient field)
-//   - CHANGED: DbProviderFactories.GetFactory() (static) → _dbProviderFactories.GetFactory() (instance via ambient field)
+//   - CHANGED: DbProviderFactories.GetFactory() (static) → _dbProviderFactories!.GetFactory() (instance via ambient field)
 //   - ADDED:   private static Security _security; ambient field (set via SetAmbient)
 //   - ADDED:   private static DbProviderFactories _dbProviderFactories; ambient field (set via SetAmbient)
 //   - ADDED:   public static void SetAmbient(Security, DbProviderFactories) registration method
@@ -46,8 +46,8 @@ namespace SplendidCRM
 	{
 		// .NET 10 Migration: Ambient static fields replace HttpContext.Current.Application and static Security access.
 		// Set via SetAmbient() during DI container initialization (Program.cs or IHostedService startup).
-		private static Security             _security;
-		private static DbProviderFactories  _dbProviderFactories;
+		private static Security?            _security;
+		private static DbProviderFactories? _dbProviderFactories;
 
 		/// <summary>
 		/// Registers the ambient service instances used by all static stored procedure wrapper methods.
@@ -71,7 +71,7 @@ namespace SplendidCRM
 		#region spACCOUNTS_CONTACTS_Update
 		public static void spACCOUNTS_CONTACTS_Update(Guid gACCOUNT_ID, Guid gCONTACT_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -102,7 +102,7 @@ namespace SplendidCRM
 
 		public static void spACCOUNTS_CONTACTS_Update(Guid gACCOUNT_ID, Guid gCONTACT_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -120,7 +120,7 @@ namespace SplendidCRM
 		#region spACCOUNTS_Delete
 		public static void spACCOUNTS_Delete(Guid gID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -150,7 +150,7 @@ namespace SplendidCRM
 
 		public static void spACCOUNTS_Delete(Guid gID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -167,7 +167,7 @@ namespace SplendidCRM
 		#region spACCOUNTS_New
 		public static void spACCOUNTS_New(ref Guid gID, string sNAME, string sPHONE_OFFICE, string sWEBSITE, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -206,7 +206,7 @@ namespace SplendidCRM
 
 		public static void spACCOUNTS_New(ref Guid gID, string sNAME, string sPHONE_OFFICE, string sWEBSITE, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -233,7 +233,7 @@ namespace SplendidCRM
 		#region spACCOUNTS_Update
 		public static void spACCOUNTS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sACCOUNT_TYPE, Guid gPARENT_ID, string sINDUSTRY, string sANNUAL_REVENUE, string sPHONE_FAX, string sBILLING_ADDRESS_STREET, string sBILLING_ADDRESS_CITY, string sBILLING_ADDRESS_STATE, string sBILLING_ADDRESS_POSTALCODE, string sBILLING_ADDRESS_COUNTRY, string sDESCRIPTION, string sRATING, string sPHONE_OFFICE, string sPHONE_ALTERNATE, string sEMAIL1, string sEMAIL2, string sWEBSITE, string sOWNERSHIP, string sEMPLOYEES, string sSIC_CODE, string sTICKER_SYMBOL, string sSHIPPING_ADDRESS_STREET, string sSHIPPING_ADDRESS_CITY, string sSHIPPING_ADDRESS_STATE, string sSHIPPING_ADDRESS_POSTALCODE, string sSHIPPING_ADDRESS_COUNTRY, string sACCOUNT_NUMBER, Guid gTEAM_ID, string sTEAM_SET_LIST, bool bEXCHANGE_FOLDER, string sPICTURE, string sTAG_SET_NAME, string sNAICS_SET_NAME, bool bDO_NOT_CALL, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -304,7 +304,7 @@ namespace SplendidCRM
 
 		public static void spACCOUNTS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sACCOUNT_TYPE, Guid gPARENT_ID, string sINDUSTRY, string sANNUAL_REVENUE, string sPHONE_FAX, string sBILLING_ADDRESS_STREET, string sBILLING_ADDRESS_CITY, string sBILLING_ADDRESS_STATE, string sBILLING_ADDRESS_POSTALCODE, string sBILLING_ADDRESS_COUNTRY, string sDESCRIPTION, string sRATING, string sPHONE_OFFICE, string sPHONE_ALTERNATE, string sEMAIL1, string sEMAIL2, string sWEBSITE, string sOWNERSHIP, string sEMPLOYEES, string sSIC_CODE, string sTICKER_SYMBOL, string sSHIPPING_ADDRESS_STREET, string sSHIPPING_ADDRESS_CITY, string sSHIPPING_ADDRESS_STATE, string sSHIPPING_ADDRESS_POSTALCODE, string sSHIPPING_ADDRESS_COUNTRY, string sACCOUNT_NUMBER, Guid gTEAM_ID, string sTEAM_SET_LIST, bool bEXCHANGE_FOLDER, string sPICTURE, string sTAG_SET_NAME, string sNAICS_SET_NAME, bool bDO_NOT_CALL, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -415,7 +415,7 @@ namespace SplendidCRM
 		#region spCALLS_CONTACTS_Update
 		public static void spCALLS_CONTACTS_Update(Guid gCALL_ID, Guid gCONTACT_ID, bool bREQUIRED, string sACCEPT_STATUS)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -448,7 +448,7 @@ namespace SplendidCRM
 
 		public static void spCALLS_CONTACTS_Update(Guid gCALL_ID, Guid gCONTACT_ID, bool bREQUIRED, string sACCEPT_STATUS, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -468,7 +468,7 @@ namespace SplendidCRM
 		#region spCALLS_EmailReminderSent
 		public static void spCALLS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -500,7 +500,7 @@ namespace SplendidCRM
 
 		public static void spCALLS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -519,7 +519,7 @@ namespace SplendidCRM
 		#region spCALLS_SmsReminderSent
 		public static void spCALLS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -551,7 +551,7 @@ namespace SplendidCRM
 
 		public static void spCALLS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -572,7 +572,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCALLS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, Int32 nDURATION_HOURS, Int32 nDURATION_MINUTES, DateTime dtDATE_TIME, string sPARENT_TYPE, Guid gPARENT_ID, string sSTATUS, string sDIRECTION, Int32 nREMINDER_TIME, string sDESCRIPTION, string sINVITEE_LIST, Guid gTEAM_ID, string sTEAM_SET_LIST, Int32 nEMAIL_REMINDER_TIME, bool bALL_DAY_EVENT, string sREPEAT_TYPE, Int32 nREPEAT_INTERVAL, string sREPEAT_DOW, DateTime dtREPEAT_UNTIL, Int32 nREPEAT_COUNT, Int32 nSMS_REMINDER_TIME, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -634,7 +634,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCALLS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, Int32 nDURATION_HOURS, Int32 nDURATION_MINUTES, DateTime dtDATE_TIME, string sPARENT_TYPE, Guid gPARENT_ID, string sSTATUS, string sDIRECTION, Int32 nREMINDER_TIME, string sDESCRIPTION, string sINVITEE_LIST, Guid gTEAM_ID, string sTEAM_SET_LIST, Int32 nEMAIL_REMINDER_TIME, bool bALL_DAY_EVENT, string sREPEAT_TYPE, Int32 nREPEAT_INTERVAL, string sREPEAT_DOW, DateTime dtREPEAT_UNTIL, Int32 nREPEAT_COUNT, Int32 nSMS_REMINDER_TIME, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -722,7 +722,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGN_LOG_BannerTracker(string sACTIVITY_TYPE, Guid gCAMPAIGN_TRKRS_ID, string sMORE_INFORMATION)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -759,7 +759,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGN_LOG_BannerTracker(string sACTIVITY_TYPE, Guid gCAMPAIGN_TRKRS_ID, string sMORE_INFORMATION, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -781,7 +781,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGN_LOG_UpdateTracker(Guid gTARGET_TRACKER_KEY, string sACTIVITY_TYPE, Guid gCAMPAIGN_TRKRS_ID, ref Guid gTARGET_ID, ref string sTARGET_TYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -824,7 +824,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGN_LOG_UpdateTracker(Guid gTARGET_TRACKER_KEY, string sACTIVITY_TYPE, Guid gCAMPAIGN_TRKRS_ID, ref Guid gTARGET_ID, ref string sTARGET_TYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -852,7 +852,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGNS_OptOut(Guid gRELATED_ID, string sRELATED_TYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -888,7 +888,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCAMPAIGNS_OptOut(Guid gRELATED_ID, string sRELATED_TYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -909,7 +909,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCASES_New(ref Guid gID, string sNAME, string sACCOUNT_NAME, Guid gACCOUNT_ID, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gB2C_CONTACT_ID, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -954,7 +954,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCASES_New(ref Guid gID, string sNAME, string sACCOUNT_NAME, Guid gACCOUNT_ID, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gB2C_CONTACT_ID, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -984,7 +984,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_BUGS_Update(Guid gCONTACT_ID, Guid gBUG_ID, string sCONTACT_ROLE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1021,7 +1021,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_BUGS_Update(Guid gCONTACT_ID, Guid gBUG_ID, string sCONTACT_ROLE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1043,7 +1043,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_CASES_Update(Guid gCONTACT_ID, Guid gCASE_ID, string sCONTACT_ROLE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1080,7 +1080,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_CASES_Update(Guid gCONTACT_ID, Guid gCASE_ID, string sCONTACT_ROLE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1102,7 +1102,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_Delete(Guid gID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1137,7 +1137,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_Delete(Guid gID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1157,7 +1157,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_New(ref Guid gID, string sFIRST_NAME, string sLAST_NAME, string sPHONE_WORK, string sEMAIL1, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1202,7 +1202,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_New(ref Guid gID, string sFIRST_NAME, string sLAST_NAME, string sPHONE_WORK, string sEMAIL1, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1232,7 +1232,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sSALUTATION, string sFIRST_NAME, string sLAST_NAME, Guid gACCOUNT_ID, string sLEAD_SOURCE, string sTITLE, string sDEPARTMENT, Guid gREPORTS_TO_ID, DateTime dtBIRTHDATE, bool bDO_NOT_CALL, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, string sASSISTANT, string sASSISTANT_PHONE, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sPRIMARY_ADDRESS_STREET, string sPRIMARY_ADDRESS_CITY, string sPRIMARY_ADDRESS_STATE, string sPRIMARY_ADDRESS_POSTALCODE, string sPRIMARY_ADDRESS_COUNTRY, string sALT_ADDRESS_STREET, string sALT_ADDRESS_CITY, string sALT_ADDRESS_STATE, string sALT_ADDRESS_POSTALCODE, string sALT_ADDRESS_COUNTRY, string sDESCRIPTION, string sPARENT_TYPE, Guid gPARENT_ID, bool bSYNC_CONTACT, Guid gTEAM_ID, string sTEAM_SET_LIST, string sSMS_OPT_IN, string sTWITTER_SCREEN_NAME, string sPICTURE, Guid gLEAD_ID, bool bEXCHANGE_FOLDER, string sTAG_SET_NAME, string sCONTACT_NUMBER, string sASSIGNED_SET_LIST, string sDP_BUSINESS_PURPOSE, DateTime dtDP_CONSENT_LAST_UPDATED)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1317,7 +1317,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sSALUTATION, string sFIRST_NAME, string sLAST_NAME, Guid gACCOUNT_ID, string sLEAD_SOURCE, string sTITLE, string sDEPARTMENT, Guid gREPORTS_TO_ID, DateTime dtBIRTHDATE, bool bDO_NOT_CALL, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, string sASSISTANT, string sASSISTANT_PHONE, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sPRIMARY_ADDRESS_STREET, string sPRIMARY_ADDRESS_CITY, string sPRIMARY_ADDRESS_STATE, string sPRIMARY_ADDRESS_POSTALCODE, string sPRIMARY_ADDRESS_COUNTRY, string sALT_ADDRESS_STREET, string sALT_ADDRESS_CITY, string sALT_ADDRESS_STATE, string sALT_ADDRESS_POSTALCODE, string sALT_ADDRESS_COUNTRY, string sDESCRIPTION, string sPARENT_TYPE, Guid gPARENT_ID, bool bSYNC_CONTACT, Guid gTEAM_ID, string sTEAM_SET_LIST, string sSMS_OPT_IN, string sTWITTER_SCREEN_NAME, string sPICTURE, Guid gLEAD_ID, bool bEXCHANGE_FOLDER, string sTAG_SET_NAME, string sCONTACT_NUMBER, string sASSIGNED_SET_LIST, string sDP_BUSINESS_PURPOSE, DateTime dtDP_CONSENT_LAST_UPDATED, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1451,7 +1451,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_USERS_Delete(Guid gCONTACT_ID, Guid gUSER_ID, string sSERVICE_NAME)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1488,7 +1488,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_USERS_Delete(Guid gCONTACT_ID, Guid gUSER_ID, string sSERVICE_NAME, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1510,7 +1510,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_USERS_Update(Guid gCONTACT_ID, Guid gUSER_ID, string sSERVICE_NAME)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1547,7 +1547,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTACTS_USERS_Update(Guid gCONTACT_ID, Guid gUSER_ID, string sSERVICE_NAME, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1569,7 +1569,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTRACTS_CONTACTS_Update(Guid gCONTRACT_ID, Guid gCONTACT_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1605,7 +1605,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spCONTRACTS_CONTACTS_Update(Guid gCONTRACT_ID, Guid gCONTACT_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1626,7 +1626,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spDOCUMENT_REVISIONS_Insert(ref Guid gID, Guid gDOCUMENT_ID, string sREVISION, string sCHANGE_LOG, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1669,7 +1669,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spDOCUMENT_REVISIONS_Insert(ref Guid gID, Guid gDOCUMENT_ID, string sREVISION, string sCHANGE_LOG, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1697,7 +1697,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAIL_CLIENT_SYNC_Update(Guid gASSIGNED_USER_ID, Guid gLOCAL_ID, string sREMOTE_KEY, string sMODULE_NAME, Guid gPARENT_ID, DateTime dtREMOTE_DATE_MODIFIED, DateTime dtREMOTE_DATE_MODIFIED_UTC)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1738,7 +1738,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAIL_CLIENT_SYNC_Update(Guid gASSIGNED_USER_ID, Guid gLOCAL_ID, string sREMOTE_KEY, string sMODULE_NAME, Guid gPARENT_ID, DateTime dtREMOTE_DATE_MODIFIED, DateTime dtREMOTE_DATE_MODIFIED_UTC, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1764,7 +1764,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAIL_IMAGES_Insert(ref Guid gID, Guid gPARENT_ID, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1805,7 +1805,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAIL_IMAGES_Insert(ref Guid gID, Guid gPARENT_ID, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1831,7 +1831,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILMAN_SendFailed(Guid gID, string sACTIVITY_TYPE, bool bABORT)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1868,7 +1868,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILMAN_SendFailed(Guid gID, string sACTIVITY_TYPE, bool bABORT, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1890,7 +1890,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILMAN_SendSuccessful(Guid gID, Guid gTARGET_TRACKER_KEY, Guid gEMAIL_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1927,7 +1927,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILMAN_SendSuccessful(Guid gID, Guid gTARGET_TRACKER_KEY, Guid gEMAIL_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -1949,7 +1949,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_ArchiveContent(Guid gID, string sNAME, string sDESCRIPTION, string sDESCRIPTION_HTML, bool bINCLUDE_CC)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -1988,7 +1988,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_ArchiveContent(Guid gID, string sNAME, string sDESCRIPTION, string sDESCRIPTION_HTML, bool bINCLUDE_CC, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2012,7 +2012,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_CampaignRef(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sTO_ADDRS_IDS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sTYPE, string sSTATUS, string sRELATED_TYPE, Guid gRELATED_ID, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, Guid gTEAM_SET_ID, Guid gASSIGNED_SET_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2068,7 +2068,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_CampaignRef(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sTO_ADDRS_IDS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sTYPE, string sSTATUS, string sRELATED_TYPE, Guid gRELATED_ID, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, Guid gTEAM_SET_ID, Guid gASSIGNED_SET_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2109,7 +2109,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_CONTACTS_Update(Guid gEMAIL_ID, Guid gCONTACT_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2145,7 +2145,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_CONTACTS_Update(Guid gEMAIL_ID, Guid gCONTACT_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2166,7 +2166,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_GetMailbox(Guid gID, ref string sMAIL_SENDTYPE, ref string sMAIL_SMTPSERVER, ref Int32 nMAIL_SMTPPORT, ref string sMAIL_SMTPUSER, ref string sMAIL_SMTPPASS, ref bool bMAIL_SMTPAUTH_REQ, ref bool bMAIL_SMTPSSL, ref Guid gOAUTH_USER_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2224,7 +2224,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_GetMailbox(Guid gID, ref string sMAIL_SENDTYPE, ref string sMAIL_SMTPSERVER, ref Int32 nMAIL_SMTPPORT, ref string sMAIL_SMTPUSER, ref string sMAIL_SMTPPASS, ref bool bMAIL_SMTPAUTH_REQ, ref bool bMAIL_SMTPSSL, ref Guid gOAUTH_USER_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2267,7 +2267,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_InsertInbound(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, DateTime dtDATE_TIME, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sCC_ADDRS, string sBCC_ADDRS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sCC_ADDRS_NAMES, string sCC_ADDRS_EMAILS, string sBCC_ADDRS_NAMES, string sBCC_ADDRS_EMAILS, string sTYPE, string sSTATUS, string sMESSAGE_ID, string sREPLY_TO_NAME, string sREPLY_TO_ADDR, string sINTENT, Guid gMAILBOX_ID, Guid gTARGET_TRACKER_KEY, string sRAW_SOURCE, Guid gTEAM_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2330,7 +2330,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_InsertInbound(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, DateTime dtDATE_TIME, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sCC_ADDRS, string sBCC_ADDRS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sCC_ADDRS_NAMES, string sCC_ADDRS_EMAILS, string sBCC_ADDRS_NAMES, string sBCC_ADDRS_EMAILS, string sTYPE, string sSTATUS, string sMESSAGE_ID, string sREPLY_TO_NAME, string sREPLY_TO_ADDR, string sINTENT, Guid gMAILBOX_ID, Guid gTARGET_TRACKER_KEY, string sRAW_SOURCE, Guid gTEAM_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2378,7 +2378,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, DateTime dtDATE_TIME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sCC_ADDRS, string sBCC_ADDRS, string sTO_ADDRS_IDS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sCC_ADDRS_IDS, string sCC_ADDRS_NAMES, string sCC_ADDRS_EMAILS, string sBCC_ADDRS_IDS, string sBCC_ADDRS_NAMES, string sBCC_ADDRS_EMAILS, string sTYPE, string sMESSAGE_ID, string sREPLY_TO_NAME, string sREPLY_TO_ADDR, string sINTENT, Guid gMAILBOX_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2447,7 +2447,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, DateTime dtDATE_TIME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, string sDESCRIPTION_HTML, string sFROM_ADDR, string sFROM_NAME, string sTO_ADDRS, string sCC_ADDRS, string sBCC_ADDRS, string sTO_ADDRS_IDS, string sTO_ADDRS_NAMES, string sTO_ADDRS_EMAILS, string sCC_ADDRS_IDS, string sCC_ADDRS_NAMES, string sCC_ADDRS_EMAILS, string sBCC_ADDRS_IDS, string sBCC_ADDRS_NAMES, string sBCC_ADDRS_EMAILS, string sTYPE, string sMESSAGE_ID, string sREPLY_TO_NAME, string sREPLY_TO_ADDR, string sINTENT, Guid gMAILBOX_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2501,7 +2501,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_UpdateContent(Guid gID, string sNAME, string sDESCRIPTION, string sDESCRIPTION_HTML)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2539,7 +2539,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_UpdateContent(Guid gID, string sNAME, string sDESCRIPTION, string sDESCRIPTION_HTML, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2562,7 +2562,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_UpdateStatus(Guid gID, string sSTATUS)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2598,7 +2598,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_UpdateStatus(Guid gID, string sSTATUS, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2619,7 +2619,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_USERS_Update(Guid gEMAIL_ID, Guid gUSER_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2655,7 +2655,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spEMAILS_USERS_Update(Guid gEMAIL_ID, Guid gUSER_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2676,7 +2676,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spINBOUND_EMAILS_ExchangeWatermark(Guid gID, string sEXCHANGE_WATERMARK)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2715,7 +2715,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spINBOUND_EMAILS_ExchangeWatermark(Guid gID, string sEXCHANGE_WATERMARK, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2739,7 +2739,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spINBOUND_EMAILS_UpdateLastUID(Guid gID, Int64 lLAST_EMAIL_UID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2775,7 +2775,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spINBOUND_EMAILS_UpdateLastUID(Guid gID, Int64 lLAST_EMAIL_UID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2796,7 +2796,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spLEADS_New(ref Guid gID, string sFIRST_NAME, string sLAST_NAME, string sPHONE_WORK, string sEMAIL1, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2841,7 +2841,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spLEADS_New(ref Guid gID, string sFIRST_NAME, string sLAST_NAME, string sPHONE_WORK, string sEMAIL1, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -2871,7 +2871,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spLEADS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sSALUTATION, string sFIRST_NAME, string sLAST_NAME, string sTITLE, string sREFERED_BY, string sLEAD_SOURCE, string sLEAD_SOURCE_DESCRIPTION, string sSTATUS, string sSTATUS_DESCRIPTION, string sDEPARTMENT, Guid gREPORTS_TO_ID, bool bDO_NOT_CALL, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sPRIMARY_ADDRESS_STREET, string sPRIMARY_ADDRESS_CITY, string sPRIMARY_ADDRESS_STATE, string sPRIMARY_ADDRESS_POSTALCODE, string sPRIMARY_ADDRESS_COUNTRY, string sALT_ADDRESS_STREET, string sALT_ADDRESS_CITY, string sALT_ADDRESS_STATE, string sALT_ADDRESS_POSTALCODE, string sALT_ADDRESS_COUNTRY, string sDESCRIPTION, string sACCOUNT_NAME, Guid gCAMPAIGN_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gCONTACT_ID, Guid gACCOUNT_ID, bool bEXCHANGE_FOLDER, DateTime dtBIRTHDATE, string sASSISTANT, string sASSISTANT_PHONE, string sWEBSITE, string sSMS_OPT_IN, string sTWITTER_SCREEN_NAME, string sPICTURE, string sTAG_SET_NAME, string sLEAD_NUMBER, string sASSIGNED_SET_LIST, string sDP_BUSINESS_PURPOSE, DateTime dtDP_CONSENT_LAST_UPDATED)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -2960,7 +2960,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spLEADS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sSALUTATION, string sFIRST_NAME, string sLAST_NAME, string sTITLE, string sREFERED_BY, string sLEAD_SOURCE, string sLEAD_SOURCE_DESCRIPTION, string sSTATUS, string sSTATUS_DESCRIPTION, string sDEPARTMENT, Guid gREPORTS_TO_ID, bool bDO_NOT_CALL, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, bool bEMAIL_OPT_OUT, bool bINVALID_EMAIL, string sPRIMARY_ADDRESS_STREET, string sPRIMARY_ADDRESS_CITY, string sPRIMARY_ADDRESS_STATE, string sPRIMARY_ADDRESS_POSTALCODE, string sPRIMARY_ADDRESS_COUNTRY, string sALT_ADDRESS_STREET, string sALT_ADDRESS_CITY, string sALT_ADDRESS_STATE, string sALT_ADDRESS_POSTALCODE, string sALT_ADDRESS_COUNTRY, string sDESCRIPTION, string sACCOUNT_NAME, Guid gCAMPAIGN_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gCONTACT_ID, Guid gACCOUNT_ID, bool bEXCHANGE_FOLDER, DateTime dtBIRTHDATE, string sASSISTANT, string sASSISTANT_PHONE, string sWEBSITE, string sSMS_OPT_IN, string sTWITTER_SCREEN_NAME, string sPICTURE, string sTAG_SET_NAME, string sLEAD_NUMBER, string sASSIGNED_SET_LIST, string sDP_BUSINESS_PURPOSE, DateTime dtDP_CONSENT_LAST_UPDATED, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3034,7 +3034,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_CONTACTS_Update(Guid gMEETING_ID, Guid gCONTACT_ID, bool bREQUIRED, string sACCEPT_STATUS)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3072,7 +3072,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_CONTACTS_Update(Guid gMEETING_ID, Guid gCONTACT_ID, bool bREQUIRED, string sACCEPT_STATUS, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3095,7 +3095,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3132,7 +3132,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3154,7 +3154,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3191,7 +3191,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3213,7 +3213,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sLOCATION, Int32 nDURATION_HOURS, Int32 nDURATION_MINUTES, DateTime dtDATE_TIME, string sSTATUS, string sPARENT_TYPE, Guid gPARENT_ID, Int32 nREMINDER_TIME, string sDESCRIPTION, string sINVITEE_LIST, Guid gTEAM_ID, string sTEAM_SET_LIST, Int32 nEMAIL_REMINDER_TIME, bool bALL_DAY_EVENT, string sREPEAT_TYPE, Int32 nREPEAT_INTERVAL, string sREPEAT_DOW, DateTime dtREPEAT_UNTIL, Int32 nREPEAT_COUNT, Int32 nSMS_REMINDER_TIME, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3275,7 +3275,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMEETINGS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sLOCATION, Int32 nDURATION_HOURS, Int32 nDURATION_MINUTES, DateTime dtDATE_TIME, string sSTATUS, string sPARENT_TYPE, Guid gPARENT_ID, Int32 nREMINDER_TIME, string sDESCRIPTION, string sINVITEE_LIST, Guid gTEAM_ID, string sTEAM_SET_LIST, Int32 nEMAIL_REMINDER_TIME, bool bALL_DAY_EVENT, string sREPEAT_TYPE, Int32 nREPEAT_INTERVAL, string sREPEAT_DOW, DateTime dtREPEAT_UNTIL, Int32 nREPEAT_COUNT, Int32 nSMS_REMINDER_TIME, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3322,7 +3322,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMODULES_ARCHIVE_LOG_InsertRule(Guid gARCHIVE_RULE_ID, string sMODULE_NAME, string sTABLE_NAME)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3362,7 +3362,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spMODULES_ARCHIVE_LOG_InsertRule(Guid gARCHIVE_RULE_ID, string sMODULE_NAME, string sTABLE_NAME, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3387,7 +3387,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTE_ATTACHMENTS_Insert(ref Guid gID, Guid gNOTE_ID, string sDESCRIPTION, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3429,7 +3429,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTE_ATTACHMENTS_Insert(ref Guid gID, Guid gNOTE_ID, string sDESCRIPTION, string sFILENAME, string sFILE_EXT, string sFILE_MIME_TYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3456,7 +3456,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTES_LinkAttachment(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, Guid gTEAM_SET_ID, Guid gNOTE_ATTACHMENT_ID, Guid gASSIGNED_SET_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3502,7 +3502,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTES_LinkAttachment(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, string sDESCRIPTION, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, Guid gTEAM_SET_ID, Guid gNOTE_ATTACHMENT_ID, Guid gASSIGNED_SET_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3533,7 +3533,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTES_Update(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, Guid gCONTACT_ID, string sDESCRIPTION, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gASSIGNED_USER_ID, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3581,7 +3581,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spNOTES_Update(ref Guid gID, string sNAME, string sPARENT_TYPE, Guid gPARENT_ID, Guid gCONTACT_ID, string sDESCRIPTION, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gASSIGNED_USER_ID, string sTAG_SET_NAME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3614,7 +3614,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_CONTACTS_Update(Guid gOPPORTUNITY_ID, Guid gCONTACT_ID, string sCONTACT_ROLE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3654,7 +3654,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_CONTACTS_Update(Guid gOPPORTUNITY_ID, Guid gCONTACT_ID, string sCONTACT_ROLE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3679,7 +3679,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_New(ref Guid gID, Guid gACCOUNT_ID, string sNAME, decimal dAMOUNT, Guid gCURRENCY_ID, DateTime dtDATE_CLOSED, string sSALES_STAGE, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gB2C_CONTACT_ID, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3727,7 +3727,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_New(ref Guid gID, Guid gACCOUNT_ID, string sNAME, decimal dAMOUNT, Guid gCURRENCY_ID, DateTime dtDATE_CLOSED, string sSALES_STAGE, Guid gASSIGNED_USER_ID, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gB2C_CONTACT_ID, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3760,7 +3760,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_Update(ref Guid gID, Guid gASSIGNED_USER_ID, Guid gACCOUNT_ID, string sNAME, string sOPPORTUNITY_TYPE, string sLEAD_SOURCE, decimal dAMOUNT, Guid gCURRENCY_ID, DateTime dtDATE_CLOSED, string sNEXT_STEP, string sSALES_STAGE, float flPROBABILITY, string sDESCRIPTION, string sPARENT_TYPE, Guid gPARENT_ID, string sACCOUNT_NAME, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gCAMPAIGN_ID, bool bEXCHANGE_FOLDER, Guid gB2C_CONTACT_ID, Guid gLEAD_ID, string sTAG_SET_NAME, string sOPPORTUNITY_NUMBER, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3821,7 +3821,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spOPPORTUNITIES_Update(ref Guid gID, Guid gASSIGNED_USER_ID, Guid gACCOUNT_ID, string sNAME, string sOPPORTUNITY_TYPE, string sLEAD_SOURCE, decimal dAMOUNT, Guid gCURRENCY_ID, DateTime dtDATE_CLOSED, string sNEXT_STEP, string sSALES_STAGE, float flPROBABILITY, string sDESCRIPTION, string sPARENT_TYPE, Guid gPARENT_ID, string sACCOUNT_NAME, Guid gTEAM_ID, string sTEAM_SET_LIST, Guid gCAMPAIGN_ID, bool bEXCHANGE_FOLDER, Guid gB2C_CONTACT_ID, Guid gLEAD_ID, string sTAG_SET_NAME, string sOPPORTUNITY_NUMBER, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3867,7 +3867,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spPROJECTS_CONTACTS_Update(Guid gPROJECT_ID, Guid gCONTACT_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3903,7 +3903,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spPROJECTS_CONTACTS_Update(Guid gPROJECT_ID, Guid gCONTACT_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3924,7 +3924,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spQUOTES_CONTACTS_Update(Guid gQUOTE_ID, Guid gCONTACT_ID, string sCONTACT_ROLE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -3961,7 +3961,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spQUOTES_CONTACTS_Update(Guid gQUOTE_ID, Guid gCONTACT_ID, string sCONTACT_ROLE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -3983,7 +3983,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSCHEDULERS_UpdateLastRun(Guid gID, DateTime dtLAST_RUN)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4019,7 +4019,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSCHEDULERS_UpdateLastRun(Guid gID, DateTime dtLAST_RUN, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4039,7 +4039,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSMS_MESSAGES_UpdateStatus(Guid gID, string sSTATUS, string sMESSAGE_SID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4076,7 +4076,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSMS_MESSAGES_UpdateStatus(Guid gID, string sSTATUS, string sMESSAGE_SID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4098,7 +4098,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSqlPruneDatabase()
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4131,7 +4131,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSqlPruneDatabase(IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4149,7 +4149,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSqlTableColumnExists(ref bool bEXISTS, string sTABLE_NAME, string sCOLUMN_NAME, string sARCHIVE_DATABASE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4188,7 +4188,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSqlTableColumnExists(ref bool bEXISTS, string sTABLE_NAME, string sCOLUMN_NAME, string sARCHIVE_DATABASE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4212,7 +4212,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSYSTEM_LOG_InsertOnly(Guid gUSER_ID, string sUSER_NAME, string sMACHINE, string sASPNET_SESSIONID, string sREMOTE_HOST, string sSERVER_HOST, string sTARGET, string sRELATIVE_PATH, string sPARAMETERS, string sERROR_TYPE, string sFILE_NAME, string sMETHOD, Int32 nLINE_NUMBER, string sMESSAGE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4260,7 +4260,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSYSTEM_LOG_InsertOnly(Guid gUSER_ID, string sUSER_NAME, string sMACHINE, string sASPNET_SESSIONID, string sREMOTE_HOST, string sSERVER_HOST, string sTARGET, string sRELATIVE_PATH, string sPARAMETERS, string sERROR_TYPE, string sFILE_NAME, string sMETHOD, Int32 nLINE_NUMBER, string sMESSAGE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4292,7 +4292,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSYSTEM_SYNC_LOG_InsertOnly(Guid gUSER_ID, string sMACHINE, string sREMOTE_URL, string sERROR_TYPE, string sFILE_NAME, string sMETHOD, Int32 nLINE_NUMBER, string sMESSAGE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4334,7 +4334,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spSYSTEM_SYNC_LOG_InsertOnly(Guid gUSER_ID, string sMACHINE, string sREMOTE_URL, string sERROR_TYPE, string sFILE_NAME, string sMETHOD, Int32 nLINE_NUMBER, string sMESSAGE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4360,7 +4360,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4397,7 +4397,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_EmailReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4419,7 +4419,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4456,7 +4456,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_SmsReminderSent(Guid gID, string sINVITEE_TYPE, Guid gINVITEE_ID, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4478,7 +4478,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sSTATUS, DateTime dtDATE_TIME_DUE, DateTime dtDATE_TIME_START, string sPARENT_TYPE, Guid gPARENT_ID, Guid gCONTACT_ID, string sPRIORITY, string sDESCRIPTION, Guid gTEAM_ID, string sTEAM_SET_LIST, string sTAG_SET_NAME, Int32 nREMINDER_TIME, Int32 nEMAIL_REMINDER_TIME, Int32 nSMS_REMINDER_TIME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4533,7 +4533,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTASKS_Update(ref Guid gID, Guid gASSIGNED_USER_ID, string sNAME, string sSTATUS, DateTime dtDATE_TIME_DUE, DateTime dtDATE_TIME_START, string sPARENT_TYPE, Guid gPARENT_ID, Guid gCONTACT_ID, string sPRIORITY, string sDESCRIPTION, Guid gTEAM_ID, string sTEAM_SET_LIST, string sTAG_SET_NAME, Int32 nREMINDER_TIME, Int32 nEMAIL_REMINDER_TIME, Int32 nSMS_REMINDER_TIME, bool bIS_PRIVATE, string sASSIGNED_SET_LIST, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4573,7 +4573,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTERMINOLOGY_HELP_Update(ref Guid gID, string sNAME, string sLANG, string sMODULE_NAME, string sDISPLAY_TEXT)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4614,7 +4614,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTERMINOLOGY_HELP_Update(ref Guid gID, string sNAME, string sLANG, string sMODULE_NAME, string sDISPLAY_TEXT, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4640,7 +4640,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTERMINOLOGY_Update(string sNAME, string sLANG, string sMODULE_NAME, string sLIST_NAME, Int32 nLIST_ORDER, string sDISPLAY_NAME)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4679,7 +4679,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spTERMINOLOGY_Update(string sNAME, string sLANG, string sMODULE_NAME, string sLIST_NAME, Int32 nLIST_ORDER, string sDISPLAY_NAME, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4703,7 +4703,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_InsertNTLM(ref Guid gID, string sUSER_DOMAIN, string sUSER_NAME, bool bIS_ADMIN)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4742,7 +4742,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_InsertNTLM(ref Guid gID, string sUSER_DOMAIN, string sUSER_NAME, bool bIS_ADMIN, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4766,7 +4766,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_LOGINS_InsertOnly(ref Guid gID, Guid gUSER_ID, string sUSER_NAME, string sLOGIN_TYPE, string sLOGIN_STATUS, string sASPNET_SESSIONID, string sREMOTE_HOST, string sSERVER_HOST, string sTARGET, string sRELATIVE_PATH, string sUSER_AGENT)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4813,7 +4813,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_LOGINS_InsertOnly(ref Guid gID, Guid gUSER_ID, string sUSER_NAME, string sLOGIN_TYPE, string sLOGIN_STATUS, string sASPNET_SESSIONID, string sREMOTE_HOST, string sSERVER_HOST, string sTARGET, string sRELATIVE_PATH, string sUSER_AGENT, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4845,7 +4845,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_PASSWORD_LINK_InsertOnly(ref Guid gID, string sUSER_NAME)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4886,7 +4886,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_PASSWORD_LINK_InsertOnly(ref Guid gID, string sUSER_NAME, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4912,7 +4912,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_PasswordUpdate(Guid gID, string sUSER_HASH)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -4948,7 +4948,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_PasswordUpdate(Guid gID, string sUSER_HASH, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -4969,7 +4969,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_Update(ref Guid gID, string sUSER_NAME, string sFIRST_NAME, string sLAST_NAME, Guid gREPORTS_TO_ID, bool bIS_ADMIN, bool bRECEIVE_NOTIFICATIONS, string sDESCRIPTION, string sTITLE, string sDEPARTMENT, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, string sSTATUS, string sADDRESS_STREET, string sADDRESS_CITY, string sADDRESS_STATE, string sADDRESS_POSTALCODE, string sADDRESS_COUNTRY, string sUSER_PREFERENCES, bool bPORTAL_ONLY, string sEMPLOYEE_STATUS, string sMESSENGER_ID, string sMESSENGER_TYPE, string sPARENT_TYPE, Guid gPARENT_ID, bool bIS_GROUP, Guid gDEFAULT_TEAM, bool bIS_ADMIN_DELEGATE, string sMAIL_SMTPUSER, string sMAIL_SMTPPASS, bool bSYSTEM_GENERATED_PASSWORD, bool bGOOGLEAPPS_SYNC_CONTACTS, bool bGOOGLEAPPS_SYNC_CALENDAR, string sGOOGLEAPPS_USERNAME, string sGOOGLEAPPS_PASSWORD, string sFACEBOOK_ID, bool bICLOUD_SYNC_CONTACTS, bool bICLOUD_SYNC_CALENDAR, string sICLOUD_USERNAME, string sICLOUD_PASSWORD, string sTHEME, string sDATE_FORMAT, string sTIME_FORMAT, string sLANG, Guid gCURRENCY_ID, Guid gTIMEZONE_ID, bool bSAVE_QUERY, bool bGROUP_TABS, bool bSUBPANEL_TABS, string sEXTENSION, string sSMS_OPT_IN, string sPICTURE, string sMAIL_SMTPSERVER, Int32 nMAIL_SMTPPORT, bool bMAIL_SMTPAUTH_REQ, Int32 nMAIL_SMTPSSL, string sMAIL_SENDTYPE)
 		{
-			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
 			using ( IDbConnection con = dbf.CreateConnection() )
 			{
 				con.Open();
@@ -5067,7 +5067,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static void spUSERS_Update(ref Guid gID, string sUSER_NAME, string sFIRST_NAME, string sLAST_NAME, Guid gREPORTS_TO_ID, bool bIS_ADMIN, bool bRECEIVE_NOTIFICATIONS, string sDESCRIPTION, string sTITLE, string sDEPARTMENT, string sPHONE_HOME, string sPHONE_MOBILE, string sPHONE_WORK, string sPHONE_OTHER, string sPHONE_FAX, string sEMAIL1, string sEMAIL2, string sSTATUS, string sADDRESS_STREET, string sADDRESS_CITY, string sADDRESS_STATE, string sADDRESS_POSTALCODE, string sADDRESS_COUNTRY, string sUSER_PREFERENCES, bool bPORTAL_ONLY, string sEMPLOYEE_STATUS, string sMESSENGER_ID, string sMESSENGER_TYPE, string sPARENT_TYPE, Guid gPARENT_ID, bool bIS_GROUP, Guid gDEFAULT_TEAM, bool bIS_ADMIN_DELEGATE, string sMAIL_SMTPUSER, string sMAIL_SMTPPASS, bool bSYSTEM_GENERATED_PASSWORD, bool bGOOGLEAPPS_SYNC_CONTACTS, bool bGOOGLEAPPS_SYNC_CALENDAR, string sGOOGLEAPPS_USERNAME, string sGOOGLEAPPS_PASSWORD, string sFACEBOOK_ID, bool bICLOUD_SYNC_CONTACTS, bool bICLOUD_SYNC_CALENDAR, string sICLOUD_USERNAME, string sICLOUD_PASSWORD, string sTHEME, string sDATE_FORMAT, string sTIME_FORMAT, string sLANG, Guid gCURRENCY_ID, Guid gTIMEZONE_ID, bool bSAVE_QUERY, bool bGROUP_TABS, bool bSUBPANEL_TABS, string sEXTENSION, string sSMS_OPT_IN, string sPICTURE, string sMAIL_SMTPSERVER, Int32 nMAIL_SMTPPORT, bool bMAIL_SMTPAUTH_REQ, Int32 nMAIL_SMTPSSL, string sMAIL_SENDTYPE, IDbTransaction trn)
 		{
-			IDbConnection con = trn.Connection;
+			IDbConnection con = trn.Connection!;
 			using ( IDbCommand cmd = con.CreateCommand() )
 			{
 				cmd.Transaction = trn;
@@ -5230,7 +5230,7 @@ namespace SplendidCRM
 		/// </summary>
 		public static IDbCommand Factory(IDbConnection con, string sProcedureName)
 		{
-			IDbCommand cmd = null;
+			IDbCommand? cmd = null;
 			switch ( sProcedureName.ToUpper() )
 			{
 				case "SPACCOUNTS_UPDATE"   :  cmd = cmdACCOUNTS_Update  (con);  break;
@@ -5249,7 +5249,7 @@ namespace SplendidCRM
 						par.DbType = DbType.Int32;
 				}
 			}
-			return cmd;
+			return cmd!;
 		}
 		#endregion
 
