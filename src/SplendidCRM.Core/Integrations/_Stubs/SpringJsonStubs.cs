@@ -56,6 +56,16 @@ namespace Spring.Json
         }
 
         /// <summary>
+        /// Gets a typed value by integer index (for JSON array access).
+        /// Supports dormant Spring.Social deserializers that access array elements by position.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public T GetValue<T>(int index)
+        {
+            return default(T)!;
+        }
+
+        /// <summary>
         /// Gets a child JSON value by name.
         /// </summary>
         public JsonValue GetValue(string name)
