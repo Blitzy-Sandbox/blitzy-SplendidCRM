@@ -39,7 +39,11 @@ namespace SplendidCRM.Web.Authentication
                 string duoRedirectUri = configuration["DUO_REDIRECT_URI"] ?? "/duo/callback";
                 services.AddSingleton(sp =>
                 {
-                    var client = new DuoUniversal.Client(integrationKey, secretKey, apiHostname, duoRedirectUri);
+                    // Use ClientBuilder (the correct public API for DuoUniversal.Client).
+                    // DuoUniversal.Client has an internal constructor — ClientBuilder is the
+                    // only way to instantiate it (builder pattern from source file).
+                    var client = new DuoUniversal.ClientBuilder(integrationKey, secretKey, apiHostname, duoRedirectUri)
+                        .Build();
                     return client;
                 });
 
