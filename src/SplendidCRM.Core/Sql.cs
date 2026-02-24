@@ -1280,6 +1280,70 @@ namespace SplendidCRM
 			return par;
 		}
 
+		// .NET 10 Migration: Added from SplendidCRM/_code/Sql.cs (lines ~1432-1477 in original).
+		// This overload was present in the original Sql.cs and is used by SqlProcsDynamicFactory.DynamicFactory()
+		// to map C# type names from the vwSqlColumns "CsType" column to ADO.NET DbType enum values.
+		// PRESERVED: All type mapping logic. IsSqlAnywhere/IsEffiProz removed (SQL Server only in .NET 10).
+		// Minimal change clause: Added only because SqlProcsDynamicFactory.cs requires it.
+		/// <summary>
+		/// Creates a typed SQL parameter from a C# type name string and a maximum length.
+		/// Used by SqlProcs.DynamicFactory to map vwSqlColumns.CsType values to ADO.NET DbType.
+		/// </summary>
+		/// <param name="cmd">The command to create the parameter for.</param>
+		/// <param name="sField">The parameter name (including @ prefix if desired).</param>
+		/// <param name="sCsType">
+		/// The C# type name from vwSqlColumns.CsType. Supported values:
+		/// "Guid", "short", "Int32", "Int64", "float", "decimal", "bool", "DateTime",
+		/// "byte[]", "ansistring", "string" (default).
+		/// </param>
+		/// <param name="nLength">The maximum length for variable-length parameters.</param>
+		/// <returns>A configured IDbDataParameter with DbType and Size set from the C# type name.</returns>
+		public static IDbDataParameter CreateParameter(IDbCommand cmd, string sField, string sCsType, int nLength)
+		{
+			IDbDataParameter par = Sql.CreateParameter(cmd, sField);
+			switch ( sCsType )
+			{
+				case "Guid":
+					// 09/12/2010 Paul.  SQL Server supports native Guid (uniqueidentifier).
+					// .NET 10 Migration: IsSqlAnywhere/IsEffiProz checks removed (SQL Server only).
+					// Oracle does not support Guids natively; use string with length 36.
+					if ( Sql.IsSQLServer(cmd) )
+					{
+						par.DbType = DbType.Guid;
+					}
+					else
+					{
+						// 08/11/2005 Paul.  Oracle does not support Guids, nor does MySQL. 
+						par.DbType = DbType.String;
+						par.Size   = 36;  // 08/13/2005 Paul.  Only set size for variable length fields. 
+					}
+					break;
+				case "short"     :  par.DbType = DbType.Int16    ;  break;
+				case "Int32"     :  par.DbType = DbType.Int32    ;  break;
+				case "Int64"     :  par.DbType = DbType.Int64    ;  break;
+				case "float"     :  par.DbType = DbType.Double   ;  break;
+				case "decimal"   :  par.DbType = DbType.Decimal  ;  break;
+				case "bool"      :
+					// 10/01/2006 Paul.  DB2 seems to prefer Boolean.  Oracle wants Byte.
+					// We are going to use Boolean for all but Oracle as this what we have tested extensively.
+					if ( Sql.IsOracle(cmd) )
+						par.DbType = DbType.Byte   ;
+					else
+						par.DbType = DbType.Boolean;
+					break;
+				case "DateTime"  :  par.DbType = DbType.DateTime ;  break;
+				case "byte[]"    :  par.DbType = DbType.Binary   ;  par.Size = nLength;  break;
+				// 01/24/2006 Paul.  A severe error occurred on the current command. The results, if any, should be discarded. 
+				// MS03-031 security patch causes this error because of stricter datatype processing.  
+				// http://www.microsoft.com/technet/security/bulletin/MS03-031.mspx.
+				// http://support.microsoft.com/kb/827366/
+				case "ansistring":  par.DbType = DbType.AnsiString;  par.Size = nLength;  break;
+				//case "string"  :  par.DbType = DbType.String    ;  par.Size = nLength;  break;
+				default          :  par.DbType = DbType.String   ;  par.Size = nLength;  break;
+			}
+			return par;
+		}
+
 		// 03/15/2012 Paul.  We need to know the parameter placeholder for PostgreSQL. 
 		public static string NextPlaceholder(IDbCommand cmd)
 		{

@@ -21,7 +21,10 @@ namespace SplendidCRM
 	/// Migrated from SplendidCRM/_code/SqlProcs.cs for .NET 10 ASP.NET Core.
 	/// Replaces ConfigurationManager.ConnectionStrings with IConfiguration.
 	/// </summary>
-	public class SqlProcs
+	// .NET 10 Migration: Added 'partial' keyword to allow SqlProcsDynamicFactory.cs to extend this class
+	// with the static DynamicFactory(IDbConnection, string) method using the same partial class pattern
+	// as the original .NET Framework 4.8 implementation.
+	public partial class SqlProcs
 	{
 		private readonly DbProviderFactories _dbProviderFactories;
 
