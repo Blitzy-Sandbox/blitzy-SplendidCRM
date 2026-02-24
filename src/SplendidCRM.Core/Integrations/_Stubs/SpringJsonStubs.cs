@@ -172,7 +172,7 @@ namespace Spring.Json
 
     /// <summary>
     /// Stub replacement for Spring.Json.JsonMapper.
-    /// Provides type-safe JSON deserialization dispatch.
+    /// Provides type-safe JSON deserialization dispatch with serializer/deserializer registration.
     /// Dormant stub — not executed at runtime.
     /// </summary>
     public class JsonMapper
@@ -184,6 +184,26 @@ namespace Spring.Json
         {
             return default(T)!;
         }
+
+        /// <summary>
+        /// Registers a JSON deserializer for the specified type.
+        /// Stub replacement for Spring.Json.JsonMapper.RegisterDeserializer used by
+        /// Spring.Social.LinkedIn integration stubs (LinkedInTemplate.GetJsonMessageConverter).
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        /// <param name="type">The type to register the deserializer for.</param>
+        /// <param name="deserializer">The deserializer instance to register.</param>
+        public void RegisterDeserializer(Type type, IJsonDeserializer deserializer) { }
+
+        /// <summary>
+        /// Registers a JSON serializer for the specified type.
+        /// Stub replacement for Spring.Json.JsonMapper.RegisterSerializer used by
+        /// Spring.Social.LinkedIn integration stubs (LinkedInTemplate.GetJsonMessageConverter).
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        /// <param name="type">The type to register the serializer for.</param>
+        /// <param name="serializer">The serializer instance to register.</param>
+        public void RegisterSerializer(Type type, IJsonSerializer serializer) { }
     }
 
     /// <summary>
