@@ -101,12 +101,11 @@ namespace Spring.Social.Salesforce.Api.Impl
 		{
 			// Migration note: RestTemplate stub is passed for sub-API construction.
 			// Sub-templates use it for HTTP operations but are never called at runtime in this dormant stub.
-			// SObjectOperations uses the protected parameterless base constructor (no RestTemplate param).
 			RestTemplate rt = new RestTemplate();
 			bool authorized = this.IsAuthorized;
 			this.versionOperations  = new VersionTemplate  (rt, authorized);
 			this.metadataOperations = new MetadataTemplate (rt, authorized);
-			this.sobjectOperations  = new SObjectOperations();
+			this.sobjectOperations  = new SObjectTemplate  (rt, authorized);
 			this.searchOperations   = new SearchTemplate   (rt, authorized);
 			this.userOperations     = new UserTemplate     (rt, authorized);
 		}
