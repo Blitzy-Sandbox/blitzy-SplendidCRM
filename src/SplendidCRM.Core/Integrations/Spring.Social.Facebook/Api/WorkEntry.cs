@@ -27,9 +27,7 @@ namespace Spring.Social.Facebook.Api
 	/// </summary>
 	/// <author>Craig Walls</author>
 	/// <author>SplendidCRM (.NET)</author>
-#if !SILVERLIGHT
 	[Serializable]
-#endif
 	public class WorkEntry
 	{
 		public WorkEntry()
