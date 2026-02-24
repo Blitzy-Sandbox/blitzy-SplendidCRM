@@ -21,8 +21,11 @@
 // Migration Note: .NET 10 ASP.NET Core replatforming — Spring.Rest.Client, Spring.Social.OAuth2,
 // Spring.Http.Converters, Spring.Json removed (no .NET 10 equivalents). This is a dormant
 // Enterprise Edition integration stub; it must compile but NOT execute.
+// SalesforceOAuth2ApiBinding moved to Spring.Social.OAuth2 namespace (preserving original namespace)
+// after .NET 10 replatforming; added using directive to resolve the base class reference.
 using System;
 
+using Spring.Social.OAuth2;
 using Spring.Social.Salesforce.Api.Impl.Json;
 
 namespace Spring.Social.Salesforce.Api.Impl
@@ -59,7 +62,7 @@ namespace Spring.Social.Salesforce.Api.Impl
 		/// </summary>
 		/// <param name="instanceUrl">The Salesforce instance URL.</param>
 		/// <param name="accessToken">An access token acquired through OAuth authentication with Salesforce.</param>
-		public SalesforceTemplate(string instanceUrl, string accessToken) : base(accessToken)
+		public SalesforceTemplate(string instanceUrl, string accessToken) : base(instanceUrl, accessToken)
 		{
 			this.InitSubApis();
 		}
