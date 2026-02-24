@@ -117,6 +117,9 @@ namespace Spring.Social.Facebook.Api.Impl
 		/// <summary>Returns true if this JSON value represents a JSON string.</summary>
 		public bool IsString { get; }
 
+		/// <summary>Returns true if this JSON value represents a JSON number.</summary>
+		public bool IsNumber { get; }
+
 		/// <summary>Returns true if this JSON object contains a member with the given name.</summary>
 		/// <param name="name">The member name to check.</param>
 		/// <returns>Always returns false in stub implementation.</returns>
