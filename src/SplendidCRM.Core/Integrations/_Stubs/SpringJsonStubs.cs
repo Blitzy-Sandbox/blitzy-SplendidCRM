@@ -64,6 +64,19 @@ namespace Spring.Json
         /// <summary>Gets whether this value represents a JSON array.</summary>
         public bool IsArray { get { return false; } }
 
+        /// <summary>Gets whether this value represents a JSON string.</summary>
+        public bool IsString { get { return false; } }
+
+        /// <summary>
+        /// Attempts to parse a JSON string into a JsonValue.
+        /// Stub implementation — always returns false. Dormant stub.
+        /// </summary>
+        public static bool TryParse(string json, out JsonValue result)
+        {
+            result = null;
+            return false;
+        }
+
         /// <summary>
         /// Gets the typed value of this JSON node.
         /// </summary>
@@ -78,6 +91,16 @@ namespace Spring.Json
         public T GetValue<T>(string name)
         {
             return default(T)!;
+        }
+
+        /// <summary>
+        /// Gets a JSON value at the specified array index.
+        /// Supports dormant Spring.Social deserializers that access array elements by position.
+        /// Dormant stub — not executed at runtime.
+        /// </summary>
+        public JsonValue GetValue(int index)
+        {
+            return new JsonValue();
         }
 
         /// <summary>
