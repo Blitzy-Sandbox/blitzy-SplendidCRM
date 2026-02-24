@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2022 Cisco Systems, Inc. and/or its affiliates
 //
 // SPDX-License-Identifier: BSD-3-Clause
-// Migrated from SplendidCRM/_code/DuoUniversal/JwtUtils.cs for .NET 10
 
 using System;
 using System.Collections.Generic;
@@ -12,152 +11,231 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace DuoUniversal
 {
-    /// <summary>
-    /// JWT utility methods for creating and validating JWTs used in the Duo OIDC flow.
-    /// </summary>
-    internal static class JwtUtils
+
+    internal class JwtUtils
     {
-        private const int JWT_EXPIRATION_SECONDS = 300;
+
+        private const int FIVE_MINUTES = 5;
 
         /// <summary>
-        /// Create a signed JWT for authenticating with the Duo API.
-        /// Uses HMAC SHA-512 signing with the client secret.
+        /// Generate an OIDC-compliant JWT for the specified client id and audience, signed with the specified secret.
+        /// The "iss", "aud", "jti", and "exp" claims will be automatically added.
+        /// Additional claims to be included can be specified in the additionalClaims argument
         /// </summary>
-        internal static string CreateJwt(string clientId, string clientSecret, string audience, string duoUsername, string nonce)
+        /// <param name="clientId">OIDC Client Id</param>
+        /// <param name="clientSecret">OIDC Client secret, used for signing the token</param>
+        /// <param name="audience">OIDC Audience</param>
+        /// <param name="additionalClaims">Any additional claims to include in the JWT payload</param>
+        /// <returns>A signed JWT</returns>
+        internal static string CreateSignedJwt(string clientId, string clientSecret, string audience, IDictionary<string, string> additionalClaims)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clientSecret));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512);
+            ValidateArguments(clientId, clientSecret, audience);
 
-            var now = DateTime.UtcNow;
-            var claims = new Dictionary<string, object>
-            {
-                { Labels.CLIENT_ID, clientId },
-                { "sub", clientId },
-                { "jti", Utils.GenerateRandomString(36) }
-            };
+            string payload = GeneratePayload(clientId, audience, additionalClaims);
 
-            if (!string.IsNullOrEmpty(duoUsername))
-            {
-                claims["duo_uname"] = duoUsername;
-            }
-
-            if (!string.IsNullOrEmpty(nonce))
-            {
-                claims["nonce"] = nonce;
-            }
-
-            var descriptor = new SecurityTokenDescriptor
-            {
-                Issuer = clientId,
-                Audience = audience,
-                Expires = now.AddSeconds(JWT_EXPIRATION_SECONDS),
-                IssuedAt = now,
-                NotBefore = now,
-                SigningCredentials = credentials,
-                Claims = claims
-            };
-
-            var handler = new JsonWebTokenHandler();
-            return handler.CreateToken(descriptor);
+            return CreateJwtFromPayload(payload, clientSecret);
         }
 
         /// <summary>
-        /// Validate an ID token received from Duo.
-        /// Verifies signature, issuer, audience, expiration, nonce, and preferred_username.
+        /// Generate a signed JWT from the given JSON payload, using the provided secret 
         /// </summary>
-        internal static IdToken ValidateIdToken(string idToken, string clientId, string clientSecret,
-            string expectedIssuer, string expectedUsername, string expectedNonce)
+        /// <param name="payload">The JSON payload to be the body of the JWT</param>
+        /// <param name="clientSecret">The shared secret, must be at least 16 characters or an exception will occur</param>
+        /// <returns>The signed JWT with the given payload</returns>
+        internal static string CreateJwtFromPayload(string payload, string clientSecret)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clientSecret));
+            return SignPayload(payload, clientSecret);
+        }
 
-            var validationParameters = new TokenValidationParameters
+        /// <summary>
+        /// Validate the provided JWT against the expected audience and issuer, and that the signature is HMAC512 with the correct secret.
+        /// Throws a DuoException if any aspect of validation fails, the JWT is malformed, or if the secret is unusable
+        /// </summary>
+        /// <param name="jwt">The JWT to validate</param>
+        /// <param name="expectedAudience">The expected audience claim</param>
+        /// <param name="secret">The shared secret that should have been used to sign the JWT</param>
+        /// <param name="expectedIssuer">The expected issuer claim</param>
+        internal static void ValidateJwt(string jwt, string expectedAudience, string secret, string expectedIssuer)
+        {
+            ValidateSecret(secret);
+            JsonWebTokenHandler jwtHandler = new JsonWebTokenHandler();
+
+            if (!jwtHandler.CanReadToken(jwt))
             {
-                ValidateIssuer = true,
-                ValidIssuer = expectedIssuer,
-                ValidateAudience = true,
-                ValidAudience = clientId,
-                ValidateLifetime = true,
-                IssuerSigningKey = securityKey,
-                ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha512 },
-                ClockSkew = TimeSpan.FromMinutes(2)
-            };
+                throw new DuoException("The Id Token appears to be malformed");
+            }
 
-            var handler = new JsonWebTokenHandler();
-            var result = handler.ValidateTokenAsync(idToken, validationParameters).GetAwaiter().GetResult();
+            TokenValidationParameters validationParameters = GetValidationParameters(secret, expectedAudience, expectedIssuer);
+            TokenValidationResult result = jwtHandler.ValidateToken(jwt, validationParameters);
 
             if (!result.IsValid)
             {
-                throw new DuoException($"Error validating Duo ID token: {result.Exception?.Message}");
+                throw new DuoException("JWT validation failed", result.Exception);
             }
+        }
 
-            var token = result.SecurityToken as JsonWebToken;
-            if (token == null)
+        /// <summary>
+        /// Validate the provided client secret.  Secrets must be at least 16 characters to be a valid secret for HMAC SHA 512
+        /// </summary>
+        /// <param name="secret">The secret to check</param>
+        private static void ValidateSecret(string secret)
+        {
+            if (string.IsNullOrWhiteSpace(secret) || secret.Length < 16)
             {
-                throw new DuoException("ID token could not be parsed.");
+                throw new DuoException("Secret for validation is too short.  It must be at least 16 characters.");
             }
+        }
 
-            // Validate nonce
-            if (!string.IsNullOrEmpty(expectedNonce))
+        /// <summary>
+        /// Construct the TokenValidationParameters for validating a JWT
+        /// </summary>
+        /// <param name="secret">The secret that should have been used to sign the JWT</param>
+        /// <param name="audience">The expected audience claim</param>
+        /// <param name="issuer">The expected issuer claim</param>
+        /// <returns>A TokenValidationParameters for validating a JWT</returns>
+        private static TokenValidationParameters GetValidationParameters(string secret, string audience, string issuer)
+        {
+            // Many validations are done by default:
+            //   Signing is required by default
+            //   Issuer is validated by default
+            //   Audience is validated by default
+            //   Expiration is required by default
+            //   Lifetime (iat / nbf / exp) is validated by default, with a default 5 minute clock skew
+            // We additionally enforce that HMACSHA512 was used
+            return new TokenValidationParameters
             {
-                string actualNonce = GetClaimValue(token, "nonce");
-                if (actualNonce != expectedNonce)
-                {
-                    throw new DuoException("ID token nonce does not match expected nonce.");
-                }
-            }
-
-            // Validate preferred_username
-            string preferredUsername = GetClaimValue(token, "preferred_username");
-            if (!string.IsNullOrEmpty(expectedUsername) && !string.Equals(preferredUsername, expectedUsername, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new DuoException("ID token preferred_username does not match expected username.");
-            }
-
-            // Extract auth_context from the token if present
-            var authContext = new AuthContext();
-            string authCtxJson = GetClaimValue(token, "auth_context");
-            if (!string.IsNullOrEmpty(authCtxJson))
-            {
-                try
-                {
-                    authContext = JsonSerializer.Deserialize<AuthContext>(authCtxJson) ?? new AuthContext();
-                }
-                catch
-                {
-                    // If deserialization fails, use default empty AuthContext
-                }
-            }
-            else
-            {
-                authContext.Result = GetClaimValue(token, "auth_result");
-                authContext.Reason = GetClaimValue(token, "auth_reason");
-                authContext.Factor = GetClaimValue(token, "auth_factor");
-            }
-
-            return new IdToken
-            {
-                Username = preferredUsername,
-                AuthContext = authContext,
-                AuthTime = GetClaimValueAsInt(token, "auth_time")
+                ValidAlgorithms = new string[] { SecurityAlgorithms.HmacSha512 },
+                ValidAudience = audience,
+                ValidIssuer = issuer,
+                IssuerSigningKey = GenerateSecurityKey(secret),
             };
         }
 
-        private static string GetClaimValue(JsonWebToken token, string claimType)
+        /// <summary>
+        /// Validates the arguments and throws an exception for any that are empty strings
+        /// </summary>
+        /// <param name="clientId">OIDC Client Id</param>
+        /// <param name="clientSecret">OIDC Client secret, used for signing the token</param>
+        /// <param name="audience">OIDC Audience</param>
+        private static void ValidateArguments(string clientId, string clientSecret, string audience)
         {
-            if (token.TryGetPayloadValue<string>(claimType, out string value))
+            ValidateSecret(clientSecret);
+
+            if (string.IsNullOrWhiteSpace(clientId))
             {
-                return value;
+                throw new DuoException("clientId argument cannot be empty.");
             }
-            return null;
+
+            if (string.IsNullOrWhiteSpace(audience))
+            {
+                throw new DuoException("audience argument cannont be empty.");
+            }
+
         }
 
-        private static int GetClaimValueAsInt(JsonWebToken token, string claimType)
+        /// <summary>
+        /// Generate a JSON payload from the provided parameters
+        /// </summary>
+        /// <param name="clientId">OIDC Client Id</param>
+        /// <param name="audience">OIDC Audience</param>
+        /// <param name="additionalClaims">Any additional claims to include in the JWT payload</param>
+        /// <returns>A JSON string of the provided parameters</returns>
+        private static string GeneratePayload(string clientId, string audience, IDictionary<string, string> additionalClaims)
         {
-            if (token.TryGetPayloadValue<int>(claimType, out int value))
+            IDictionary<string, string> payloadParams = GenerateParams(clientId, audience, additionalClaims);
+
+            return SerializeParams(payloadParams);
+        }
+
+        /// <summary>
+        /// Package the provided parameters into a Dictionary suitable for conversion to a JWT
+        /// </summary>
+        /// <param name="clientId">OIDC Client Id</param>
+        /// <param name="audience">OIDC Audience</param>
+        /// <param name="additionalClaims">Any additional claims to include in the JWT payload</param>
+        /// <returns>An IDictionary containing the provided parameters keyed by the offical JWT claims identifiers</returns>
+        private static IDictionary<string, string> GenerateParams(string clientId, string audience, IDictionary<string, string> additionalClaims)
+        {
+            string jti = Utils.GenerateRandomString(36);
+            string exp = CalculateExpiration();
+
+            var claims = new Dictionary<string, string>() {
+                {Labels.ISS, clientId},
+                {Labels.AUD, audience},
+                {Labels.JTI, jti},
+                {Labels.EXP, exp}
+            };
+
+            // Caller can provide additional claims, or overwrite the default ones, if necessary
+            foreach (KeyValuePair<string, string> claim in additionalClaims)
             {
-                return value;
+                claims[claim.Key] = claim.Value;
             }
-            return 0;
+
+            return claims;
+        }
+
+        private static string CalculateExpiration()
+        {
+            long exp = EpochTime.GetIntDate(DateTime.UtcNow.AddMinutes(FIVE_MINUTES));
+            return exp.ToString();
+        }
+
+        /// <summary>
+        /// Serialize the provided parameter map to JSON
+        /// </summary>
+        /// <param name="payloadParams">The JWT payload parameters</param>
+        /// <returns>A JSON string representation of the provided parameters</returns>
+        private static string SerializeParams(IDictionary<string, string> payloadParams)
+        {
+            return JsonSerializer.Serialize(payloadParams);
+        }
+
+        /// <summary>
+        /// Create a signed JWT for the provided payload and shared secret
+        /// </summary>
+        /// <param name="payload">The JSON payload</param>
+        /// <param name="secret">The shared secret</param>
+        /// <returns></returns>
+        private static string SignPayload(string payload, string secret)
+        {
+            SigningCredentials signingCreds = GenerateSigningCreds(secret);
+
+            JsonWebTokenHandler jwtHandler = new JsonWebTokenHandler
+            {
+                // We'll manually set the timestamps we care about
+                SetDefaultTimesOnTokenCreation = false,
+                TokenLifetimeInMinutes = FIVE_MINUTES
+            };
+
+            return jwtHandler.CreateToken(payload, signingCreds);
+        }
+
+        /// <summary>
+        /// Generate a signing credential for the given shared secret
+        /// </summary>
+        /// <param name="secret">The shared secret</param>
+        /// <returns>A SigningCredentials to be used by the JWT token creator</returns>
+        private static SigningCredentials GenerateSigningCreds(string secret)
+        {
+            SecurityKey signingKey = GenerateSecurityKey(secret);
+            return new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha512);
+        }
+
+        /// <summary>
+        /// Generate a SecurityKey for the given shared secret 
+        /// </summary>
+        /// <param name="secret">The shared secret</param>
+        /// <returns>A SecurityKey encoding the shared secret</returns>
+        private static SecurityKey GenerateSecurityKey(string secret)
+        {
+            byte[] keyBytes = Encoding.UTF8.GetBytes(secret);
+            // In case anything wants to enforce the correct key size, pad out to 64 bytes
+            if (keyBytes.Length < 64)
+            {
+                Array.Resize(ref keyBytes, 64);
+            }
+            return new SymmetricSecurityKey(keyBytes);
         }
     }
 }

@@ -90,11 +90,13 @@ namespace DuoUniversal
         public async Task<bool> DoHealthCheck()
         {
             string url = $"https://{_apiHost}{HEALTH_CHECK_ENDPOINT}";
+            // Generate a subject JWT for the health check endpoint (minimal claims: iss, aud, jti, exp + sub)
+            var healthCheckClaims = new Dictionary<string, string> { { Labels.SUB, _clientId } };
             var parameters = new Dictionary<string, string>
             {
                 { Labels.CLIENT_ID, _clientId },
-                { Labels.CLIENT_ASSERTION, JwtUtils.CreateJwt(_clientId, _clientSecret, $"https://{_apiHost}{HEALTH_CHECK_ENDPOINT}", null, null) },
-                { Labels.CLIENT_ASSERTION_TYPE, "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" }
+                { Labels.CLIENT_ASSERTION, JwtUtils.CreateSignedJwt(_clientId, _clientSecret, $"https://{_apiHost}{HEALTH_CHECK_ENDPOINT}", healthCheckClaims) },
+                { Labels.CLIENT_ASSERTION_TYPE, Labels.JWT_BEARER_TYPE }
             };
 
             var response = await _httpClient.PostAsync(url, Utils.CreateFormContent(parameters));
@@ -117,12 +119,22 @@ namespace DuoUniversal
             Utils.ValidateRequiredStringParam(nameof(username), username);
             Utils.ValidateRequiredStringParam(nameof(state), state);
 
-            string nonce = Utils.GenerateRandomString(STATE_LENGTH);
-            string jwt = JwtUtils.CreateJwt(_clientId, _clientSecret, $"https://{_apiHost}{AUTHORIZE_ENDPOINT}", username, nonce);
+            // Build the auth JWT with required OIDC claims for the Duo authorize endpoint
+            string authEndpoint = $"https://{_apiHost}{AUTHORIZE_ENDPOINT}";
+            var additionalClaims = new Dictionary<string, string>
+            {
+                { Labels.CLIENT_ID, _clientId },
+                { Labels.DUO_UNAME, username },
+                { Labels.REDIRECT_URI, _redirectUri },
+                { Labels.RESPONSE_TYPE, Labels.CODE },
+                { Labels.SCOPE, Labels.OPENID },
+                { Labels.STATE, state }
+            };
+            string jwt = JwtUtils.CreateSignedJwt(_clientId, _clientSecret, authEndpoint, additionalClaims);
 
             var queryParams = new Dictionary<string, string>
             {
-                { "response_type", "code" },
+                { Labels.RESPONSE_TYPE, Labels.CODE },
                 { Labels.CLIENT_ID, _clientId },
                 { Labels.REQUEST, jwt },
                 { Labels.REDIRECT_URI, _redirectUri }
@@ -145,23 +157,25 @@ namespace DuoUniversal
         /// <summary>
         /// Exchange the authorization code from Duo callback for an ID token and validate it.
         /// </summary>
-        public async Task<IdToken> ExchangeAuthorizationCodeFor2FAResult(string duoCode, string username, string nonce = null)
+        public async Task<IdToken> ExchangeAuthorizationCodeFor2FAResult(string duoCode, string username)
         {
             Utils.ValidateRequiredStringParam(nameof(duoCode), duoCode);
             Utils.ValidateRequiredStringParam(nameof(username), username);
 
-            string url = $"https://{_apiHost}{TOKEN_ENDPOINT}";
+            string tokenEndpoint = $"https://{_apiHost}{TOKEN_ENDPOINT}";
+            // Generate a subject JWT for authenticating the token endpoint request
+            var subjectClaims = new Dictionary<string, string> { { Labels.SUB, _clientId } };
             var parameters = new Dictionary<string, string>
             {
-                { "grant_type", Labels.AUTHORIZATION_CODE },
+                { Labels.GRANT_TYPE, Labels.AUTHORIZATION_CODE },
                 { Labels.CODE, duoCode },
                 { Labels.REDIRECT_URI, _redirectUri },
                 { Labels.CLIENT_ID, _clientId },
-                { Labels.CLIENT_ASSERTION, JwtUtils.CreateJwt(_clientId, _clientSecret, $"https://{_apiHost}{TOKEN_ENDPOINT}", null, null) },
-                { Labels.CLIENT_ASSERTION_TYPE, "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" }
+                { Labels.CLIENT_ASSERTION, JwtUtils.CreateSignedJwt(_clientId, _clientSecret, tokenEndpoint, subjectClaims) },
+                { Labels.CLIENT_ASSERTION_TYPE, Labels.JWT_BEARER_TYPE }
             };
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint);
             request.Content = Utils.CreateFormContent(parameters);
 
             var response = await _httpClient.SendAsync(request);
@@ -178,14 +192,17 @@ namespace DuoUniversal
                 throw new DuoException("No ID token in Duo token response.");
             }
 
-            return JwtUtils.ValidateIdToken(
-                tokenResponse.IdToken,
-                _clientId,
-                _clientSecret,
-                $"https://{_apiHost}{TOKEN_ENDPOINT}",
-                username,
-                nonce
-            );
+            // Validate the JWT signature, audience, issuer, and expiry; then decode the token claims
+            JwtUtils.ValidateJwt(tokenResponse.IdToken, _clientId, _clientSecret, tokenEndpoint);
+            IdToken idToken = Utils.DecodeToken(tokenResponse.IdToken);
+
+            // Enforce that the authenticated username matches the expected username
+            if (!string.Equals(idToken.Username, username, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DuoException("The specified username does not match the username from Duo");
+            }
+
+            return idToken;
         }
     }
 }
