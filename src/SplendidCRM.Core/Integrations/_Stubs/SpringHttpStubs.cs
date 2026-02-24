@@ -9,6 +9,22 @@ using System;
 using System.Net;
 using System.Text;
 
+namespace Spring.IO
+{
+    /// <summary>
+    /// Stub replacement for Spring.IO.IResource from Spring.Rest.dll.
+    /// Represents an abstraction over underlying resource (file, URL, stream, etc.).
+    /// Used as a parameter type for media upload methods in Spring.Social.Twitter
+    /// ITimelineOperations interface (UpdateStatus with photo/IResource overloads).
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public interface IResource
+    {
+        /// <summary>Gets or sets the description of the resource.</summary>
+        string Description { get; }
+    }
+}
+
 namespace Spring.Http
 {
     /// <summary>
@@ -42,6 +58,29 @@ namespace Spring.Http
         HEAD,
         OPTIONS,
         PATCH
+    }
+
+    /// <summary>
+    /// Stub replacement for Spring.Http.HttpResponseMessage from Spring.Rest.dll.
+    /// Represents a non-generic HTTP response message (status code, headers, body as byte[]).
+    /// Used as type parameter in RestOperationCompletedEventArgs&lt;HttpResponseMessage&gt; for
+    /// Retweet, AddToFavorites, and RemoveFromFavorites async callback methods in
+    /// Spring.Social.Twitter ITimelineOperations interface.
+    /// Dormant stub — not executed at runtime.
+    /// </summary>
+    public class HttpResponseMessage
+    {
+        /// <summary>Gets or sets the HTTP status code.</summary>
+        public System.Net.HttpStatusCode StatusCode { get; set; }
+
+        /// <summary>Gets or sets the HTTP status description.</summary>
+        public string StatusDescription { get; set; }
+
+        /// <summary>Gets or sets the response body as raw bytes.</summary>
+        public byte[] Body { get; set; }
+
+        /// <summary>Gets or sets the response headers.</summary>
+        public HttpHeaders Headers { get; set; }
     }
 
     /// <summary>
