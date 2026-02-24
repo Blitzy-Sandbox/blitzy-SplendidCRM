@@ -47,6 +47,10 @@
     <!-- Used in Spring.Social integration stubs for GetObjectData overrides -->
     <PackageReference Include="System.Security.Permissions" Version="10.0.0" />
 
+    <!-- ODBC: dBase (.dbf) import via Microsoft dBase ODBC driver (Windows-only at runtime) -->
+    <!-- Required by SplendidImport.cs ConvertDBaseToXml() and ConvertStreamToXml() dbase/act paths -->
+    <PackageReference Include="System.Data.Odbc" Version="9.0.1" />
+
   </ItemGroup>
 
 </Project>
