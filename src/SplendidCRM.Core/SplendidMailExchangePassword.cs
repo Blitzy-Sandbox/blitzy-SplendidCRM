@@ -64,6 +64,29 @@ namespace SplendidCRM
 			throw new Exception("Exchange Server integration is not supported.");
 		}
 
+		/// <summary>
+		/// Initialises the Exchange Server (password) mail client with explicit connection parameters.
+		/// .NET 10 Migration: HttpApplicationState Application replaced with IMemoryCache memoryCache.
+		///
+		/// Original signature: SplendidMailExchangePassword(HttpApplicationState Application, string sSERVER_URL, string sUSER_NAME, string sPASSWORD)
+		/// Migration change: HttpApplicationState Application → IMemoryCache memoryCache
+		///
+		/// Community Edition: throws immediately to indicate the integration is not supported.
+		/// The Enterprise Edition overrides this to establish an EWS (Exchange Web Services) connection.
+		/// </summary>
+		/// <param name="memoryCache">
+		///   In-process memory cache (replaces Application[] in .NET Framework).
+		/// </param>
+		/// <param name="sSERVER_URL">Exchange Web Services endpoint URL (e.g. https://exchange.contoso.com/EWS/Exchange.asmx).</param>
+		/// <param name="sUSER_NAME">Exchange account username (UPN or domain\user).</param>
+		/// <param name="sPASSWORD">Exchange account password.</param>
+		/// <exception cref="Exception">Always thrown — Exchange Server integration is not supported.</exception>
+		public SplendidMailExchangePassword(IMemoryCache memoryCache, string sSERVER_URL, string sUSER_NAME, string sPASSWORD)
+			: base(memoryCache)
+		{
+			throw new Exception("Exchange Server integration is not supported.");
+		}
+
 		/// <inheritdoc/>
 		/// <exception cref="Exception">Always thrown — Exchange Server integration is not supported.</exception>
 		override public void Send(MailMessage mail)
