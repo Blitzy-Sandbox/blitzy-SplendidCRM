@@ -1,52 +1,35 @@
 #nullable disable
 using System;
 using System.Collections.Generic;
+
 namespace Spring.Social.Twitter.Api
 {
+    /// <summary>
+    /// Legacy compatibility class representing tweet entity metadata.
+    /// Note: The migrated Twitter API uses <see cref="TweetEntities"/> instead.
+    /// This class is retained as a compile-time compatibility stub.
+    /// </summary>
     [Serializable]
     public class Entities
     {
+        /// <summary>
+        /// Gets or sets the URLs extracted from the Tweet text.
+        /// </summary>
         public List<UrlEntity> Urls { get; set; }
-        public List<HashTagEntity> HashTags { get; set; }
-        public List<MentionEntity> Mentions { get; set; }
+
+        /// <summary>
+        /// Gets or sets the hashtags extracted from the Tweet text.
+        /// </summary>
+        public List<HashtagEntity> Hashtags { get; set; }
+
+        /// <summary>
+        /// Gets or sets the user mentions extracted from the Tweet text.
+        /// </summary>
+        public List<UserMentionEntity> Mentions { get; set; }
+
+        /// <summary>
+        /// Gets or sets the media extracted from the Tweet text.
+        /// </summary>
         public List<MediaEntity> Media { get; set; }
-    }
-
-    [Serializable]
-    public class UrlEntity
-    {
-        public string Url { get; set; }
-        public string DisplayUrl { get; set; }
-        public string ExpandedUrl { get; set; }
-        public List<int> Indices { get; set; }
-    }
-
-    [Serializable]
-    public class HashTagEntity
-    {
-        public string Text { get; set; }
-        public List<int> Indices { get; set; }
-    }
-
-    [Serializable]
-    public class MentionEntity
-    {
-        public long ID { get; set; }
-        public string ScreenName { get; set; }
-        public string Name { get; set; }
-        public List<int> Indices { get; set; }
-    }
-
-    [Serializable]
-    public class MediaEntity
-    {
-        public long ID { get; set; }
-        public string MediaUrl { get; set; }
-        public string MediaUrlHttps { get; set; }
-        public string Url { get; set; }
-        public string DisplayUrl { get; set; }
-        public string ExpandedUrl { get; set; }
-        public string Type { get; set; }
-        public List<int> Indices { get; set; }
     }
 }
