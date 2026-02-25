@@ -639,6 +639,41 @@ namespace SplendidCRM
 		}
 
 		// =====================================================================================
+		// WebForms Control compatibility — added for DynamicControl migration
+		// BEFORE: System.Web.UI.Control.ID (string property inherited from Control)
+		//         System.Web.UI.Control.FindControl(string) (inherited from Control)
+		// AFTER:  Simple stub implementations for .NET 10 DynamicControl compatibility.
+		//         ID: simple string property (no naming-container hierarchy).
+		//         FindControl: always returns null — no WebForms control tree in ReactOnlyUI.
+		// =====================================================================================
+
+		/// <summary>
+		/// The unique server-side identifier for this control.
+		/// BEFORE: inherited from System.Web.UI.Control — used in DynamicControl.ClientID as
+		///         "ctlPARENT.ID + ':' + sNAME" to construct the compound field identifier.
+		/// AFTER:  Simple auto-property; defaults to String.Empty.
+		///         Used by DynamicControl.ClientID as the parent prefix.
+		/// </summary>
+		// .NET 10 Migration: Added for DynamicControl compatibility.
+		// DynamicControl.ClientID = ctlPARENT.ID + ":" + sNAME (uses this property as prefix).
+		public string ID { get; set; } = String.Empty;
+
+		/// <summary>
+		/// Searches for a named child control. Always returns null in .NET 10 ReactOnlyUI.
+		/// BEFORE: System.Web.UI.Control.FindControl(string id) — traversed the WebForms
+		///         control tree looking for a control matching the given ID.  Used extensively
+		///         in DynamicControl to locate typed form fields (TextBox, DropDownList, etc.).
+		/// AFTER:  Always returns null — no WebForms control tree exists in ASP.NET Core.
+		///         DynamicControl falls through to its DataRow fallback paths on null return.
+		/// </summary>
+		/// <param name="id">The ID of the control to find (ignored in .NET 10).</param>
+		/// <returns>Always null — no WebForms control tree in ReactOnlyUI.</returns>
+		// .NET 10 Migration: Added for DynamicControl compatibility.
+		// DynamicControl calls ctlPARENT.FindControl(sNAME) to locate named form fields.
+		// Returning null causes DynamicControl to use its DataRow fallback (primary path).
+		public virtual Control FindControl(string id) { return null; }
+
+		// =====================================================================================
 		// Localization, timezone, and currency initialization
 		// BEFORE: Context.Items["L10n/T10n/C10n"] → stored/read via WebForms Context.Items
 		//         Session["USER_SETTINGS/CULTURE/TIMEZONE/CURRENCY"] → WebForms Session

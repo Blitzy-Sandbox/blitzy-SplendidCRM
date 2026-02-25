@@ -61,6 +61,24 @@ namespace SplendidCRM
 		public string ID { get; set; }
 
 		/// <summary>
+		/// Client-side HTML element ID, mirrors System.Web.UI.Control.ClientID.
+		/// BEFORE: Generated from naming container hierarchy in WebForms.
+		/// AFTER:  Returns ID (no naming container hierarchy in .NET 10 stub).
+		/// Used by DynamicControl.ClientID as the parent ID prefix.
+		/// </summary>
+		// .NET 10 Migration: Added for DynamicControl.ClientID compatibility.
+		public virtual string ClientID { get { return ID; } }
+
+		/// <summary>
+		/// Whether this control is rendered in the page output.
+		/// BEFORE: System.Web.UI.Control.Visible — suppressed rendering when false.
+		/// AFTER:  Simple bool property; defaults to true (no rendering in .NET 10).
+		/// Used by DynamicControl.Visible property getter/setter.
+		/// </summary>
+		// .NET 10 Migration: Added for DynamicControl.Visible compatibility.
+		public bool Visible { get; set; } = true;
+
+		/// <summary>
 		/// Naming container parent control. In WebForms this walks up the control tree to
 		/// the nearest INamingContainer. In this stub it always returns null — validators
 		/// that use NamingContainer (TeamSelect, UserSelect, etc.) will return false from

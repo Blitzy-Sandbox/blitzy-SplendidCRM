@@ -1020,6 +1020,25 @@ namespace SplendidCRM
 		// =====================================================================================
 
 		/// <summary>
+		/// No-op stub. Original set the selected value of a WebForms DropDownList or ListBox.
+		/// BEFORE: Validated the value against the control's Items collection and set
+		///         DropDownList.SelectedValue / ListBox.SelectedValue.
+		/// AFTER:  No-op — WebForms ListControl not available in ASP.NET Core.
+		///         Preserved as a static stub for DynamicControl API compatibility.
+		///         DynamicControl's Text setter calls Utils.SetValue(lst, value) when it
+		///         has a DropDownList or ListBox control; since FindControl always returns
+		///         null in .NET 10 ReactOnlyUI, this stub is never actually invoked.
+		/// </summary>
+		/// <param name="lst">The WebForms ListControl to set (always null in .NET 10).</param>
+		/// <param name="sValue">The value to select (ignored in .NET 10).</param>
+		// .NET 10 Migration: Added for DynamicControl compatibility.
+		// DynamicControl.Text setter: Utils.SetValue(lst, value) — no-op stub.
+		public static void SetValue(object lst, string sValue)
+		{
+			// No-op: WebForms ListControl not available in ASP.NET Core
+		}
+
+		/// <summary>
 		/// No-op stub. Original selected a ListBox item in a WebForms control.
 		/// Not applicable in ASP.NET Core MVC.
 		/// </summary>
