@@ -55,10 +55,21 @@ using SoapCore;
 // =====================================================================================
 var builder = WebApplication.CreateBuilder(args);
 
-// Security hardening: suppress Kestrel Server header to prevent technology disclosure (Issue 4).
+// Configure Kestrel web server settings.
+// Replaces Web.config <httpRuntime maxRequestLength="104857600" /> (line 111) and
+// <system.webServer>/<security>/<requestFiltering>/<requestLimits maxAllowedContentLength="104857600"/>
+// (Web.config line 139) with Kestrel-native limits.
+// Kestrel port is configurable via ASPNETCORE_URLS env var (default http://+:5000).
 builder.WebHost.ConfigureKestrel(options =>
 {
+	// Security hardening: suppress Kestrel Server header to prevent technology disclosure.
 	options.AddServerHeader = false;
+
+	// 100MB request body size limit — matches legacy Web.config line 111:
+	//   maxRequestLength="104857600" (in bytes)
+	// Required for file upload endpoints (image, campaign tracker, import).
+	// Per AAP Phase 7 (Kestrel Configuration).
+	options.Limits.MaxRequestBodySize = 104857600;
 });
 
 // Tier 5 (lowest priority): appsettings.json — already loaded by default.
@@ -180,6 +191,16 @@ else
 	authBuilder.AddFormsAuthentication(builder.Configuration);
 }
 
+// Conditionally register Duo 2FA if DUO_INTEGRATION_KEY is present in configuration.
+// Per AAP §0.8.2: DUO_INTEGRATION_KEY is Optional — DuoUniversal 2FA is only registered when
+// this key is non-empty. Replaces the embedded DuoUniversal implementation from
+// SplendidCRM/_code/DuoUniversal/ by wiring into the DuoTwoFactorSetup middleware.
+string duoIntegrationKey = builder.Configuration["Duo:IntegrationKey"];
+if (!string.IsNullOrWhiteSpace(duoIntegrationKey))
+{
+	builder.Services.AddDuoTwoFactorAuthentication(builder.Configuration);
+}
+
 // Authorization services with 4-tier ACL model (Module → Team → Field → Record).
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<ModuleAuthorizationHandler>();
@@ -243,7 +264,17 @@ builder.Services.AddSingleton<SplendidMailSmtp>();
 builder.Services.AddSingleton<WorkflowUtils>();
 builder.Services.AddSingleton<WorkflowInit>();
 builder.Services.AddSingleton<SyncUtils>();
+builder.Services.AddSingleton<SyncError>();
 builder.Services.AddSingleton<SqlBuild>();
+builder.Services.AddSingleton<DbAcrhiveFactories>();
+builder.Services.AddSingleton<SplendidGrid>();
+
+// Mail transport subclasses registered for direct DI resolution when needed by services.
+// Note: SplendidMailClient.CreateMailClient() also instantiates these via factory pattern.
+// Registering them here provides optional direct resolution via IServiceProvider if needed.
+builder.Services.AddSingleton<SplendidMailOffice365>();
+builder.Services.AddSingleton<SplendidMailGmail>();
+builder.Services.AddSingleton<SplendidMailExchangePassword>();
 
 // SignalR manager services (business logic behind hub invocations).
 builder.Services.AddSingleton<ChatManager>();
@@ -309,11 +340,15 @@ builder.Services.AddHostedService<EmailPollingHostedService>();
 builder.Services.AddHostedService<ArchiveHostedService>();
 builder.Services.AddHostedService<CacheInvalidationService>();
 
-// Cookie policy (replaces Global.asax.cs Session_Start cookie hardening).
-builder.Services.Configure<CookiePolicyOptions>(options =>
-{
-	options.MinimumSameSitePolicy = SameSiteMode.Lax;
-});
+// Cookie policy (replaces Global.asax.cs Session_Start SameSite/Secure cookie hardening).
+// AddSplendidCookiePolicy() configures:
+//   - MinimumSameSitePolicy = SameSiteMode.Lax (AAP §0.7.6)
+//   - Secure = CookieSecurePolicy.SameAsRequest (HTTPS only)
+//   - User-agent-based SameSite override for iOS 12 / Chrome 50-69 / Mac Safari 12
+//     (replicates DisallowsSameSiteNone from Global.asax.cs lines 110-147)
+// P3P header intentionally dropped — legacy IE iframe compatibility, no modern browsers support it
+// (was in Global.asax.cs lines 223-226; per AAP §0.7.6 and Phase 6 requirement)
+builder.Services.AddSplendidCookiePolicy();
 
 // =====================================================================================
 // 3. BUILD — Build the application
@@ -397,10 +432,13 @@ app.UseSession();
 // Map REST API controllers.
 app.MapControllers();
 
-// Map SignalR hubs (preserves hub method signatures from OWIN SignalR).
-app.MapHub<ChatManagerHub>("/hubs/chat");
-app.MapHub<TwilioManagerHub>("/hubs/twilio");
-app.MapHub<PhoneBurnerHub>("/hubs/phoneburner");
+// Map SignalR hubs via SignalRUtils.MapHubs() (preserves hub method signatures from OWIN SignalR).
+// Registers: ChatManagerHub at /hubs/chat, TwilioManagerHub at /hubs/twilio,
+//            PhoneBurnerHub at /hubs/phoneburner.
+// HANDOFF TO PROMPT 2: These paths changed from the OWIN default /signalr.
+//   Frontend must update @microsoft/signalr HubConnectionBuilder().withUrl() calls accordingly.
+// Per AAP §0.4.4 and §0.7 (Goal 7 — SignalR Migration).
+SignalRUtils.MapHubs(app);
 
 // =====================================================================================
 // 6. RUN — Start the application
