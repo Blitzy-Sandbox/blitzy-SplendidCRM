@@ -15,6 +15,8 @@
 
   <ItemGroup>
     <!-- Data Access: replaces System.Data.SqlClient -->
+    <PackageReference Include="LogicBuilder.Workflow.Activities.Rules" Version="2.0.4" />
+    <PackageReference Include="LogicBuilder.Workflow.ComponentModel.Serialization" Version="2.0.4" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
 
     <!-- JSON Serialization: backward compatibility fallback -->
@@ -35,6 +37,7 @@
 
     <!-- HTTP Client: integration stubs (Spring.Social replacement) -->
     <PackageReference Include="RestSharp" Version="112.1.0" />
+    <PackageReference Include="System.CodeDom" Version="10.0.0" />
 
     <!-- Telephony: Twilio SMS/Voice API -->
     <PackageReference Include="Twilio" Version="7.8.0" />

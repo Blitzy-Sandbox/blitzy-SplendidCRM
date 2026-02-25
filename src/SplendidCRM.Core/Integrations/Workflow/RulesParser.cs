@@ -19,26 +19,17 @@
  * the Appropriate Legal Notices must display the following words on all interactive user interfaces: 
  * "Copyright (C) 2005-2011 SplendidCRM Software, Inc. All rights reserved."
  *********************************************************************************************************************/
+// .NET 10 Migration: Stub RuleValidation, RuleExpressionCondition, and RuleAction classes removed.
+// These are now provided by LogicBuilder.Workflow.Activities.Rules 2.0.4 NuGet package.
+// Removed stub definitions prevent namespace conflict with the real LogicBuilder types.
+// The RulesParser class uses LogicBuilder types via the using directive below.
 using System;
 using System.Reflection;
 using System.Collections.Generic;
+using LogicBuilder.Workflow.Activities.Rules;
 
 namespace SplendidCRM
 {
-	// STUB: System.Workflow.Activities.Rules.RuleValidation is not available in .NET 10. Dormant stub for compilation only.
-	public class RuleValidation
-	{
-	}
-
-	// STUB: System.Workflow.Activities.Rules.RuleExpressionCondition is not available in .NET 10. Dormant stub for compilation only.
-	public class RuleExpressionCondition
-	{
-	}
-
-	// STUB: System.Workflow.Activities.Rules.RuleAction is not available in .NET 10. Dormant stub for compilation only.
-	public class RuleAction
-	{
-	}
 
 	public class RulesParser
 	{
