@@ -659,6 +659,20 @@ namespace SplendidCRM
 		public string ID { get; set; } = String.Empty;
 
 		/// <summary>
+		/// Gets or sets whether this control is considered visible/active.
+		/// BEFORE: inherited from System.Web.UI.Control.Visible — suppressed WebForms rendering
+		///         when false (the control was not rendered to the HTML output).
+		/// AFTER:  Simple bool auto-property; defaults to true.
+		///         Callers (e.g. MassUpdate.Page_Load) set Visible = false on mobile browsers
+		///         to indicate the control should be excluded from the response.
+		///         No WebForms rendering suppression — callers check this property as needed.
+		/// </summary>
+		// .NET 10 Migration: Added to replace System.Web.UI.Control.Visible.
+		// Used by MassUpdate.Page_Load() to hide the control on mobile browsers.
+		// Used by DynamicControl.Visible as a pass-through property.
+		public bool Visible { get; set; } = true;
+
+		/// <summary>
 		/// Searches for a named child control. Always returns null in .NET 10 ReactOnlyUI.
 		/// BEFORE: System.Web.UI.Control.FindControl(string id) — traversed the WebForms
 		///         control tree looking for a control matching the given ID.  Used extensively
