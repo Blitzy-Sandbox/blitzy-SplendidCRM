@@ -1337,7 +1337,7 @@ namespace SplendidCRM
 							}
 						}
 					}
-					Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+					Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 					// 02/23/2017 Paul.  Add support for Team Hierarchy.
 					// 06/05/2017 Paul.  The SavedSearch does not apply to the Dashboard.
 					// 04/24/2018 Paul.  Provide a way to exclude the SavedSearch for areas that are global in nature.
@@ -1361,7 +1361,7 @@ namespace SplendidCRM
 								cmd.CommandText += "       inner join " + fnPrefix + "fnTEAM_HIERARCHY_ByTeam(@" + sFieldPlaceholder2 + ") vwTEAM_HIERARCHY_ByTeam" + ControlChars.CrLf;
 								cmd.CommandText += "               on vwTEAM_HIERARCHY_ByTeam.MEMBERSHIP_TEAM_ID = TEAM_ID" + ControlChars.CrLf;
 							}
-							Sql.AddParameter(cmd, "@" + sFieldPlaceholder2, gTEAM_ID);
+							Sql.AddParameter(cmd, sFieldPlaceholder2, gTEAM_ID);
 						}
 					}
 				}
@@ -1388,7 +1388,7 @@ namespace SplendidCRM
 					cmd.CommandText += "join vwASSIGNED_SET_MEMBERSHIPS" + ControlChars.CrLf;
 					cmd.CommandText += "               on vwASSIGNED_SET_MEMBERSHIPS.MEMBERSHIP_ASSIGNED_SET_ID  = " + sASSIGNED_SET_ID_Field + ControlChars.CrLf;
 					cmd.CommandText += "              and vwASSIGNED_SET_MEMBERSHIPS.MEMBERSHIP_ASSIGNED_USER_ID = @" + sFieldPlaceholder + ControlChars.CrLf;
-					Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+					Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 				}
 			}
 
@@ -1436,7 +1436,7 @@ namespace SplendidCRM
 							else
 								cmd.CommandText += "   and "       + sASSIGNED_USER_ID_Field +  " = @"       + sFieldPlaceholder       + ControlChars.CrLf;
 						}
-						Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+						Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 					}
 				}
 			}
@@ -1529,7 +1529,7 @@ namespace SplendidCRM
 							}
 						}
 					}
-					Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+					Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 					// 02/23/2017 Paul.  Add support for Team Hierarchy.
 					if (bEnableTeamHierarchy)
 					{
@@ -1551,7 +1551,7 @@ namespace SplendidCRM
 								cmd.CommandText += "       inner join " + fnPrefix + "fnTEAM_HIERARCHY_ByTeam(@" + sFieldPlaceholder2 + ") vwTEAM_HIERARCHY_ByTeam" + ControlChars.CrLf;
 								cmd.CommandText += "               on vwTEAM_HIERARCHY_ByTeam.MEMBERSHIP_TEAM_ID = TEAM_ID" + ControlChars.CrLf;
 							}
-							Sql.AddParameter(cmd, "@" + sFieldPlaceholder2, gTEAM_ID);
+							Sql.AddParameter(cmd, sFieldPlaceholder2, gTEAM_ID);
 						}
 					}
 				}
@@ -1583,7 +1583,7 @@ namespace SplendidCRM
 						cmd.CommandText += "join vwASSIGNED_SET_MEMBERSHIPS   vwASSIGNED_SET_MEMBERSHIPS_" + sMODULE_NAME + ControlChars.CrLf;
 						cmd.CommandText += "               on vwASSIGNED_SET_MEMBERSHIPS_" + sMODULE_NAME + ".MEMBERSHIP_ASSIGNED_SET_ID  = " + sASSIGNED_SET_ID_Field + ControlChars.CrLf;
 						cmd.CommandText += "              and vwASSIGNED_SET_MEMBERSHIPS_" + sMODULE_NAME + ".MEMBERSHIP_ASSIGNED_USER_ID = @" + sFieldPlaceholder + ControlChars.CrLf;
-						Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+						Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 					}
 				}
 			}
@@ -1618,13 +1618,13 @@ namespace SplendidCRM
 							{
 								string sMODULEPlaceholder = NextPlaceholder(cmd, sMODULE_NAME_Field);
 								cmd.CommandText += "         or (" + sMODULE_NAME_Field + " = @" + sMODULEPlaceholder + sModuleSpacer + " and (" + sASSIGNED_SET_ID_Field + " is null or vwASSIGNED_SET_MEMBERSHIPS_" + sMODULE_NAME + ".MEMBERSHIP_ASSIGNED_SET_ID is not null))" + ControlChars.CrLf;
-								Sql.AddParameter(cmd, "@" + sMODULEPlaceholder, sMODULE_NAME);
+								Sql.AddParameter(cmd, sMODULEPlaceholder, sMODULE_NAME);
 							}
 							else
 							{
 								string sMODULEPlaceholder = NextPlaceholder(cmd, sMODULE_NAME_Field);
 								cmd.CommandText += "         or (" + sMODULE_NAME_Field + " = @" + sMODULEPlaceholder + sModuleSpacer + " and (vwASSIGNED_SET_MEMBERSHIPS_" + sMODULE_NAME + ".MEMBERSHIP_ASSIGNED_SET_ID is not null))" + ControlChars.CrLf;
-								Sql.AddParameter(cmd, "@" + sMODULEPlaceholder, sMODULE_NAME);
+								Sql.AddParameter(cmd, sMODULEPlaceholder, sMODULE_NAME);
 							}
 						}
 						else
@@ -1645,15 +1645,15 @@ namespace SplendidCRM
 								else
 									cmd.CommandText += "         or (" + sMODULE_NAME_Field + " = @" + sMODULEPlaceholder + sModuleSpacer + " and "       + sASSIGNED_USER_ID_Field +  " = @"       + sFieldPlaceholder +  ")" + ControlChars.CrLf;
 							}
-							Sql.AddParameter(cmd, "@" + sFieldPlaceholder , this.USER_ID  );
-							Sql.AddParameter(cmd, "@" + sMODULEPlaceholder, sMODULE_NAME  );
+							Sql.AddParameter(cmd, sFieldPlaceholder , this.USER_ID  );
+							Sql.AddParameter(cmd, sMODULEPlaceholder, sMODULE_NAME  );
 						}
 					}
 					else if (nACLACCESS > 0)
 					{
 						string sMODULEPlaceholder = NextPlaceholder(cmd, sMODULE_NAME_Field);
 						cmd.CommandText += "          or " + sMODULE_NAME_Field + " = @" + sMODULEPlaceholder + ControlChars.CrLf;
-						Sql.AddParameter(cmd, "@" + sMODULEPlaceholder, sMODULE_NAME);
+						Sql.AddParameter(cmd, sMODULEPlaceholder, sMODULE_NAME);
 					}
 				}
 				cmd.CommandText += "       )" + ControlChars.CrLf;
@@ -1702,7 +1702,7 @@ namespace SplendidCRM
 					cmd.CommandText += "join vwASSIGNED_SET_MEMBERSHIPS" + ControlChars.CrLf;
 					cmd.CommandText += "               on vwASSIGNED_SET_MEMBERSHIPS.MEMBERSHIP_ASSIGNED_SET_ID  = " + sASSIGNED_SET_ID_Field + ControlChars.CrLf;
 					cmd.CommandText += "              and vwASSIGNED_SET_MEMBERSHIPS.MEMBERSHIP_ASSIGNED_USER_ID = @" + sFieldPlaceholder + ControlChars.CrLf;
-					Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+					Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 				}
 			}
 
@@ -1736,7 +1736,7 @@ namespace SplendidCRM
 							else
 								cmd.CommandText += "   and "       + sASSIGNED_USER_ID_Field +  " = @"       + sFieldPlaceholder       + ControlChars.CrLf;
 						}
-						Sql.AddParameter(cmd, "@" + sFieldPlaceholder, this.USER_ID);
+						Sql.AddParameter(cmd, sFieldPlaceholder, this.USER_ID);
 					}
 				}
 			}
