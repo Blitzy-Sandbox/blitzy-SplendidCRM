@@ -3345,5 +3345,129 @@ namespace SplendidCRM
 			return sTableName;
 		}
 
+	// =====================================================================================
+		// RestTables — returns a DataTable from vwSYSTEM_REST_TABLES for a given table name.
+		// Used by the SOAP service to validate that a module is accessible via REST/SOAP.
+		// Migrated from SplendidCRM/_code/SplendidCache.cs line 6962.
+		// Session-based caching migrated to IMemoryCache with same cache key pattern.
+		// =====================================================================================
+		public DataTable RestTables(string sTABLE_NAME, bool bExcludeSystemTables)
+		{
+			string sCacheKey = "vwSYSTEM_REST_TABLES." + sTABLE_NAME + (bExcludeSystemTables ? String.Empty : ".Admin");
+			DataTable dt = _memoryCache.Get<DataTable>(sCacheKey);
+			if ( dt == null )
+			{
+				dt = new DataTable();
+				try
+				{
+					if ( _security.IsAuthenticated() )
+					{
+						using IDbConnection con = NewConnection();
+						con.Open();
+						string sSQL;
+						sSQL = "select *                          " + ControlChars.CrLf;
+						if ( Crm.Config.enable_data_privacy() )
+							sSQL += "     , (case when exists(select * from vwDATA_PRIVACY_FIELDS where vwDATA_PRIVACY_FIELDS.MODULE_NAME = vwSYSTEM_REST_TABLES.MODULE_NAME) then 1 else 0 end) as IS_DATA_PRIVACY_MODULE" + ControlChars.CrLf;
+						sSQL += "  from vwSYSTEM_REST_TABLES       " + ControlChars.CrLf
+						      + " where TABLE_NAME = @TABLE_NAME   " + ControlChars.CrLf;
+						if ( bExcludeSystemTables )
+							sSQL += "   and IS_SYSTEM = 0              " + ControlChars.CrLf;
+						using IDbCommand cmd = con.CreateCommand();
+						cmd.CommandText = sSQL;
+						cmd.CommandTimeout = 0;
+						Sql.AddParameter(cmd, "@TABLE_NAME", sTABLE_NAME);
+						using DbDataAdapter da = NewDataAdapter();
+						((IDbDataAdapter)da).SelectCommand = cmd;
+						da.Fill(dt);
+						if ( dt.Rows.Count > 0 )
+							CacheSet(sCacheKey, dt);
+					}
+				}
+				catch(Exception ex)
+				{
+					SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				}
+			}
+			return dt;
+		}
+
+		// =====================================================================================
+		// SqlColumns — returns a DataTable from vwSqlColumns for a given table name.
+		// Used by get_module_fields in the SOAP service to enumerate view columns.
+		// Migrated from SplendidCRM/_code/SplendidCache.cs line 4607.
+		// =====================================================================================
+		public DataTable SqlColumns(string sTABLE_NAME)
+		{
+			string sCacheKey = "vwSqlColumns." + sTABLE_NAME;
+			DataTable dt = _memoryCache.Get<DataTable>(sCacheKey);
+			if ( dt == null )
+			{
+				try
+				{
+					using IDbConnection con = NewConnection();
+					con.Open();
+					string sSQL;
+					sSQL = "select ColumnName              " + ControlChars.CrLf
+					     + "     , CsType                  " + ControlChars.CrLf
+					     + "     , length                  " + ControlChars.CrLf
+					     + "  from vwSqlColumns            " + ControlChars.CrLf
+					     + " where ObjectName = @TABLE_NAME" + ControlChars.CrLf
+					     + " order by colid                " + ControlChars.CrLf;
+					using IDbCommand cmd = con.CreateCommand();
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@TABLE_NAME", Sql.MetadataName(cmd, sTABLE_NAME));
+					using DbDataAdapter da = NewDataAdapter();
+					((IDbDataAdapter)da).SelectCommand = cmd;
+					dt = new DataTable();
+					da.Fill(dt);
+					CacheSet(sCacheKey, dt);
+				}
+				catch(Exception ex)
+				{
+					SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+					dt = new DataTable();
+				}
+			}
+			return dt;
+		}
+
+		// =====================================================================================
+		// FieldsMetaData_Validated — returns DataTable from vwFIELDS_META_DATA_Validated.
+		// Used by UpdateCustomFields in the SOAP service for custom field validation.
+		// Migrated from SplendidCRM/_code/SplendidCache.cs line 4543.
+		// =====================================================================================
+		public DataTable FieldsMetaData_Validated(string sTABLE_NAME)
+		{
+			string sCacheKey = "vwFIELDS_META_DATA_Validated." + sTABLE_NAME;
+			DataTable dt = _memoryCache.Get<DataTable>(sCacheKey);
+			if ( dt == null )
+			{
+				try
+				{
+					using IDbConnection con = NewConnection();
+					con.Open();
+					string sSQL;
+					sSQL = "select *                             " + ControlChars.CrLf
+					     + "  from vwFIELDS_META_DATA_Validated  " + ControlChars.CrLf
+					     + " where TABLE_NAME = @TABLE_NAME      " + ControlChars.CrLf
+					     + " order by colid                      " + ControlChars.CrLf;
+					using IDbCommand cmd = con.CreateCommand();
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@TABLE_NAME", sTABLE_NAME);
+					using DbDataAdapter da = NewDataAdapter();
+					((IDbDataAdapter)da).SelectCommand = cmd;
+					dt = new DataTable();
+					da.Fill(dt);
+					CacheSet(sCacheKey, dt);
+				}
+				catch(Exception ex)
+				{
+					SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+					dt = new DataTable();
+				}
+			}
+			return dt;
+		}
+
 	}  // end class SplendidCache
 }  // end namespace SplendidCRM

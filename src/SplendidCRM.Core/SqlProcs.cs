@@ -5253,5 +5253,793 @@ namespace SplendidCRM
 		}
 		#endregion
 
+	#region spCALLS_USERS_Update
+		/// <summary>spCALLS_USERS_Update — links a user to a call invitation.</summary>
+		public static void spCALLS_USERS_Update(Guid gCALL_ID, Guid gUSER_ID, bool bREQUIRED, string sACCEPT_STATUS)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spCALLS_USERS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parCALL_ID          = Sql.AddParameter(cmd, "@CALL_ID"         , gCALL_ID          );
+							IDbDataParameter parUSER_ID          = Sql.AddParameter(cmd, "@USER_ID"         , gUSER_ID          );
+							IDbDataParameter parREQUIRED         = Sql.AddParameter(cmd, "@REQUIRED"        , bREQUIRED         );
+							IDbDataParameter parACCEPT_STATUS    = Sql.AddParameter(cmd, "@ACCEPT_STATUS"   , sACCEPT_STATUS    ,  25);
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spMEETINGS_USERS_Update
+		/// <summary>spMEETINGS_USERS_Update — links a user to a meeting invitation.</summary>
+		public static void spMEETINGS_USERS_Update(Guid gMEETING_ID, Guid gUSER_ID, bool bREQUIRED, string sACCEPT_STATUS)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spMEETINGS_USERS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parMEETING_ID       = Sql.AddParameter(cmd, "@MEETING_ID"      , gMEETING_ID       );
+							IDbDataParameter parUSER_ID          = Sql.AddParameter(cmd, "@USER_ID"         , gUSER_ID          );
+							IDbDataParameter parREQUIRED         = Sql.AddParameter(cmd, "@REQUIRED"        , bREQUIRED         );
+							IDbDataParameter parACCEPT_STATUS    = Sql.AddParameter(cmd, "@ACCEPT_STATUS"   , sACCEPT_STATUS    ,  25);
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_ACCOUNTS_Update
+		/// <summary>spEMAILS_ACCOUNTS_Update — links an email to an account.</summary>
+		public static void spEMAILS_ACCOUNTS_Update(Guid gEMAIL_ID, Guid gACCOUNT_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_ACCOUNTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_LEADS_Update
+		/// <summary>spEMAILS_LEADS_Update — links an email to a lead.</summary>
+		public static void spEMAILS_LEADS_Update(Guid gEMAIL_ID, Guid gLEAD_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_LEADS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parLEAD_ID          = Sql.AddParameter(cmd, "@LEAD_ID"         , gLEAD_ID          );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spACCOUNTS_BUGS_Update
+		/// <summary>spACCOUNTS_BUGS_Update — links an account to a bug.</summary>
+		public static void spACCOUNTS_BUGS_Update(Guid gACCOUNT_ID, Guid gBUG_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spACCOUNTS_BUGS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							IDbDataParameter parBUG_ID           = Sql.AddParameter(cmd, "@BUG_ID"          , gBUG_ID           );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spACCOUNTS_OPPORTUNITIES_Update
+		/// <summary>spACCOUNTS_OPPORTUNITIES_Update — links an account to an opportunity.</summary>
+		public static void spACCOUNTS_OPPORTUNITIES_Update(Guid gACCOUNT_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spACCOUNTS_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spPROJECTS_ACCOUNTS_Update
+		/// <summary>spPROJECTS_ACCOUNTS_Update — links a project to an account.</summary>
+		public static void spPROJECTS_ACCOUNTS_Update(Guid gPROJECT_ID, Guid gACCOUNT_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spPROJECTS_ACCOUNTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parPROJECT_ID       = Sql.AddParameter(cmd, "@PROJECT_ID"      , gPROJECT_ID       );
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spQUOTES_ACCOUNTS_Update
+		/// <summary>spQUOTES_ACCOUNTS_Update — links a quote to an account.</summary>
+		public static void spQUOTES_ACCOUNTS_Update(Guid gQUOTE_ID, Guid gACCOUNT_ID, string sTEAM_SET_LIST)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spQUOTES_ACCOUNTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parQUOTE_ID         = Sql.AddParameter(cmd, "@QUOTE_ID"        , gQUOTE_ID         );
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							IDbDataParameter parTEAM_SET_LIST    = Sql.AddParameter(cmd, "@TEAM_SET_LIST"   , sTEAM_SET_LIST    , 8000);
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spORDERS_ACCOUNTS_Update
+		/// <summary>spORDERS_ACCOUNTS_Update — links an order to an account.</summary>
+		public static void spORDERS_ACCOUNTS_Update(Guid gORDER_ID, Guid gACCOUNT_ID, string sTEAM_SET_LIST)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spORDERS_ACCOUNTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parORDER_ID         = Sql.AddParameter(cmd, "@ORDER_ID"        , gORDER_ID         );
+							IDbDataParameter parACCOUNT_ID       = Sql.AddParameter(cmd, "@ACCOUNT_ID"      , gACCOUNT_ID       );
+							IDbDataParameter parTEAM_SET_LIST    = Sql.AddParameter(cmd, "@TEAM_SET_LIST"   , sTEAM_SET_LIST    , 8000);
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spORDERS_CONTACTS_Update
+		/// <summary>spORDERS_CONTACTS_Update — links an order to a contact.</summary>
+		public static void spORDERS_CONTACTS_Update(Guid gORDER_ID, Guid gCONTACT_ID, string sTEAM_SET_LIST)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spORDERS_CONTACTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parORDER_ID         = Sql.AddParameter(cmd, "@ORDER_ID"        , gORDER_ID         );
+							IDbDataParameter parCONTACT_ID       = Sql.AddParameter(cmd, "@CONTACT_ID"      , gCONTACT_ID       );
+							IDbDataParameter parTEAM_SET_LIST    = Sql.AddParameter(cmd, "@TEAM_SET_LIST"   , sTEAM_SET_LIST    , 8000);
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spTASKS_Delete
+		/// <summary>spTASKS_Delete — deletes a task by ID (used by SugarCRM plug-in unsyncing).</summary>
+		public static void spTASKS_Delete(Guid gTASK_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spTASKS_Delete";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parID               = Sql.AddParameter(cmd, "@ID"              , gTASK_ID          );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_BUGS_Update
+		/// <summary>spEMAILS_BUGS_Update — links an email to a bug.</summary>
+		public static void spEMAILS_BUGS_Update(Guid gEMAIL_ID, Guid gBUG_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_BUGS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parBUG_ID           = Sql.AddParameter(cmd, "@BUG_ID"          , gBUG_ID           );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_CASES_Update
+		/// <summary>spEMAILS_CASES_Update — links an email to a case.</summary>
+		public static void spEMAILS_CASES_Update(Guid gEMAIL_ID, Guid gCASE_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_CASES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parCASE_ID          = Sql.AddParameter(cmd, "@CASE_ID"         , gCASE_ID          );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_OPPORTUNITIES_Update
+		/// <summary>spEMAILS_OPPORTUNITIES_Update — links an email to an opportunity.</summary>
+		public static void spEMAILS_OPPORTUNITIES_Update(Guid gEMAIL_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_PROJECTS_Update
+		/// <summary>spEMAILS_PROJECTS_Update — links an email to a project.</summary>
+		public static void spEMAILS_PROJECTS_Update(Guid gEMAIL_ID, Guid gPROJECT_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_PROJECTS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parPROJECT_ID       = Sql.AddParameter(cmd, "@PROJECT_ID"      , gPROJECT_ID       );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_QUOTES_Update
+		/// <summary>spEMAILS_QUOTES_Update — links an email to a quote.</summary>
+		public static void spEMAILS_QUOTES_Update(Guid gEMAIL_ID, Guid gQUOTE_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_QUOTES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parQUOTE_ID         = Sql.AddParameter(cmd, "@QUOTE_ID"        , gQUOTE_ID         );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_TASKS_Update
+		/// <summary>spEMAILS_TASKS_Update — links an email to a task.</summary>
+		public static void spEMAILS_TASKS_Update(Guid gEMAIL_ID, Guid gTASK_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_TASKS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parTASK_ID          = Sql.AddParameter(cmd, "@TASK_ID"         , gTASK_ID          );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spQUOTES_OPPORTUNITIES_Update
+		/// <summary>spQUOTES_OPPORTUNITIES_Update — links a quote to an opportunity.</summary>
+		public static void spQUOTES_OPPORTUNITIES_Update(Guid gQUOTE_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spQUOTES_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parQUOTE_ID         = Sql.AddParameter(cmd, "@QUOTE_ID"        , gQUOTE_ID         );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spPROJECTS_QUOTES_Update
+		/// <summary>spPROJECTS_QUOTES_Update — links a project to a quote.</summary>
+		public static void spPROJECTS_QUOTES_Update(Guid gPROJECT_ID, Guid gQUOTE_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spPROJECTS_QUOTES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parPROJECT_ID       = Sql.AddParameter(cmd, "@PROJECT_ID"      , gPROJECT_ID       );
+							IDbDataParameter parQUOTE_ID         = Sql.AddParameter(cmd, "@QUOTE_ID"        , gQUOTE_ID         );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spEMAILS_ORDERS_Update
+		/// <summary>spEMAILS_ORDERS_Update — links an email to an order.</summary>
+		public static void spEMAILS_ORDERS_Update(Guid gEMAIL_ID, Guid gORDER_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spEMAILS_ORDERS_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parEMAIL_ID         = Sql.AddParameter(cmd, "@EMAIL_ID"        , gEMAIL_ID         );
+							IDbDataParameter parORDER_ID         = Sql.AddParameter(cmd, "@ORDER_ID"        , gORDER_ID         );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spORDERS_OPPORTUNITIES_Update
+		/// <summary>spORDERS_OPPORTUNITIES_Update — links an order to an opportunity.</summary>
+		public static void spORDERS_OPPORTUNITIES_Update(Guid gORDER_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spORDERS_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parORDER_ID         = Sql.AddParameter(cmd, "@ORDER_ID"        , gORDER_ID         );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spCONTRACTS_OPPORTUNITIES_Update
+		/// <summary>spCONTRACTS_OPPORTUNITIES_Update — links a contract to an opportunity.</summary>
+		public static void spCONTRACTS_OPPORTUNITIES_Update(Guid gCONTRACT_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spCONTRACTS_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parCONTRACT_ID      = Sql.AddParameter(cmd, "@CONTRACT_ID"     , gCONTRACT_ID      );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
+		#region spPROJECTS_OPPORTUNITIES_Update
+		/// <summary>spPROJECTS_OPPORTUNITIES_Update — links a project to an opportunity.</summary>
+		public static void spPROJECTS_OPPORTUNITIES_Update(Guid gPROJECT_ID, Guid gOPPORTUNITY_ID)
+		{
+			DbProviderFactory dbf = _dbProviderFactories!.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+				{
+					try
+					{
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.Transaction = trn;
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.CommandText = "spPROJECTS_OPPORTUNITIES_Update";
+							IDbDataParameter parMODIFIED_USER_ID = Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security?.USER_ID ?? Guid.Empty);
+							IDbDataParameter parPROJECT_ID       = Sql.AddParameter(cmd, "@PROJECT_ID"      , gPROJECT_ID       );
+							IDbDataParameter parOPPORTUNITY_ID   = Sql.AddParameter(cmd, "@OPPORTUNITY_ID"  , gOPPORTUNITY_ID   );
+							cmd.ExecuteNonQuery();
+						}
+						trn.Commit();
+					}
+					catch
+					{
+						trn.Rollback();
+						throw;
+					}
+				}
+			}
+		}
+		#endregion
+
 	}
 }

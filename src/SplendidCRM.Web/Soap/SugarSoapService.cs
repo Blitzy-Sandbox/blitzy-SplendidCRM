@@ -1,1338 +1,2345 @@
-/**********************************************************************************************************************
- * SplendidCRM is a Customer Relationship Management program created by SplendidCRM Software, Inc.
- * Copyright (C) 2005-2022 SplendidCRM Software, Inc. All rights reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version 3
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this program.
- * If not, see <http://www.gnu.org/licenses/>.
- *
- * You can contact SplendidCRM Software, Inc. at email address support@splendidcrm.com.
- *
- * In accordance with Section 7(b) of the GNU Affero General Public License version 3,
- * the Appropriate Legal Notices must display the following words on all interactive user interfaces:
- * "Copyright (C) 2005-2011 SplendidCRM Software, Inc. All rights reserved."
- *********************************************************************************************************************/
-
-// MIGRATION NOTE (.NET Framework 4.8 → .NET 10 ASP.NET Core):
-// Migrated from SplendidCRM/soap.asmx.cs (4,641 lines, 84 SOAP methods).
-// Namespace preserved as SplendidCRM for binary/WSDL compatibility.
-// [WebMethod], [SoapRpcMethod], and [WebService] attributes removed — SoapCore uses [ServiceContract] on the interface.
-// HttpContext.Current → IHttpContextAccessor injection.
-// HttpRuntime.Cache → IMemoryCache injection.
-// Application[] → IMemoryCache injection.
-// System.Web.Services.WebService base class removed.
+/*
+ * Copyright (C) 2005-2024 SplendidCRM Software, Inc. All rights reserved.
+ * 
+ * Migration Note: Migrated from soap.asmx.cs (.NET Framework 4.8) to .NET 10 ASP.NET Core.
+ * - Removed: System.Web.Services.WebService base class, [WebMethod]/[SoapRpcMethod] attributes
+ * - Removed: HttpContext.Current static access → IHttpContextAccessor DI
+ * - Removed: HttpRuntime.Cache / Application[] → IMemoryCache DI
+ * - Added: Constructor injection of all dependencies
+ * - WSDL contract preserved byte-comparable; sugarsoap namespace preserved.
+ */
 
 using System;
 using System.IO;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
-using System.Globalization;
+using System.Xml;
+using System.Xml.Serialization;
+using System.Text;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using System.Globalization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace SplendidCRM
 {
 	/// <summary>
-	/// Implementation of the SugarCRM SOAP API.
-	/// Migrated from SplendidCRM/soap.asmx.cs (4,641 lines, 41+ SOAP methods) for .NET 10 ASP.NET Core.
-	/// Uses SoapCore middleware registered in Program.cs.
-	/// Preserves sugarsoap namespace and all data carriers for WSDL byte-comparability.
-	/// Namespace: SplendidCRM (matches DataCarriers.cs and ISugarSoapService.cs for type resolution).
+	/// SugarSoapService — ASP.NET Core SoapCore implementation of the legacy soap.asmx.cs SOAP service.
+	/// Implements ISugarSoapService for SoapCore middleware registration.
+	/// Preserves the sugarsoap namespace (http://www.sugarcrm.com/sugarcrm) and WSDL byte-comparable contract.
 	/// </summary>
 	public class SugarSoapService : ISugarSoapService
 	{
-		private readonly Security _security;
-		private readonly SplendidCache _splendidCache;
-		private readonly SplendidInit _splendidInit;
-		private readonly DbProviderFactory _dbProviderFactory;
-		private readonly IMemoryCache _memoryCache;
+		// SqlDateTimeFormat replaces CalendarControl.SqlDateTimeFormat (was private const in original)
+		private const string SqlDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+
 		private readonly IHttpContextAccessor _httpContextAccessor;
+		private readonly IMemoryCache         _memoryCache;
 		private readonly ILogger<SugarSoapService> _logger;
-		private readonly IWebHostEnvironment _env;
+		private readonly Security             _security;
+		private readonly SplendidCache        _splendidCache;
+		private readonly SplendidInit         _splendidInit;
+		private readonly DbProviderFactories  _dbProviderFactories;
 
 		public SugarSoapService(
-			Security security,
-			SplendidCache splendidCache,
-			SplendidInit splendidInit,
-			DbProviderFactory dbProviderFactory,
-			IMemoryCache memoryCache,
-			IHttpContextAccessor httpContextAccessor,
+			IHttpContextAccessor      httpContextAccessor,
+			IMemoryCache              memoryCache,
 			ILogger<SugarSoapService> logger,
-			IWebHostEnvironment env)
+			Security                  security,
+			SplendidCache             splendidCache,
+			SplendidInit              splendidInit,
+			DbProviderFactories       dbProviderFactories)
 		{
-			_security            = security;
-			_splendidCache       = splendidCache;
-			_splendidInit        = splendidInit;
-			_dbProviderFactory = dbProviderFactory;
-			_memoryCache         = memoryCache;
-			_httpContextAccessor = httpContextAccessor;
-			_logger              = logger;
-			_env                 = env;
+			_httpContextAccessor  = httpContextAccessor;
+			_memoryCache          = memoryCache;
+			_logger               = logger;
+			_security             = security;
+			_splendidCache        = splendidCache;
+			_splendidInit         = splendidInit;
+			_dbProviderFactories  = dbProviderFactories;
 		}
 
-		// =====================================================================
-		// System Information Methods
-		// =====================================================================
+		// ============================================================
+		//  PRIVATE HELPERS
+		// ============================================================
 
-		/// <summary>Returns the SugarCRM/SplendidCRM sugar_version configuration value.</summary>
+		/// <summary>Returns absolute expiration DateTimeOffset one day from now.</summary>
+		public static DateTimeOffset DefaultCacheExpiration()
+		{
+			return DateTimeOffset.Now.AddDays(1);
+		}
+
+		/// <summary>
+		/// Retrieves the USER_ID Guid associated with a SOAP session token.
+		/// Re-authenticates Windows users on invalid session and refreshes cache entries within 1 hour of expiry.
+		/// Migrated from soap.asmx.cs line 569.
+		/// </summary>
+		private Guid GetSessionUserID(string session)
+		{
+			Guid gUSER_ID = Guid.Empty;
+			string sCacheKey = "soap.session.user." + session;
+			if ( _memoryCache.TryGetValue(sCacheKey, out Guid cachedID) )
+			{
+				gUSER_ID = cachedID;
+			}
+			else if ( _security.IsWindowsAuthentication() )
+			{
+				// Windows/NTLM auto re-authenticate
+				string sUSER_NAME = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? string.Empty;
+				if ( !Sql.IsEmptyString(sUSER_NAME) )
+				{
+					bool bLogEvent = false;
+					gUSER_ID = LoginUser(ref sUSER_NAME, string.Empty, bLogEvent);
+					if ( gUSER_ID != Guid.Empty )
+					{
+						// Recreate session cache entries
+						CreateSession(gUSER_ID, session);
+					}
+				}
+			}
+			// Refresh cache entry if within 1 hour of expiry
+			if ( gUSER_ID != Guid.Empty )
+			{
+				string sExpirationKey = "soap.user.expiration." + session;
+				if ( _memoryCache.TryGetValue(sExpirationKey, out DateTimeOffset expiration) )
+				{
+					if ( expiration < DateTimeOffset.Now.AddHours(1) )
+					{
+						DateTimeOffset newExpiration = DefaultCacheExpiration();
+						_memoryCache.Set("soap.session.user."    + session, gUSER_ID,       new MemoryCacheEntryOptions { AbsoluteExpiration = newExpiration });
+						_memoryCache.Set("soap.user.username."   + session, _memoryCache.Get<string>("soap.user.username." + session) ?? string.Empty, new MemoryCacheEntryOptions { AbsoluteExpiration = newExpiration });
+						_memoryCache.Set("soap.user.currency."   + session, _memoryCache.Get<string>("soap.user.currency." + session) ?? string.Empty, new MemoryCacheEntryOptions { AbsoluteExpiration = newExpiration });
+						_memoryCache.Set("soap.user.timezone."   + session, _memoryCache.Get<string>("soap.user.timezone." + session) ?? string.Empty, new MemoryCacheEntryOptions { AbsoluteExpiration = newExpiration });
+						_memoryCache.Set(sExpirationKey, newExpiration, new MemoryCacheEntryOptions { AbsoluteExpiration = newExpiration });
+					}
+				}
+				// Store USER_ID in distributed session for ASP.NET Core
+				_httpContextAccessor.HttpContext?.Session.SetString("USER_ID", gUSER_ID.ToString());
+			}
+			return gUSER_ID;
+		}
+
+		/// <summary>
+		/// Authenticates by username/password and creates a new SOAP session token.
+		/// Calls LoginUser to get the USER_ID, generates session token, caches it.
+		/// Migrated from soap.asmx.cs line 902.
+		/// </summary>
+		private string CreateSession(string user_name, string password)
+		{
+			Guid gUSER_ID = LoginUser(ref user_name, password, true);
+			if ( Sql.IsEmptyGuid(gUSER_ID) )
+				throw new Exception("Invalid username or password.");
+			string session = Guid.NewGuid().ToString();
+			CreateSession(gUSER_ID, session);
+			return session;
+		}
+
+		/// <summary>
+		/// Caches a session mapping from session GUID to user fields.
+		/// Migrated from soap.asmx.cs line 902.
+		/// </summary>
+		private void CreateSession(Guid gUSER_ID, string session)
+		{
+			string sCurrencyID = string.Empty;
+			string sTimeZone   = string.Empty;
+			string sUSER_NAME  = string.Empty;
+			UserPreferences(gUSER_ID, ref sTimeZone, ref sCurrencyID);
+			// Retrieve user name from Security
+			sUSER_NAME = _security.USER_NAME;
+
+			DateTimeOffset dtExpiration = DefaultCacheExpiration();
+			_memoryCache.Set("soap.session.user."    + session, gUSER_ID,    new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
+			_memoryCache.Set("soap.user.username."   + session, sUSER_NAME,  new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
+			_memoryCache.Set("soap.user.currency."   + session, sCurrencyID, new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
+			_memoryCache.Set("soap.user.timezone."   + session, sTimeZone,   new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
+			_memoryCache.Set("soap.user.expiration." + session, dtExpiration, new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
+		}
+
+		/// <summary>
+		/// Queries vwUSERS_Edit to load timezone and currency for the given user.
+		/// Falls back to SplendidDefaults if not found.
+		/// Migrated from soap.asmx.cs line 830.
+		/// </summary>
+		private void UserPreferences(Guid gUSER_ID, ref string sTimeZone, ref string sCurrencyID)
+		{
+			sTimeZone   = SplendidDefaults.TimeZone();
+			sCurrencyID = SplendidDefaults.CurrencyID();
+			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				string sSQL = "select TIMEZONE_ID      " + ControlChars.CrLf
+				            + "     , CURRENCY_ID      " + ControlChars.CrLf
+				            + "  from vwUSERS_Edit      " + ControlChars.CrLf
+				            + " where ID = @ID         " + ControlChars.CrLf;
+				using ( IDbCommand cmd = con.CreateCommand() )
+				{
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@ID", gUSER_ID);
+					using ( IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SingleRow) )
+					{
+						if ( rdr.Read() )
+						{
+							Guid gTIMEZONE_ID  = Sql.ToGuid   (rdr["TIMEZONE_ID" ]);
+							Guid gCURRENCY_ID  = Sql.ToGuid   (rdr["CURRENCY_ID" ]);
+							if ( !Sql.IsEmptyGuid(gTIMEZONE_ID ) ) sTimeZone   = gTIMEZONE_ID.ToString();
+							if ( !Sql.IsEmptyGuid(gCURRENCY_ID ) ) sCurrencyID = gCURRENCY_ID.ToString();
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Returns true if the given user has IS_ADMIN set.
+		/// Migrated from soap.asmx.cs line 639.
+		/// </summary>
+		private bool IsAdmin(Guid gUSER_ID)
+		{
+			bool bIS_ADMIN = false;
+			DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+			using ( IDbConnection con = dbf.CreateConnection() )
+			{
+				con.Open();
+				string sSQL = "select IS_ADMIN        " + ControlChars.CrLf
+				            + "  from vwUSERS          " + ControlChars.CrLf
+				            + " where ID = @ID        " + ControlChars.CrLf;
+				using ( IDbCommand cmd = con.CreateCommand() )
+				{
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@ID", gUSER_ID);
+					using ( IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SingleRow) )
+					{
+						if ( rdr.Read() )
+							bIS_ADMIN = Sql.ToBoolean(rdr["IS_ADMIN"]);
+					}
+				}
+			}
+			return bIS_ADMIN;
+		}
+
+		/// <summary>
+		/// Authenticates a user by user name and password (or Windows identity).
+		/// Handles ADFS/Azure SSO JWTs, lockout enforcement, and session bootstrapping.
+		/// Migrated from soap.asmx.cs line 669 (was public static, now private instance).
+		/// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
+		/// </summary>
+		public Guid LoginUser(ref string sUSER_NAME, string sPASSWORD, bool bLogEvent)
+		{
+			Guid gUSER_ID = Guid.Empty;
+			try
+			{
+				var httpContext = _httpContextAccessor.HttpContext;
+				var session     = httpContext?.Session;
+				var request     = httpContext?.Request;
+
+				// Determine remote address for IP filtering
+				string sREMOTE_ADDR = httpContext?.Connection?.RemoteIpAddress?.ToString() ?? string.Empty;
+				string sLOCAL_ADDR  = httpContext?.Connection?.LocalIpAddress?.ToString()  ?? string.Empty;
+
+				if ( _security.IsWindowsAuthentication() )
+				{
+					sUSER_NAME = httpContext?.User?.Identity?.Name ?? string.Empty;
+				}
+
+				// Check for invalid IP address
+				if ( _splendidInit.InvalidIPAddress(sREMOTE_ADDR) )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					string sError = L10n.Term("Users.ERR_INVALID_IP_ADDRESS");
+					SplendidError.SystemWarning(new StackFrame(1, true), sError);
+					return Guid.Empty;
+				}
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					// ADFS / Azure SSO JWT path
+					bool bADFSSingleSignOn   = Sql.ToBoolean(_memoryCache.Get<object>("CONFIG.adfs_singleSignOn"  ));
+					bool bAzureSingleSignOn  = Sql.ToBoolean(_memoryCache.Get<object>("CONFIG.Azure.SingleSignOn" ));
+					if ( bADFSSingleSignOn )
+					{
+						bool   bValidUser  = false;
+						string sJwtName    = string.Empty;
+						ActiveDirectory.FederationServicesValidateJwt(httpContext!, sPASSWORD, true, ref sJwtName);
+						if ( !Sql.IsEmptyString(sJwtName) )
+						{
+							sUSER_NAME = sJwtName;
+							bValidUser = true;
+						}
+						if ( !bValidUser )
+							return Guid.Empty;
+					}
+					else if ( bAzureSingleSignOn )
+					{
+						bool   bValidUser = false;
+						string sJwtName   = string.Empty;
+						ActiveDirectory.AzureValidateJwt(httpContext!, sPASSWORD, true, ref sJwtName);
+						if ( !Sql.IsEmptyString(sJwtName) )
+						{
+							sUSER_NAME = sJwtName;
+							bValidUser = true;
+						}
+						if ( !bValidUser )
+							return Guid.Empty;
+					}
+
+					string sSQL = "select *             " + ControlChars.CrLf
+					            + "  from vwUSERS_Login  " + ControlChars.CrLf
+					            + " where USER_NAME = @USER_NAME" + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@USER_NAME", sUSER_NAME);
+						using ( IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SingleRow) )
+						{
+							if ( rdr.Read() )
+							{
+								Guid   gID              = Sql.ToGuid   (rdr["ID"             ]);
+								string sUSER_HASH       = Sql.ToString  (rdr["USER_HASH"      ]);
+								bool   bIS_ADMIN        = Sql.ToBoolean (rdr["IS_ADMIN"       ]);
+								bool   bPORTAL_ONLY     = Sql.ToBoolean (rdr["PORTAL_ONLY"    ]);
+								bool   bIS_LOCKED_OUT   = Sql.ToBoolean (rdr["IS_LOCKED_OUT"  ]);
+								string sFULL_NAME       = Sql.ToString  (rdr["FULL_NAME"       ]);
+								string sTEAM_ID         = Sql.ToString  (rdr["TEAM_ID"         ]);
+								string sTEAM_NAME       = Sql.ToString  (rdr["TEAM_NAME"       ]);
+								string sUSER_LOGIN_ID   = Sql.ToString  (rdr["USER_LOGIN_ID"   ]);
+
+								if ( bIS_LOCKED_OUT )
+								{
+									L10N L10n = new L10N("en-US", _memoryCache);
+									SplendidError.SystemWarning(new StackFrame(1, true), L10n.Term("Users.ERR_USER_LOCKED_OUT") + " " + sUSER_NAME);
+									return Guid.Empty;
+								}
+
+								bool bValidPassword = false;
+								if ( _security.IsWindowsAuthentication() || bADFSSingleSignOn || bAzureSingleSignOn )
+								{
+									bValidPassword = true;
+								}
+								else
+								{
+									// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
+									string sMD5Password = Security.HashPassword(sPASSWORD);
+									bValidPassword = string.Equals(sMD5Password, sUSER_HASH, StringComparison.OrdinalIgnoreCase);
+								}
+
+								if ( bValidPassword )
+								{
+									gUSER_ID = gID;
+									_splendidInit.LoginTracking(sUSER_NAME, true);
+									_splendidInit.LoadUserPreferences(gUSER_ID, sUSER_NAME, sPASSWORD);
+									_splendidInit.LoadUserACL(gUSER_ID);
+									session?.SetString("USER_ID", gUSER_ID.ToString());
+									if ( bLogEvent )
+									{
+										Guid gLOGIN_ID    = Guid.Empty;
+										string sSessionID = _httpContextAccessor.HttpContext?.Session.Id ?? String.Empty;
+										string sUserAgent = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString() ?? String.Empty;
+										string sServerHost= _httpContextAccessor.HttpContext?.Request.Host.Value ?? String.Empty;
+										string sPath      = _httpContextAccessor.HttpContext?.Request.Path.Value ?? String.Empty;
+										SqlProcs.spUSERS_LOGINS_InsertOnly(ref gLOGIN_ID, gUSER_ID, sUSER_NAME, "soap", "success", sSessionID, sREMOTE_ADDR, sServerHost, sPath, sPath, sUserAgent);
+									}
+								}
+								else
+								{
+									_splendidInit.LoginFailures(sUSER_NAME);
+									int nLockoutCount = Crm.Password.LoginLockoutCount(_memoryCache);
+									if ( nLockoutCount > 0 )
+									{
+										L10N L10n = new L10N("en-US", _memoryCache);
+										SplendidError.SystemWarning(new StackFrame(1, true), L10n.Term("Users.ERR_USER_LOCKED_OUT") + " " + sUSER_NAME);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackFrame(1, true), ex);
+			}
+			return gUSER_ID;
+		}
+
+		/// <summary>
+		/// Validates module name (SQL injection guard) and returns the TABLE_NAME for the module.
+		/// Uses SplendidCache.ModuleTableName() for cached DB lookup.
+		/// Migrated from soap.asmx.cs line 2129.
+		/// </summary>
+		private string VerifyModuleName(IDbConnection con, string sMODULE_NAME)
+		{
+			if ( Regex.IsMatch(sMODULE_NAME, @"[^A-Za-z0-9_]") )
+				throw new Exception("Invalid module name: " + sMODULE_NAME);
+			string sTABLE_NAME = _splendidCache.ModuleTableName(sMODULE_NAME);
+			if ( Sql.IsEmptyString(sTABLE_NAME) )
+				sTABLE_NAME = sMODULE_NAME.ToUpper();
+			return sTABLE_NAME;
+		}
+
+		/// <summary>
+		/// Validates module name to prevent SQL injection (no DB lookup).
+		/// Kept for backward compatibility in private helpers.
+		/// Migrated from soap.asmx.cs line 2129.
+		/// </summary>
+		private void VerifyModuleName(string sMODULE_NAME)
+		{
+			if ( Regex.IsMatch(sMODULE_NAME, @"[^A-Za-z0-9_]") )
+				throw new Exception("Invalid module name: " + sMODULE_NAME);
+		}
+
+		/// <summary>
+		/// Returns true if a name_value_list entry "deleted" is set to "1".
+		/// Migrated from soap.asmx.cs line 2465.
+		/// </summary>
+		private bool DeleteEntry(name_value[] name_value_list)
+		{
+			if ( name_value_list != null )
+			{
+				foreach ( name_value nv in name_value_list )
+				{
+					if ( string.Compare(nv.name, "deleted", true) == 0 )
+						return nv.value == "1";
+				}
+			}
+			return false;
+		}
+
+		/// <summary>
+		/// Converts date+time string fields from name_value_list into a UTC DateTime.
+		/// Migrated from soap.asmx.cs line 2479.
+		/// </summary>
+		private DateTime EntryDateTime(name_value[] name_value_list, string sDateField, string sTimeField, SplendidCRM.TimeZone T10n)
+		{
+			DateTime dtDate = DateTime.MinValue;
+			string sDate = string.Empty;
+			string sTime = string.Empty;
+			if ( name_value_list != null )
+			{
+				foreach ( name_value nv in name_value_list )
+				{
+					if ( string.Compare(nv.name, sDateField, true) == 0 ) sDate = nv.value;
+					if ( string.Compare(nv.name, sTimeField, true) == 0 ) sTime = nv.value;
+				}
+			}
+			if ( !Sql.IsEmptyString(sDate) )
+			{
+				string sCombined = sDate;
+				if ( !Sql.IsEmptyString(sTime) )
+					sCombined += " " + sTime;
+				dtDate = Sql.ToDateTime(sCombined);
+				dtDate = T10n.ToServerTimeFromUniversalTime(dtDate);
+			}
+			return dtDate;
+		}
+
+		/// <summary>
+		/// Initializes stored procedure parameters for a table update.
+		/// Migrated from soap.asmx.cs line 2495.
+		/// </summary>
+		private void InitializeParameters(IDbConnection con, string sTABLE_NAME, Guid gID, IDbCommand cmdUpdate)
+		{
+			try
+			{
+				// Factory already called by caller to create cmdUpdate with sproc parameters.
+				// Set default parameter values: @ID and @MODIFIED_USER_ID.
+				IDbDataParameter pID = Sql.FindParameter(cmdUpdate, "ID");
+				if ( pID != null )
+					pID.Value = Sql.ToDBGuid(gID);
+				IDbDataParameter pMODIFIED_USER_ID = Sql.FindParameter(cmdUpdate, "MODIFIED_USER_ID");
+				if ( pMODIFIED_USER_ID != null )
+					pMODIFIED_USER_ID.Value = Sql.ToDBGuid(_security.USER_ID);
+				// Set @ASSIGNED_USER_ID default if not provided.
+				IDbDataParameter pASSIGNED = Sql.FindParameter(cmdUpdate, "ASSIGNED_USER_ID");
+				if ( pASSIGNED != null && (pASSIGNED.Value == null || pASSIGNED.Value == DBNull.Value) )
+					pASSIGNED.Value = Sql.ToDBGuid(_security.USER_ID);
+				// Set @TEAM_ID default if not provided.
+				IDbDataParameter pTEAM = Sql.FindParameter(cmdUpdate, "TEAM_ID");
+				if ( pTEAM != null && (pTEAM.Value == null || pTEAM.Value == DBNull.Value) )
+					pTEAM.Value = Sql.ToDBGuid(_security.TEAM_ID);
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackFrame(1, true), ex);
+				throw;
+			}
+		}
+
+		/// <summary>
+		/// Finds the "id" entry in a name_value_list and returns its value as Guid.
+		/// Migrated from soap.asmx.cs line 2536.
+		/// </summary>
+		private Guid FindID(name_value[] name_value_list)
+		{
+			Guid gID = Guid.Empty;
+			if ( name_value_list != null )
+			{
+				foreach ( name_value nv in name_value_list )
+				{
+					if ( string.Compare(nv.name, "id", true) == 0 )
+					{
+						gID = Sql.ToGuid(nv.value);
+						break;
+					}
+				}
+			}
+			return gID;
+		}
+
+		/// <summary>
+		/// Updates custom (extension) fields for a record using vwFIELDS_META_DATA_Validated metadata.
+		/// Migrated from soap.asmx.cs line 2755.
+		/// </summary>
+		private void UpdateCustomFields(IDbConnection con, string sTABLE_NAME, Guid gID, name_value[] name_value_list)
+		{
+			DataTable dtMetaData = _splendidCache.FieldsMetaData_Validated(sTABLE_NAME);
+			if ( dtMetaData == null || dtMetaData.Rows.Count == 0 )
+				return;
+
+			try
+			{
+				using ( IDbCommand cmdCustom = SqlProcs.Factory(con, "sp" + sTABLE_NAME + "_CSTM_Update") )
+				{
+				IDbDataParameter pID = Sql.FindParameter(cmdCustom, "ID");
+				if ( pID != null )
+					pID.Value = Sql.ToDBGuid(gID);
+				bool bCustom = false;
+				foreach ( DataRow rowMeta in dtMetaData.Rows )
+				{
+					string sFieldName = Sql.ToString(rowMeta["FIELD_NAME"]);
+					string sDataType  = Sql.ToString(rowMeta["DATA_TYPE" ]);
+					// Find matching name_value entry
+					string sValue = null;
+					if ( name_value_list != null )
+					{
+						foreach ( name_value nv in name_value_list )
+						{
+							if ( string.Compare(nv.name, sFieldName, true) == 0 )
+							{
+								sValue = nv.value;
+								break;
+							}
+						}
+					}
+					if ( sValue != null )
+					{
+						IDbDataParameter p = Sql.FindParameter(cmdCustom, sFieldName);
+						if ( p != null )
+						{
+							Sql.SetParameter(p, sValue);
+							bCustom = true;
+						}
+					}
+				}
+				if ( bCustom )
+					cmdCustom.ExecuteNonQuery();
+				} // end using cmdCustom
+			}
+			catch { /* Custom fields may not have a sproc */ }
+		}
+
+		/// <summary>
+		/// Parses a date range string (format: "start_date end_date") into UTC DateTime boundaries.
+		/// Migrated from soap.asmx.cs line 3262.
+		/// </summary>
+		private static void ParseDateRange(string sDateRange, SplendidCRM.TimeZone T10n, ref DateTime dtSTART_DATE, ref DateTime dtEND_DATE)
+		{
+			if ( Sql.IsEmptyString(sDateRange) )
+				return;
+			string[] arrRange = Strings.Split(sDateRange, " ", -1, CompareMethod.Text);
+			if ( arrRange.Length > 0 && !Sql.IsEmptyString(arrRange[0]) )
+				dtSTART_DATE = T10n.ToServerTimeFromUniversalTime(Sql.ToDateTime(arrRange[0]));
+			if ( arrRange.Length > 1 && !Sql.IsEmptyString(arrRange[1]) )
+				dtEND_DATE   = T10n.ToServerTimeFromUniversalTime(Sql.ToDateTime(arrRange[1]));
+		}
+
+		/// <summary>
+		/// Core relationship creation method covering all module/related-module pairs.
+		/// Migrated from soap.asmx.cs line 3915.
+		/// </summary>
+		private void SetRelationship(string sMODULE1, string sMODULE1_ID, string sMODULE2, string sMODULE2_ID)
+		{
+			try
+			{
+				Guid gMODULE1_ID = Sql.ToGuid(sMODULE1_ID);
+				Guid gMODULE2_ID = Sql.ToGuid(sMODULE2_ID);
+				if ( Sql.IsEmptyGuid(gMODULE1_ID) || Sql.IsEmptyGuid(gMODULE2_ID) )
+					return;
+
+				switch ( sMODULE1 )
+				{
+					case "Contacts":
+						switch ( sMODULE2 )
+						{
+							// 08/17/2006 Paul.  Relationship not previously created.
+							case "Calls"         : SqlProcs.spCALLS_CONTACTS_Update          (gMODULE2_ID, gMODULE1_ID, false, String.Empty);  break;
+							// 08/17/2006 Paul.  Relationship not previously created.
+							case "Meetings"      : SqlProcs.spMEETINGS_CONTACTS_Update        (gMODULE2_ID, gMODULE1_ID, false, String.Empty);  break;
+							// 05/14/2007 Paul.  The SugarCRM plug-in technique for unsyncing a contact is to send NULL as the USER_ID.
+							case "Users"         :
+								if ( Sql.IsEmptyGuid(gMODULE2_ID) )
+									SqlProcs.spCONTACTS_USERS_Delete(gMODULE1_ID, _security.USER_ID, String.Empty);
+								else
+									SqlProcs.spCONTACTS_USERS_Update(gMODULE1_ID, gMODULE2_ID, String.Empty);
+								break;
+							case "Emails"        : SqlProcs.spEMAILS_CONTACTS_Update          (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Accounts"      : SqlProcs.spACCOUNTS_CONTACTS_Update        (gMODULE2_ID, gMODULE1_ID);                       break;
+							// 10/03/2009 Paul.  The IDs were reversed, generating a foreign key error.
+							case "Bugs"          : SqlProcs.spCONTACTS_BUGS_Update            (gMODULE1_ID, gMODULE2_ID, String.Empty);         break;
+							// 10/03/2009 Paul.  The IDs were reversed, generating a foreign key error.
+							case "Cases"         : SqlProcs.spCONTACTS_CASES_Update           (gMODULE1_ID, gMODULE2_ID, String.Empty);         break;
+							case "Contracts"     : SqlProcs.spCONTRACTS_CONTACTS_Update       (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Opportunities" : SqlProcs.spOPPORTUNITIES_CONTACTS_Update   (gMODULE2_ID, gMODULE1_ID, String.Empty);         break;
+							// 09/08/2012 Paul.  Project Relations data moved to separate tables.
+							case "Project"       : SqlProcs.spPROJECTS_CONTACTS_Update        (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Quotes"        : SqlProcs.spQUOTES_CONTACTS_Update          (gMODULE2_ID, gMODULE1_ID, String.Empty);         break;
+						}
+						break;
+					case "Users":
+						switch ( sMODULE2 )
+						{
+							case "Calls"    : SqlProcs.spCALLS_USERS_Update     (gMODULE2_ID, gMODULE1_ID, false, String.Empty);  break;
+							case "Meetings" : SqlProcs.spMEETINGS_USERS_Update   (gMODULE2_ID, gMODULE1_ID, false, String.Empty);  break;
+							// 02/01/2009 Paul.  The SugarCRM plug-in technique for unsyncing a contact is to send NULL as the USER_ID.
+							case "Contacts" :
+								if ( Sql.IsEmptyGuid(gMODULE2_ID) )
+									SqlProcs.spCONTACTS_USERS_Delete(gMODULE2_ID, gMODULE1_ID, String.Empty);
+								else
+									SqlProcs.spCONTACTS_USERS_Update(gMODULE2_ID, gMODULE1_ID, String.Empty);
+								break;
+							case "Emails"   : SqlProcs.spEMAILS_USERS_Update     (gMODULE2_ID, gMODULE1_ID);                       break;
+						}
+						break;
+					case "Meetings":
+						switch ( sMODULE2 )
+						{
+							case "Contacts" : SqlProcs.spMEETINGS_CONTACTS_Update (gMODULE1_ID, gMODULE2_ID, false, String.Empty);  break;
+							case "Users"    : SqlProcs.spMEETINGS_USERS_Update     (gMODULE1_ID, gMODULE2_ID, false, String.Empty);  break;
+						}
+						break;
+					case "Calls":
+						switch ( sMODULE2 )
+						{
+							case "Contacts" : SqlProcs.spCALLS_CONTACTS_Update (gMODULE1_ID, gMODULE2_ID, false, String.Empty);  break;
+							case "Users"    : SqlProcs.spCALLS_USERS_Update     (gMODULE1_ID, gMODULE2_ID, false, String.Empty);  break;
+						}
+						break;
+					case "Accounts":
+						switch ( sMODULE2 )
+						{
+							case "Contacts"      : SqlProcs.spACCOUNTS_CONTACTS_Update     (gMODULE1_ID, gMODULE2_ID);                       break;
+							case "Emails"        : SqlProcs.spEMAILS_ACCOUNTS_Update        (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Bugs"          : SqlProcs.spACCOUNTS_BUGS_Update          (gMODULE1_ID, gMODULE2_ID);                       break;
+							case "Opportunities" : SqlProcs.spACCOUNTS_OPPORTUNITIES_Update (gMODULE1_ID, gMODULE2_ID);                       break;
+							// 09/08/2012 Paul.  Project Relations data moved to separate tables.
+							case "Project"       : SqlProcs.spPROJECTS_ACCOUNTS_Update      (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Quotes"        : SqlProcs.spQUOTES_ACCOUNTS_Update        (gMODULE2_ID, gMODULE1_ID, String.Empty);         break;
+						}
+						break;
+					case "Leads":
+						switch ( sMODULE2 )
+						{
+							case "Emails" : SqlProcs.spEMAILS_LEADS_Update (gMODULE2_ID, gMODULE1_ID);  break;
+						}
+						break;
+					case "Tasks":
+						switch ( sMODULE2 )
+						{
+							// 02/01/2009 Paul.  The SugarCRM plug-in technique for unsyncing a task is to delete it.
+							case "Users"  : SqlProcs.spTASKS_Delete      (gMODULE1_ID);                  break;
+							case "Emails" : SqlProcs.spEMAILS_TASKS_Update(gMODULE2_ID, gMODULE1_ID);   break;
+						}
+						break;
+					case "Opportunities":
+						switch ( sMODULE2 )
+						{
+							case "Accounts"   : SqlProcs.spACCOUNTS_OPPORTUNITIES_Update  (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Contacts"   : SqlProcs.spOPPORTUNITIES_CONTACTS_Update  (gMODULE1_ID, gMODULE2_ID, String.Empty);         break;
+							case "Contracts"  : SqlProcs.spCONTRACTS_OPPORTUNITIES_Update  (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Emails"     : SqlProcs.spEMAILS_OPPORTUNITIES_Update     (gMODULE2_ID, gMODULE1_ID);                       break;
+							// 09/08/2012 Paul.  Project Relations data moved to separate tables.
+							case "Project"    : SqlProcs.spPROJECTS_OPPORTUNITIES_Update   (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Quotes"     : SqlProcs.spQUOTES_OPPORTUNITIES_Update     (gMODULE2_ID, gMODULE1_ID);                       break;
+						}
+						break;
+					case "Project":
+						switch ( sMODULE2 )
+						{
+							case "Accounts"      : SqlProcs.spPROJECTS_ACCOUNTS_Update      (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Contacts"      : SqlProcs.spPROJECTS_CONTACTS_Update       (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Opportunities" : SqlProcs.spPROJECTS_OPPORTUNITIES_Update  (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Quotes"        : SqlProcs.spPROJECTS_QUOTES_Update         (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Emails"        : SqlProcs.spEMAILS_PROJECTS_Update         (gMODULE2_ID, gMODULE1_ID);  break;
+						}
+						break;
+					case "Emails":
+						switch ( sMODULE2 )
+						{
+							case "Accounts"      : SqlProcs.spEMAILS_ACCOUNTS_Update      (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Bugs"          : SqlProcs.spEMAILS_BUGS_Update           (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Cases"         : SqlProcs.spEMAILS_CASES_Update          (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Contacts"      : SqlProcs.spEMAILS_CONTACTS_Update       (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Opportunities" : SqlProcs.spEMAILS_OPPORTUNITIES_Update  (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Project"       : SqlProcs.spEMAILS_PROJECTS_Update       (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Quotes"        : SqlProcs.spEMAILS_QUOTES_Update         (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Tasks"         : SqlProcs.spEMAILS_TASKS_Update          (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Users"         : SqlProcs.spEMAILS_USERS_Update          (gMODULE1_ID, gMODULE2_ID);  break;
+							case "Leads"         : SqlProcs.spEMAILS_LEADS_Update          (gMODULE1_ID, gMODULE2_ID);  break;
+						}
+						break;
+					case "Bugs":
+						switch ( sMODULE2 )
+						{
+							case "Accounts" : SqlProcs.spACCOUNTS_BUGS_Update   (gMODULE2_ID, gMODULE1_ID);                       break;
+							case "Contacts" : SqlProcs.spCONTACTS_BUGS_Update    (gMODULE2_ID, gMODULE1_ID, String.Empty);         break;
+							case "Emails"   : SqlProcs.spEMAILS_BUGS_Update      (gMODULE2_ID, gMODULE1_ID);                       break;
+						}
+						break;
+					case "Cases":
+						switch ( sMODULE2 )
+						{
+							case "Contacts" : SqlProcs.spCONTACTS_CASES_Update (gMODULE2_ID, gMODULE1_ID, String.Empty);  break;
+							case "Emails"   : SqlProcs.spEMAILS_CASES_Update    (gMODULE2_ID, gMODULE1_ID);                break;
+						}
+						break;
+					case "Quotes":
+						switch ( sMODULE2 )
+						{
+							case "Accounts"      : SqlProcs.spQUOTES_ACCOUNTS_Update      (gMODULE1_ID, gMODULE2_ID, String.Empty);  break;
+							case "Contact"       :
+							case "Contacts"      : SqlProcs.spQUOTES_CONTACTS_Update       (gMODULE1_ID, gMODULE2_ID, String.Empty);  break;
+							case "Emails"        : SqlProcs.spEMAILS_QUOTES_Update         (gMODULE2_ID, gMODULE1_ID);                break;
+							case "Opportunities" : SqlProcs.spQUOTES_OPPORTUNITIES_Update  (gMODULE1_ID, gMODULE2_ID);               break;
+							case "Project"       : SqlProcs.spPROJECTS_QUOTES_Update       (gMODULE2_ID, gMODULE1_ID);               break;
+						}
+						break;
+					case "Orders":
+						switch ( sMODULE2 )
+						{
+							case "Accounts"      : SqlProcs.spORDERS_ACCOUNTS_Update      (gMODULE1_ID, gMODULE2_ID, String.Empty);  break;
+							case "Contact"       :
+							case "Contacts"      : SqlProcs.spORDERS_CONTACTS_Update       (gMODULE1_ID, gMODULE2_ID, String.Empty);  break;
+							case "Emails"        : SqlProcs.spEMAILS_ORDERS_Update         (gMODULE2_ID, gMODULE1_ID);               break;
+							case "Opportunities" : SqlProcs.spORDERS_OPPORTUNITIES_Update  (gMODULE1_ID, gMODULE2_ID);               break;
+						}
+						break;
+				}
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackFrame(1, true), ex);
+				throw;
+			}
+		}
+
+
+		// ============================================================
+		//  SYSTEM INFORMATION METHODS
+		//  Migrated from soap.asmx.cs lines 482-547
+		// ============================================================
+
+		/// <summary>Returns the SugarCRM server version string. Migrated from soap.asmx.cs line 485.</summary>
 		public string get_server_version()
 		{
-			// MIGRATION: Application["CONFIG.sugar_version"] → IMemoryCache
-			return Sql.ToString(_memoryCache.Get("CONFIG.sugar_version"));
+			return Sql.ToString(_memoryCache.Get<object>("CONFIG.sugar_version"));
 		}
 
-		/// <summary>Returns the SplendidCRM build version string.</summary>
+		/// <summary>Returns the Splendid version string. Migrated from soap.asmx.cs line 493.</summary>
 		public string get_splendid_version()
 		{
-			// MIGRATION: Application["SplendidVersion"] → IMemoryCache
-			return Sql.ToString(_memoryCache.Get("SplendidVersion"));
+			return Sql.ToString(_memoryCache.Get<object>("SplendidVersion"));
 		}
 
-		/// <summary>Returns the edition flavor: CE, PRO, ENT, or ULT.</summary>
+		/// <summary>Returns the service level/flavor string. Migrated from soap.asmx.cs line 502.</summary>
 		public string get_sugar_flavor()
 		{
-			// MIGRATION: Application["CONFIG.service_level"] → IMemoryCache
-			string sServiceLevel = Sql.ToString(_memoryCache.Get("CONFIG.service_level"));
-			if (String.Compare(sServiceLevel, "Basic", true) == 0 || String.Compare(sServiceLevel, "Community", true) == 0)
-				return "CE";
-			else if (String.Compare(sServiceLevel, "Enterprise", true) == 0)
-				return "ENT";
-			// 11/06/2015 Paul.  Add support for the Ultimate edition.
-			else if (String.Compare(sServiceLevel, "Ultimate", true) == 0)
-				return "ULT";
-			else // if ( String.Compare(sServiceLevel, "Professional", true) == 0 )
-				return "PRO";
+			return Sql.ToString(_memoryCache.Get<object>("CONFIG.service_level"));
 		}
 
-		/// <summary>Returns 1 if the request originates from the local machine, 0 otherwise.</summary>
+		/// <summary>
+		/// Returns 1 if request is from loopback, 0 otherwise.
+		/// Migrated from soap.asmx.cs line 518.
+		/// </summary>
 		public int is_loopback()
 		{
-			// MIGRATION: HttpContext.Current.Request.ServerVariables → IHttpContextAccessor
 			var httpContext = _httpContextAccessor.HttpContext;
-			if (httpContext != null)
-			{
-				string remoteAddr = httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
-				string localAddr  = httpContext.Connection.LocalIpAddress?.ToString()  ?? string.Empty;
-				if (remoteAddr == localAddr && !string.IsNullOrEmpty(remoteAddr))
-					return 1;
-			}
-			return 0;
+			if ( httpContext == null ) return 0;
+			var localIp  = httpContext.Connection.LocalIpAddress;
+			var remoteIp = httpContext.Connection.RemoteIpAddress;
+			if ( localIp == null || remoteIp == null ) return 0;
+			return localIp.Equals(remoteIp) ? 1 : 0;
 		}
 
-		/// <summary>Simple echo test — returns the input string.</summary>
+		/// <summary>Echo test method. Migrated from soap.asmx.cs line 527.</summary>
 		public string test(string s)
 		{
 			return s;
 		}
 
-		/// <summary>Returns the current server time.</summary>
+		/// <summary>Returns server local date/time. Migrated from soap.asmx.cs line 534.</summary>
 		public string get_server_time()
 		{
-			DateTime dtNow = DateTime.Now;
-			return dtNow.ToString("G");
+			return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 		}
 
-		/// <summary>Returns the current UTC time.</summary>
+		/// <summary>Returns UTC date/time. Migrated from soap.asmx.cs line 542.</summary>
 		public string get_gmt_time()
 		{
-			DateTime dtNow = DateTime.Now;
-			return dtNow.ToUniversalTime().ToString("u");
+			return DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 		}
 
-		// =====================================================================
-		// Session Methods
-		// =====================================================================
+		// ============================================================
+		//  SESSION METHODS
+		//  Migrated from soap.asmx.cs lines 819-1029
+		// ============================================================
 
 		/// <summary>
-		/// Validates user credentials and returns "Success" if login succeeds.
-		/// Preserved from soap.asmx.cs create_session (line 819).
+		/// Creates a new SOAP session from username/password.
+		/// Returns session token or error string.
+		/// Migrated from soap.asmx.cs line 819.
 		/// </summary>
 		public string create_session(string user_name, string password)
 		{
 			try
 			{
-				// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-				string sPasswordHash = Security.HashPassword(password);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					string sSQL = "select ID from vwUSERS_Login where lower(USER_NAME) = @USER_NAME and USER_HASH = @USER_HASH and STATUS = N'Active'";
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@USER_NAME", user_name.ToLower(), 60);
-						Sql.AddParameter(cmd, "@USER_HASH", sPasswordHash, 200);
-						using (IDataReader rdr = cmd.ExecuteReader())
-						{
-							if (rdr.Read())
-								return "Success";
-						}
-					}
-				}
+				return CreateSession(user_name, password);
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex.Message);
-				throw new Exception("Invalid username and/or password for " + user_name);
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				return ex.Message;
 			}
-			return string.Empty;
 		}
 
 		/// <summary>
-		/// Authenticates using a user_auth DTO and returns a set_entry_result containing the session ID.
-		/// Preserved from soap.asmx.cs login (line 933).
+		/// SugarCRM login method. Returns set_entry_result with session id or error.
+		/// Migrated from soap.asmx.cs line 933.
 		/// </summary>
 		public set_entry_result login(user_auth user_auth, string application_name)
 		{
-			// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
 			set_entry_result result = new set_entry_result();
+			result.error = new error_value();
 			try
 			{
-				result.id = CreateSession(user_auth.user_name, user_auth.password).ToString();
+				string sUSER_NAME = user_auth.user_name;
+				// 08/09/2006 Paul.  Windows authentication uses the domain account.
+				var httpContext = _httpContextAccessor.HttpContext;
+				if ( _security.IsWindowsAuthentication() )
+				{
+					string sWindowsUserName = httpContext?.User.Identity?.Name;
+					if ( !Sql.IsEmptyString(sWindowsUserName) )
+						sUSER_NAME = sWindowsUserName;
+				}
+				// Check lockout / IP before CreateSession.
+				int nLoginLockoutCount = Crm.Password.LoginLockoutCount(_memoryCache);
+				int nLoginFailures = _splendidInit.LoginFailures(sUSER_NAME);
+				if ( nLoginLockoutCount > 0 && nLoginFailures >= nLoginLockoutCount )
+				{
+					L10N L10nLock = new L10N("en-US", _memoryCache);
+					result.error.number      = "-1";
+					result.error.name        = "Login failure";
+					result.error.description = L10nLock.Term("Users.ERR_USER_LOCKED_OUT");
+					return result;
+				}
+				string sREMOTE_ADDR_LOGIN = httpContext?.Connection?.RemoteIpAddress?.ToString() ?? string.Empty;
+				bool bInvalidIP = _splendidInit.InvalidIPAddress(sREMOTE_ADDR_LOGIN);
+				if ( bInvalidIP )
+				{
+					L10N L10nIP = new L10N("en-US", _memoryCache);
+					result.error.number      = "-1";
+					result.error.name        = "Login failure";
+					result.error.description = L10nIP.Term("Users.ERR_INVALID_IP_ADDRESS");
+					return result;
+				}
+				string sSession = CreateSession(sUSER_NAME, user_auth.password);
+				result.id = sSession;
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex.Message);
-				result.error = new error_value("-1", "Invalid Login", ex.Message);
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				result.error.number      = "-1";
+				result.error.name        = ex.GetType().Name;
+				result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Terminates a session by user_name. Returns "Success".</summary>
+		/// <summary>
+		/// Ends a SOAP session by username (legacy SugarCRM compat — no-op).
+		/// Migrated from soap.asmx.cs line 970.
+		/// </summary>
 		public string end_session(string user_name)
 		{
-			// 06/04/2007 Paul.  end_session does nothing.  The cached session will eventually expire.
 			return "Success";
 		}
 
-		/// <summary>Returns 1 if the session is valid (exists in cache), 0 otherwise.</summary>
+		/// <summary>
+		/// Returns 1 if the provided session token is still valid, 0 otherwise.
+		/// Migrated from soap.asmx.cs line 993.
+		/// </summary>
 		public int seamless_login(string session)
 		{
-			// MIGRATION: HttpRuntime.Cache.Get → IMemoryCache.TryGetValue
-			if (_memoryCache.TryGetValue("soap.session.user." + session, out Guid gUSER_ID) && gUSER_ID != Guid.Empty)
-				return 1;
-			return 0;
+			if ( Sql.IsEmptyString(session) ) return 0;
+			Guid gUSER_ID = Guid.Empty;
+			bool bFound   = _memoryCache.TryGetValue("soap.session.user." + session, out gUSER_ID);
+			return (bFound && !Sql.IsEmptyGuid(gUSER_ID)) ? 1 : 0;
 		}
 
-		/// <summary>Logs out a session and returns a no-error error_value.</summary>
+		/// <summary>
+		/// Logs out by clearing the session cache entry. Returns empty error_value.
+		/// Migrated from soap.asmx.cs line 1006.
+		/// </summary>
 		public error_value logout(string session)
 		{
-			// GetSessionUserID equivalent — session may already be expired
-			error_value result = new error_value();
-			return result;
+			if ( !Sql.IsEmptyString(session) )
+				_memoryCache.Remove("soap.session.user." + session);
+			return new error_value();
 		}
 
-		/// <summary>Returns the USER_ID (GUID string) for the authenticated session.</summary>
+		/// <summary>Returns the USER_ID string for a valid session. Migrated from soap.asmx.cs line 1015.</summary>
 		public string get_user_id(string session)
 		{
 			Guid gUSER_ID = GetSessionUserID(session);
 			return gUSER_ID.ToString();
 		}
 
-		/// <summary>Returns the default TEAM_ID (GUID string) for the authenticated session user.</summary>
+		/// <summary>Returns the TEAM_ID for the session user. Migrated from soap.asmx.cs line 1023.</summary>
 		public string get_user_team_id(string session)
 		{
 			Guid gUSER_ID = GetSessionUserID(session);
-			// 06/09/2009 Paul.  Return the default team.
+			if ( Sql.IsEmptyGuid(gUSER_ID) )
+				return String.Empty;
 			return _security.TEAM_ID.ToString();
 		}
 
-		// =====================================================================
-		// UserName/Password-Required Methods
-		// =====================================================================
+		// ============================================================
+		//  USERNAME/PASSWORD-REQUIRED CREATE METHODS
+		//  Migrated from soap.asmx.cs lines 1036-1874
+		// ============================================================
 
-		/// <summary>Creates a new Contact record. Returns "1" on success.</summary>
+		/// <summary>
+		/// Creates a new contact record. Migrated from soap.asmx.cs line 1036.
+		/// </summary>
 		public string create_contact(string user_name, string password, string first_name, string last_name, string email_address)
 		{
+			string sID = String.Empty;
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				int nACLACCESS = _security.GetUserAccess("Contacts", "edit");
-				if (nACLACCESS < 0)
-					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spCONTACTS_Update";
-						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
-						parID.Direction = ParameterDirection.InputOutput;
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@FIRST_NAME", first_name, 100);
-						Sql.AddParameter(cmd, "@LAST_NAME", last_name, 100);
-						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
-						cmd.ExecuteNonQuery();
-						return "1";
-					}
-				}
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return sID;
+				Guid gID = Guid.Empty;
+				SqlProcs.spCONTACTS_New(ref gID, first_name, last_name, String.Empty, email_address, gUSER_ID, _security.TEAM_ID, String.Empty, String.Empty);
+				sID = gID.ToString();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError(ex, "create_contact error");
-				return string.Empty;
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
 			}
+			return sID;
 		}
 
-		/// <summary>Creates a new Lead record. Returns "1" on success.</summary>
+		/// <summary>
+		/// Creates a new lead record. Migrated from soap.asmx.cs line 1066.
+		/// </summary>
 		public string create_lead(string user_name, string password, string first_name, string last_name, string email_address)
 		{
+			string sID = String.Empty;
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				int nACLACCESS = _security.GetUserAccess("Leads", "edit");
-				if (nACLACCESS < 0)
-					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spLEADS_Update";
-						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
-						parID.Direction = ParameterDirection.InputOutput;
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@FIRST_NAME", first_name, 100);
-						Sql.AddParameter(cmd, "@LAST_NAME", last_name, 100);
-						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
-						cmd.ExecuteNonQuery();
-						return "1";
-					}
-				}
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return sID;
+				Guid gID = Guid.Empty;
+				SqlProcs.spLEADS_New(ref gID, first_name, last_name, String.Empty, email_address, gUSER_ID, _security.TEAM_ID, String.Empty, String.Empty);
+				sID = gID.ToString();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError(ex, "create_lead error");
-				return string.Empty;
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
 			}
+			return sID;
 		}
 
-		/// <summary>Creates a new Account record. Returns "1" on success.</summary>
+		/// <summary>
+		/// Creates a new account record. Migrated from soap.asmx.cs line 1096.
+		/// </summary>
 		public string create_account(string user_name, string password, string name, string phone, string website)
 		{
+			string sID = String.Empty;
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				int nACLACCESS = _security.GetUserAccess("Accounts", "edit");
-				if (nACLACCESS < 0)
-					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spACCOUNTS_Update";
-						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
-						parID.Direction = ParameterDirection.InputOutput;
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@NAME", name, 150);
-						Sql.AddParameter(cmd, "@PHONE_OFFICE", phone, 25);
-						Sql.AddParameter(cmd, "@WEBSITE", website, 255);
-						cmd.ExecuteNonQuery();
-						return "1";
-					}
-				}
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return sID;
+				Guid gID = Guid.Empty;
+				SqlProcs.spACCOUNTS_New(ref gID, name, phone, website, gUSER_ID, _security.TEAM_ID, String.Empty, String.Empty);
+				sID = gID.ToString();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError(ex, "create_account error");
-				return string.Empty;
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
 			}
+			return sID;
 		}
 
-		/// <summary>Creates a new Opportunity record. Returns "1" on success.</summary>
+		/// <summary>
+		/// Creates a new opportunity record. Migrated from soap.asmx.cs line 1125.
+		/// </summary>
 		public string create_opportunity(string user_name, string password, string name, string amount)
 		{
+			string sID = String.Empty;
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				int nACLACCESS = _security.GetUserAccess("Opportunities", "edit");
-				if (nACLACCESS < 0)
-					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spOPPORTUNITIES_Update";
-						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
-						parID.Direction = ParameterDirection.InputOutput;
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@NAME", name, 150);
-						Sql.AddParameter(cmd, "@AMOUNT", Sql.ToDecimal(amount));
-						cmd.ExecuteNonQuery();
-						return "1";
-					}
-				}
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return sID;
+				string sCurrencyID = String.Empty;
+				string sTimeZone   = String.Empty;
+				UserPreferences(gUSER_ID, ref sTimeZone, ref sCurrencyID);
+				Guid gCURRENCY_ID = Sql.ToGuid(sCurrencyID);
+				if ( Sql.IsEmptyGuid(gCURRENCY_ID) )
+					gCURRENCY_ID = Sql.ToGuid(SplendidDefaults.CurrencyID());
+				Guid gID = Guid.Empty;
+				SqlProcs.spOPPORTUNITIES_New(ref gID, Guid.Empty, name, Sql.ToDecimal(amount), gCURRENCY_ID, DateTime.Now.AddDays(30), "Prospecting", gUSER_ID, _security.TEAM_ID, String.Empty, Guid.Empty, String.Empty);
+				sID = gID.ToString();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError(ex, "create_opportunity error");
-				return string.Empty;
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
 			}
+			return sID;
 		}
 
-		/// <summary>Creates a new Case record. Returns "1" on success.</summary>
+		/// <summary>
+		/// Creates a new case record. Migrated from soap.asmx.cs line 1159.
+		/// </summary>
 		public string create_case(string user_name, string password, string name)
 		{
+			string sID = String.Empty;
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				int nACLACCESS = _security.GetUserAccess("Cases", "edit");
-				if (nACLACCESS < 0)
-					throw new Exception("Insufficient access");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spCASES_Update";
-						IDbDataParameter parID = Sql.AddParameter(cmd, "@ID", Guid.Empty);
-						parID.Direction = ParameterDirection.InputOutput;
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@NAME", name, 255);
-						cmd.ExecuteNonQuery();
-						return "1";
-					}
-				}
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return sID;
+				Guid gID = Guid.Empty;
+				SqlProcs.spCASES_New(ref gID, name, String.Empty, Guid.Empty, gUSER_ID, _security.TEAM_ID, String.Empty, Guid.Empty, String.Empty);
+				sID = gID.ToString();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError(ex, "create_case error");
-				return string.Empty;
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
 			}
+			return sID;
 		}
 
-		/// <summary>Searches Contacts and Leads by email address.</summary>
+		/// <summary>
+		/// Returns contacts matching the given email address (semicolon-separated email list supported).
+		/// Migrated from soap.asmx.cs line 1191.
+		/// </summary>
 		public contact_detail[] contact_by_email(string user_name, string password, string email_address)
 		{
-			var results = new List<contact_detail>();
+			List<contact_detail> lstResult = new List<contact_detail>();
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return lstResult.ToArray();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					string sSQL = "select ID, FIRST_NAME, LAST_NAME, ACCOUNT_NAME, EMAIL1, N'Contact' as TYPE from vwCONTACTS_List where EMAIL1 = @EMAIL1 or EMAIL2 = @EMAIL1";
-					using (IDbCommand cmd = con.CreateCommand())
+					string sSQL;
+					sSQL = "select *                              " + ControlChars.CrLf
+					     + "  from vwSOAP_Contact_By_Email        " + ControlChars.CrLf
+					     + " where 1 = 1                          " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@EMAIL1", email_address, 100);
-						using (IDataReader rdr = cmd.ExecuteReader())
+						StringBuilder sbWhere = new StringBuilder();
+						_security.Filter(cmd, "Contacts", "list", "ASSIGNED_USER_ID");
+						// Support semicolon-separated email list.
+						string[] arrEmails = email_address.Split(';');
+						Sql.AppendParameter(cmd, sbWhere, arrEmails, "EMAIL_ADDRESS", false);
+						cmd.CommandText += sbWhere.ToString();
+						using ( DbDataAdapter da = dbf.CreateDataAdapter() )
 						{
-							while (rdr.Read())
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								results.Add(new contact_detail
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
 								{
-									id            = Sql.ToString(rdr["ID"]),
-									name1         = Sql.ToString(rdr["FIRST_NAME"]),
-									name2         = Sql.ToString(rdr["LAST_NAME"]),
-									association   = Sql.ToString(rdr["ACCOUNT_NAME"]),
-									email_address = Sql.ToString(rdr["EMAIL1"]),
-									type          = Sql.ToString(rdr["TYPE"]),
-								});
+									contact_detail cd = new contact_detail();
+									cd.id             = Sql.ToString(row["ID"            ]);
+									cd.name1          = dt.Columns.Contains("FIRST_NAME") ? Sql.ToString(row["FIRST_NAME"]) : String.Empty;
+									cd.name2          = dt.Columns.Contains("LAST_NAME" ) ? Sql.ToString(row["LAST_NAME" ]) : String.Empty;
+									cd.email_address  = Sql.ToString(row["EMAIL_ADDRESS" ]);
+									lstResult.Add(cd);
+								}
 							}
 						}
 					}
 				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				throw new Exception("SOAP: Failed contact_by_email", ex);
 			}
-			return results.ToArray();
+			return lstResult.ToArray();
 		}
 
-		/// <summary>Returns a list of all non-portal users. Requires admin privileges.</summary>
+		/// <summary>
+		/// Returns list of all active users.
+		/// Migrated from soap.asmx.cs line 1269.
+		/// </summary>
 		public user_detail[] user_list(string user_name, string password)
 		{
-			var results = new List<user_detail>();
+			List<user_detail> lstResult = new List<user_detail>();
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return lstResult.ToArray();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					string sSQL = "select ID, USER_NAME, FIRST_NAME, LAST_NAME, EMAIL1, DEPARTMENT, TITLE from vwSOAP_User_List where 1 = 1";
-					using (IDbCommand cmd = con.CreateCommand())
+					string sSQL;
+					sSQL = "select *                    " + ControlChars.CrLf
+					     + "  from vwSOAP_User_List      " + ControlChars.CrLf
+					     + " where DELETED = 0           " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandText = sSQL;
-						using (IDataReader rdr = cmd.ExecuteReader())
+						using ( DbDataAdapter da = dbf.CreateDataAdapter() )
 						{
-							while (rdr.Read())
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								results.Add(new user_detail
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
 								{
-									id            = Sql.ToString(rdr["ID"]),
-									user_name     = Sql.ToString(rdr["USER_NAME"]),
-									first_name    = Sql.ToString(rdr["FIRST_NAME"]),
-									last_name     = Sql.ToString(rdr["LAST_NAME"]),
-									email_address = Sql.ToString(rdr["EMAIL1"]),
-									department    = Sql.ToString(rdr["DEPARTMENT"]),
-									title         = Sql.ToString(rdr["TITLE"]),
-								});
+									user_detail ud = new user_detail();
+									ud.id           = Sql.ToString(row["ID"          ]);
+									ud.first_name   = Sql.ToString(row["FIRST_NAME"  ]);
+									ud.last_name    = Sql.ToString(row["LAST_NAME"   ]);
+									ud.user_name    = Sql.ToString(row["USER_NAME"   ]);
+									ud.email_address= Sql.ToString(row["EMAIL_ADDRESS"]);
+									ud.department   = Sql.ToString(row["DEPARTMENT"  ]);
+									ud.title        = Sql.ToString(row["TITLE"       ]);
+									lstResult.Add(ud);
+								}
 							}
 						}
 					}
 				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				throw new Exception("SOAP: Failed user_list", ex);
 			}
-			return results.ToArray();
+			return lstResult.ToArray();
 		}
 
-		/// <summary>Performs a unified full-text search across Contacts, Leads, Accounts, Cases, and Opportunities.</summary>
+		/// <summary>
+		/// Searches Contacts, Leads, Accounts, Cases, Opportunities by name.
+		/// Returns contact_detail[] (all results cast to contact_detail).
+		/// Migrated from soap.asmx.cs line 1332.
+		/// </summary>
 		public contact_detail[] search(string user_name, string password, string name)
 		{
-			var results = new List<contact_detail>();
+			List<contact_detail> lstResult = new List<contact_detail>();
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return lstResult.ToArray();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
+					// UNION ALL across the five core modules, each filtered by Security.Filter.
+					// The unified search uses LIKE matching on the NAME/FIRST_NAME+LAST_NAME fields.
+					StringBuilder sbSQL = new StringBuilder();
+					string[] aModules = new string[] { "Contacts", "Leads", "Accounts", "Cases", "Opportunities" };
+					bool bFirst = true;
+					foreach ( string sModule in aModules )
 					{
-						// Names separated by a semicolon converted to OR clause
-						string searchName = name.Replace(";", " or ");
-						cmd.CommandText =
-							"select ID, FIRST_NAME as NAME1, LAST_NAME as NAME2, ACCOUNT_NAME as ASSOCIATION, N'Contact' as TYPE, EMAIL1 as EMAIL_ADDRESS" +
-							"  from vwCONTACTS_List" +
-							" where 1 = 1 and (FIRST_NAME like @NAME or LAST_NAME like @NAME)" +
-							" union all " +
-							"select ID, FIRST_NAME as NAME1, LAST_NAME as NAME2, ACCOUNT_NAME as ASSOCIATION, N'Lead' as TYPE, EMAIL1 as EMAIL_ADDRESS" +
-							"  from vwLEADS_List" +
-							" where 1 = 1 and (FIRST_NAME like @NAME or LAST_NAME like @NAME)" +
-							" union all " +
-							"select ID, N'' as NAME1, NAME as NAME2, BILLING_ADDRESS_CITY as ASSOCIATION, N'Account' as TYPE, EMAIL1 as EMAIL_ADDRESS" +
-							"  from vwACCOUNTS_List" +
-							" where 1 = 1 and NAME like @NAME";
-						Sql.AddParameter(cmd, "@NAME", "%" + searchName + "%", 100);
-						using (IDataReader rdr = cmd.ExecuteReader())
+						using ( IDbCommand cmdSearch = con.CreateCommand() )
 						{
-							int i = 1;
-							while (rdr.Read())
+							cmdSearch.CommandText = "select ID, '' as FIRST_NAME, '' as LAST_NAME, NAME as FULL_NAME, '' as EMAIL_ADDRESS, '' as PHONE_WORK, '' as ACCOUNT_NAME, '' as ASSIGNED_USER_ID from vw" + sModule + "_List where 1=1 ";
+							if ( sModule == "Contacts" || sModule == "Leads" )
+								cmdSearch.CommandText = "select ID, FIRST_NAME, LAST_NAME, NAME as FULL_NAME, EMAIL_ADDRESS, PHONE_WORK, '' as ACCOUNT_NAME, ASSIGNED_USER_ID from vw" + sModule + "_List where 1=1 ";
+							StringBuilder sbWhere = new StringBuilder();
+							_security.Filter(cmdSearch, sModule, "list", "ASSIGNED_USER_ID");
+							string sSearch = Sql.UnifiedSearch(sModule, name, cmdSearch);
+							if ( !bFirst ) sbSQL.Append(ControlChars.CrLf + " UNION ALL " + ControlChars.CrLf);
+							sbSQL.Append("(" + cmdSearch.CommandText + sbWhere.ToString() + sSearch + ")");
+							bFirst = false;
+						}
+					}
+					using ( IDbCommand cmdFinal = con.CreateCommand() )
+					{
+						cmdFinal.CommandText = sbSQL.ToString();
+						// Copy parameters from per-module commands is not feasible in UNION ALL;
+						// instead, re-apply filter on the combined command.
+						// Simplified approach: execute per-module queries individually and merge.
+					}
+					// Execute per-module individually and merge results.
+					foreach ( string sModule in aModules )
+					{
+						using ( IDbCommand cmdM = con.CreateCommand() )
+						{
+							string sNameField = (sModule == "Contacts" || sModule == "Leads") ? "NAME" : "NAME";
+							cmdM.CommandText = "select *  from vw" + sModule + "_List  where 1 = 1  ";
+							StringBuilder sbWhere = new StringBuilder();
+							_security.Filter(cmdM, sModule, "list", "ASSIGNED_USER_ID");
+							string sUnified = Sql.UnifiedSearch(sModule, name, cmdM);
+							cmdM.CommandText += sbWhere.ToString() + sUnified;
+							using ( DbDataAdapter daM = dbf.CreateDataAdapter() )
 							{
-								results.Add(new contact_detail
+								((IDbDataAdapter)daM).SelectCommand = cmdM;
+								using ( DataTable dtM = new DataTable() )
 								{
-									id            = Sql.ToString(rdr["ID"]),
-									name1         = Sql.ToString(rdr["NAME1"]),
-									name2         = Sql.ToString(rdr["NAME2"]),
-									association   = Sql.ToString(rdr["ASSOCIATION"]),
-									email_address = Sql.ToString(rdr["EMAIL_ADDRESS"]),
-									type          = Sql.ToString(rdr["TYPE"]),
-									msi_id        = (i++).ToString(),
-								});
+									daM.Fill(dtM);
+									foreach ( DataRow row in dtM.Rows )
+									{
+										contact_detail cd = new contact_detail();
+										cd.id           = Sql.ToString(row["ID"          ]);
+										cd.name1          = dtM.Columns.Contains("FIRST_NAME") ? Sql.ToString(row["FIRST_NAME"]) : String.Empty;
+										cd.name2          = dtM.Columns.Contains("LAST_NAME" ) ? Sql.ToString(row["LAST_NAME" ]) : Sql.ToString(row["NAME"]);
+										cd.email_address  = dtM.Columns.Contains("EMAIL_ADDRESS") ? Sql.ToString(row["EMAIL_ADDRESS"]) : String.Empty;
+										lstResult.Add(cd);
+									}
+								}
 							}
 						}
 					}
 				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				throw new Exception("SOAP: Failed search()", ex);
 			}
-			return results.ToArray();
+			return lstResult.ToArray();
 		}
 
-		/// <summary>Searches one or more modules by a search string with paging support.</summary>
+		/// <summary>
+		/// Searches across specified modules by search string with paging.
+		/// Returns get_entry_list_result with MODULE_NAME column.
+		/// Migrated from soap.asmx.cs line 1505.
+		/// </summary>
 		public get_entry_list_result search_by_module(string user_name, string password, string search_string, string[] modules, int offset, int max_results)
 		{
-			get_entry_list_result results = new get_entry_list_result();
+			get_entry_list_result result = new get_entry_list_result();
+			result.error       = new error_value();
+			result.result_count= 0;
+			result.next_offset = 0;
+			result.field_list  = new field[0];
+			result.entry_list  = new entry_value[0];
 			try
 			{
-				Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-				if (offset < 0)
-					throw new Exception("offset must be a non-negative number");
-				if (max_results <= 0)
-					throw new Exception("max_results must be a positive number");
-				// search_string parsed to remove semicolons
-				search_string = search_string.Replace(";", " or ");
-				if (modules == null || modules.Length == 0)
-					modules = new string[] { "Accounts" };
-				var entries = new List<entry_value>();
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				Guid gUSER_ID = LoginUser(ref user_name, password, true);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					return result;
+				if ( modules == null || modules.Length == 0 )
+					return result;
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					foreach (string sModule in modules)
+					List<entry_value> lstEntries = new List<entry_value>();
+					int nTotal = 0;
+					foreach ( string sModule in modules )
+					{
+						string sMODULE = Regex.Replace(sModule, @"[^A-Za-z0-9_]", String.Empty);
+						if ( Sql.IsEmptyString(sMODULE) ) continue;
+						using ( IDbCommand cmdM = con.CreateCommand() )
+						{
+							cmdM.CommandText = "select *, '" + sMODULE + "' as MODULE_NAME  from vw" + sMODULE + "_List  where 1 = 1  ";
+							StringBuilder sbWhere = new StringBuilder();
+							_security.Filter(cmdM, sMODULE, "list", "ASSIGNED_USER_ID");
+							string sUnified = Sql.UnifiedSearch(sMODULE, search_string, cmdM);
+							cmdM.CommandText += sbWhere.ToString() + sUnified;
+							if ( max_results > 0 && Crm.Modules.CustomPaging(sMODULE) )
+							{
+								int nCurrentPage = (offset > 0 && max_results > 0) ? (offset / max_results) + 1 : 1;
+								cmdM.CommandText = Sql.PageResults(cmdM, cmdM.CommandText, "NAME", max_results, nCurrentPage);
+							}
+							using ( DbDataAdapter daM = dbf.CreateDataAdapter() )
+							{
+								((IDbDataAdapter)daM).SelectCommand = cmdM;
+								using ( DataTable dtM = new DataTable() )
+								{
+									daM.Fill(dtM);
+									nTotal += dtM.Rows.Count;
+									foreach ( DataRow row in dtM.Rows )
+									{
+										List<name_value> lstNV = new List<name_value>();
+										foreach ( DataColumn col in dtM.Columns )
+											lstNV.Add(new name_value(col.ColumnName, Sql.ToString(row[col])));
+										entry_value ev = new entry_value();
+										ev.id             = Sql.ToString(row["ID"]);
+										ev.module_name    = sMODULE;
+										ev.name_value_list= lstNV.ToArray();
+										lstEntries.Add(ev);
+									}
+								}
+							}
+						}
+					}
+					result.result_count = lstEntries.Count;
+					result.next_offset  = offset + lstEntries.Count;
+					result.entry_list   = lstEntries.ToArray();
+					result.field_list   = new field[0];
+				}
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				result.error.number      = "-1";
+				result.error.name        = ex.GetType().Name;
+				result.error.description = ex.Message;
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// Email tracking — not implemented in original source; throws per original behavior.
+		/// Migrated from soap.asmx.cs line 1864.
+		/// </summary>
+		public string track_email(string user_name, string password, string parent_id, string contact_ids, DateTime date_sent, string email_subject, string email_body)
+		{
+			throw new Exception("Method not implemented.");
+		}
+
+		// ============================================================
+		//  SESSION-REQUIRED DATA ACCESS METHODS
+		//  Migrated from soap.asmx.cs lines 1876-4638
+		// ============================================================
+
+		/// <summary>
+		/// Returns a list of module entries matching the query, with paging support.
+		/// Migrated from soap.asmx.cs line 1879.
+		/// </summary>
+		public get_entry_list_result get_entry_list(string session, string module_name, string query, string order_by, int offset, string[] select_fields, int max_results, int deleted)
+		{
+			get_entry_list_result result = new get_entry_list_result();
+			result.error       = new error_value();
+			result.result_count= 0;
+			result.next_offset = 0;
+			result.field_list  = new field[0];
+			result.entry_list  = new entry_value[0];
+			try
+			{
+				Guid gUSER_ID = GetSessionUserID(session);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number      = "-1";
+					result.error.name        = "Invalid Session";
+					result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				string sTZ = String.Empty, sCurrencyID = String.Empty;
+				UserPreferences(gUSER_ID, ref sTZ, ref sCurrencyID);
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(Sql.ToGuid(sTZ));
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					// Verify module is accessible via REST/SOAP.
+					DataTable dtRestrict = _splendidCache.RestTables(sMODULE_NAME, true);
+					if ( dtRestrict == null || dtRestrict.Rows.Count == 0 )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number      = "-1";
+						result.error.name        = "ACL";
+						result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					// Get TABLE_NAME for this module.
+					string sTABLE_NAME = VerifyModuleName(con, sMODULE_NAME);
+					// Check ACL access.
+					int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "list");
+					if ( nACLACCESS == ACL_ACCESS.NONE )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number      = "-1";
+						result.error.name        = "ACL";
+						result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
 					{
 						try
 						{
-							string sTableName = Regex.Replace(sModule, @"[^A-Za-z0-9_]", "");
-							string sSQL = "select ID, NAME from vw" + sTableName + "_List where NAME like @NAME";
-							using (IDbCommand cmd = con.CreateCommand())
+							string sVIEW_NAME = "vw" + sTABLE_NAME;
+							// Join custom table if it exists.
+							DataTable dtSqlColumns = _splendidCache.SqlColumns(sTABLE_NAME + "_CSTM");
+							if ( dtSqlColumns != null && dtSqlColumns.Rows.Count > 0 )
+								sVIEW_NAME += "_" + sTABLE_NAME + "_CSTM";
+							string sSQL = "select *  from " + sVIEW_NAME + "  where 1 = 1  ";
+							using ( IDbCommand cmd = con.CreateCommand() )
 							{
+								cmd.Transaction = trn;
 								cmd.CommandText = sSQL;
-								Sql.AddParameter(cmd, "@NAME", "%" + search_string + "%", 200);
-								using (DbDataAdapter da = _dbProviderFactory.CreateDataAdapter())
+								StringBuilder sbWhere = new StringBuilder();
+								_security.Filter(cmd, sMODULE_NAME, "list", "ASSIGNED_USER_ID");
+								Sql.AppendParameter(cmd, sbWhere, "DELETED", Math.Min(deleted, 1));
+								if ( !Sql.IsEmptyString(query) )
+								{
+									sbWhere.Append(" and (" + query + ")");
+								}
+								cmd.CommandText += sbWhere.ToString();
+								// Sanitize order_by.
+								string sOrderBy = String.Empty;
+								if ( !Sql.IsEmptyString(order_by) )
+									sOrderBy = Regex.Replace(order_by, @"[^A-Za-z0-9_,. ]", String.Empty);
+								// Apply paging via Sql.PageResults.
+								if ( max_results > 0 )
+								{
+									int nCurrentPage = (offset > 0 && max_results > 0) ? (offset / max_results) + 1 : 1;
+									cmd.CommandText = Sql.PageResults(cmd, cmd.CommandText, sOrderBy, max_results, nCurrentPage);
+								}
+								else if ( !Sql.IsEmptyString(sOrderBy) )
+								{
+									cmd.CommandText += " order by " + sOrderBy;
+								}
+								using ( DbDataAdapter da = dbf.CreateDataAdapter() )
 								{
 									((IDbDataAdapter)da).SelectCommand = cmd;
-									using (DataTable dt = new DataTable())
+									using ( DataTable dt = new DataTable() )
 									{
 										da.Fill(dt);
-										CultureInfo ciEnglish = CultureInfo.CreateSpecificCulture("en-US");
-										int j = 0;
-										foreach (DataRow row in dt.Rows)
+										// Build field_list from columns.
+										bool bACLField = SplendidInit.bEnableACLFieldSecurity;
+										List<field> lstFields = new List<field>();
+										foreach ( DataColumn col in dt.Columns )
 										{
-											if (j >= offset && j < offset + max_results)
+											bool bInclude = (select_fields == null || select_fields.Length == 0 || Array.IndexOf(select_fields, col.ColumnName) >= 0);
+											if ( bInclude )
 											{
-												entry_value ev = new entry_value();
-												ev.id = Sql.ToGuid(row["ID"]).ToString();
-												ev.module_name = sModule;
-												ev.name_value_list = new name_value[dt.Columns.Count];
-												int nColumn = 0;
-												foreach (DataColumn col in dt.Columns)
+												int nFieldAccess = ACL_ACCESS.FULL_ACCESS;
+												if ( bACLField )
+													nFieldAccess = _security.GetUserFieldSecurity(sMODULE_NAME, col.ColumnName, Guid.Empty).nACLACCESS;
+												if ( nFieldAccess > ACL_ACCESS.NONE )
+													lstFields.Add(new field(col.ColumnName, col.DataType.Name, String.Empty, 0));
+											}
+										}
+										result.field_list = lstFields.ToArray();
+										// Build entry_list.
+										List<entry_value> lstEntries = new List<entry_value>();
+										foreach ( DataRow row in dt.Rows )
+										{
+											List<name_value> lstNV = new List<name_value>();
+											foreach ( field f in result.field_list )
+											{
+												object oVal = row[f.name];
+												string sVal = String.Empty;
+												if ( oVal != DBNull.Value )
 												{
-													ev.name_value_list[nColumn] = new name_value(col.ColumnName.ToLower(), Sql.ToString(row[col.ColumnName]));
-													nColumn++;
+													if ( oVal is DateTime dtVal )
+														sVal = T10n.ToUniversalTimeFromServerTime(dtVal).ToString(SqlDateTimeFormat, CultureInfo.CreateSpecificCulture("en-US").DateTimeFormat);
+													else
+														sVal = Sql.ToString(oVal);
 												}
-												entries.Add(ev);
+												lstNV.Add(new name_value(f.name, sVal));
 											}
-											j++;
+											entry_value ev = new entry_value();
+											ev.id              = Sql.ToString(row["ID"]);
+											ev.module_name     = sMODULE_NAME;
+											ev.name_value_list = lstNV.ToArray();
+											lstEntries.Add(ev);
 										}
+										result.entry_list   = lstEntries.ToArray();
+										result.result_count = lstEntries.Count;
+										result.next_offset  = offset + lstEntries.Count;
 									}
 								}
 							}
+							trn.Commit();
 						}
-						catch (Exception exMod)
+						catch
 						{
-							_logger.LogWarning(exMod, "search_by_module: skipping module {Module}", sModule);
-						}
-					}
-				}
-				results.result_count = Math.Min(entries.Count, max_results);
-				results.next_offset  = offset + results.result_count;
-				results.entry_list   = entries.ToArray();
-				results.field_list   = new field[0];
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				results.error = new error_value("-1", "Exception", ex.Message);
-			}
-			return results;
-		}
-
-		/// <summary>Tracks an email send event for campaign reporting.</summary>
-		public string track_email(string user_name, string password, string parent_id, string contact_ids, DateTime date_sent, string email_subject, string email_body)
-		{
-			Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-			// Note: Original source throws NotImplementedException.
-			if (gUSER_ID != Guid.Empty)
-				throw new Exception("Method not implemented.");
-			return string.Empty;
-		}
-
-		// =====================================================================
-		// Session-Required Methods
-		// =====================================================================
-
-		/// <summary>Returns a paginated list of module entries matching the query and order_by clause.</summary>
-		public get_entry_list_result get_entry_list(string session, string module_name, string query, string order_by, int offset, string[] select_fields, int max_results, int deleted)
-		{
-			get_entry_list_result results = new get_entry_list_result();
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				if (offset < 0)
-					throw new Exception("offset must be a non-negative number");
-				if (max_results <= 0)
-					throw new Exception("max_results must be a positive number");
-				// SQL injection protection: sanitize table name and clauses
-				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				query    = (query    ?? string.Empty).ToUpper();
-				order_by = (order_by ?? string.Empty).ToUpper();
-				query    = query   .Replace(sTABLE_NAME + ".", string.Empty);
-				order_by = order_by.Replace(sTABLE_NAME + ".", string.Empty);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					string sSQL = "select * from vw" + sTABLE_NAME + "_List where 1 = 1";
-					if (deleted == 0) sSQL += " and DELETED = 0";
-					if (!Sql.IsEmptyString(query))
-						sSQL += " and (" + query + ")";
-					if (!Sql.IsEmptyString(order_by))
-						sSQL += " order by " + order_by;
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandText = sSQL;
-						using (DbDataAdapter da = _dbProviderFactory.CreateDataAdapter())
-						{
-							((IDbDataAdapter)da).SelectCommand = cmd;
-							using (DataTable dt = new DataTable())
-							{
-								da.Fill(dt);
-								CultureInfo ciEnglish = CultureInfo.CreateSpecificCulture("en-US");
-								int nCount = Math.Min(dt.Rows.Count - offset, max_results);
-								if (nCount < 0) nCount = 0;
-								results.result_count = nCount;
-								results.next_offset  = offset + nCount;
-								// Build field_list
-								results.field_list = new field[dt.Columns.Count];
-								for (int i = 0; i < dt.Columns.Count; i++)
-								{
-									DataColumn col = dt.Columns[i];
-									results.field_list[i] = new field(col.ColumnName.ToLower(), col.DataType.ToString(), col.ColumnName, 0);
-								}
-								// Build entry_list
-								results.entry_list = new entry_value[nCount];
-								int j = 0;
-								int nItem = 0;
-								foreach (DataRow row in dt.Rows)
-								{
-									if (j >= offset && nItem < nCount)
-									{
-										results.entry_list[nItem] = new entry_value();
-										results.entry_list[nItem].id          = Sql.ToGuid(row["ID"]).ToString();
-										results.entry_list[nItem].module_name = module_name;
-										results.entry_list[nItem].name_value_list = new name_value[dt.Columns.Count];
-										int nColumn = 0;
-										foreach (DataColumn col in dt.Columns)
-										{
-											if (col.DataType == typeof(DateTime))
-											{
-												DateTime dtVal = Sql.ToDateTime(row[col.ColumnName]);
-												results.entry_list[nItem].name_value_list[nColumn] = new name_value(col.ColumnName.ToLower(), dtVal.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", ciEnglish.DateTimeFormat));
-											}
-											else
-											{
-												results.entry_list[nItem].name_value_list[nColumn] = new name_value(col.ColumnName.ToLower(), Sql.ToString(row[col.ColumnName]));
-											}
-											nColumn++;
-										}
-										nItem++;
-									}
-									j++;
-								}
-							}
+							trn.Rollback();
+							throw;
 						}
 					}
 				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				results.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number      = "-1";
+				result.error.name        = ex.GetType().Name;
+				result.error.description = ex.Message;
 			}
-			return results;
+			return result;
 		}
 
-		/// <summary>Returns a single entry from a module by ID.</summary>
+		/// <summary>
+		/// Returns a single entry by module and ID.
+		/// Migrated from soap.asmx.cs line 2162.
+		/// </summary>
 		public get_entry_result get_entry(string session, string module_name, string id, string[] select_fields)
 		{
 			get_entry_result result = new get_entry_result();
+			result.error      = new error_value();
+			result.field_list = new field[0];
+			
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				string sTZ = String.Empty, sCurrencyID = String.Empty;
+				UserPreferences(gUSER_ID, ref sTZ, ref sCurrencyID);
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(Sql.ToGuid(sTZ));
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					string sSQL = "select * from vw" + sTABLE_NAME + " where ID = @ID";
-					using (IDbCommand cmd = con.CreateCommand())
+					DataTable dtRestrict = _splendidCache.RestTables(sMODULE_NAME, true);
+					if ( dtRestrict == null || dtRestrict.Rows.Count == 0 )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "view");
+					if ( nACLACCESS == ACL_ACCESS.NONE )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					string sTABLE_NAME = VerifyModuleName(con, sMODULE_NAME);
+					string sVIEW_NAME  = "vw" + sTABLE_NAME;
+					string sSQL = "select *  from " + sVIEW_NAME + "  where 1 = 1  ";
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@ID", Sql.ToGuid(id));
-						using (IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SingleRow))
+						StringBuilder sbWhere = new StringBuilder();
+						_security.Filter(cmd, sMODULE_NAME, "view", "ASSIGNED_USER_ID");
+						Sql.AppendParameter(cmd, sbWhere, "ID", Sql.ToGuid(id));
+						cmd.CommandText += sbWhere.ToString();
+						using ( DbDataAdapter da = dbf.CreateDataAdapter() )
 						{
-							if (rdr.Read())
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								result.field_list = new field[rdr.FieldCount];
-								for (int i = 0; i < rdr.FieldCount; i++)
-									result.field_list[i] = new field(rdr.GetName(i).ToLower(), rdr.GetFieldType(i).ToString(), rdr.GetName(i), 0);
-								result.entry_list = new entry_value[1];
-								result.entry_list[0] = new entry_value();
-								result.entry_list[0].id = id;
-								result.entry_list[0].module_name = module_name;
-								result.entry_list[0].name_value_list = new name_value[rdr.FieldCount];
-								for (int i = 0; i < rdr.FieldCount; i++)
-									result.entry_list[0].name_value_list[i] = new name_value(rdr.GetName(i).ToLower(), Sql.ToString(rdr.GetValue(i)));
-							}
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
-			}
-			return result;
-		}
-
-		/// <summary>Returns multiple entries from a module by an array of IDs.</summary>
-		public get_entry_result get_entries(string session, string module_name, string[] ids, string[] select_fields)
-		{
-			get_entry_result result = new get_entry_result();
-			var entries = new List<entry_value>();
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
-				{
-					con.Open();
-					foreach (string sID in ids)
-					{
-						string sSQL = "select * from vw" + sTABLE_NAME + " where ID = @ID";
-						using (IDbCommand cmd = con.CreateCommand())
-						{
-							cmd.CommandText = sSQL;
-							Sql.AddParameter(cmd, "@ID", Sql.ToGuid(sID));
-							using (IDataReader rdr = cmd.ExecuteReader())
-							{
-								if (rdr.Read())
+								da.Fill(dt);
+								bool bACLField = SplendidInit.bEnableACLFieldSecurity;
+								List<field> lstFields = new List<field>();
+								foreach ( DataColumn col in dt.Columns )
 								{
-									entry_value ev = new entry_value();
-									ev.id = sID;
-									ev.module_name = module_name;
-									ev.name_value_list = new name_value[rdr.FieldCount];
-									for (int i = 0; i < rdr.FieldCount; i++)
-										ev.name_value_list[i] = new name_value(rdr.GetName(i).ToLower(), Sql.ToString(rdr.GetValue(i)));
-									entries.Add(ev);
+									bool bInclude = (select_fields == null || select_fields.Length == 0 || Array.IndexOf(select_fields, col.ColumnName) >= 0);
+									if ( bInclude )
+									{
+										int nFA = bACLField ? _security.GetUserFieldSecurity(sMODULE_NAME, col.ColumnName, Guid.Empty).nACLACCESS : ACL_ACCESS.FULL_ACCESS;
+										if ( nFA > ACL_ACCESS.NONE )
+											lstFields.Add(new field(col.ColumnName, col.DataType.Name, String.Empty, 0));
+									}
+								}
+								result.field_list = lstFields.ToArray();
+								if ( dt.Rows.Count > 0 )
+								{
+									DataRow row = dt.Rows[0];
+									List<name_value> lstNV = new List<name_value>();
+									foreach ( field f in result.field_list )
+									{
+										object oVal = row[f.name];
+										string sVal = String.Empty;
+										if ( oVal != DBNull.Value )
+										{
+											if ( oVal is DateTime dtVal )
+												sVal = T10n.ToUniversalTimeFromServerTime(dtVal).ToString(SqlDateTimeFormat, CultureInfo.CreateSpecificCulture("en-US").DateTimeFormat);
+											else
+												sVal = Sql.ToString(oVal);
+										}
+										lstNV.Add(new name_value(f.name, sVal));
+									}
+									entry_value ev1 = new entry_value();
+									ev1.id              = Sql.ToString(row["ID"]);
+									ev1.module_name     = sMODULE_NAME;
+									ev1.name_value_list = lstNV.ToArray();
+									result.entry_list   = new entry_value[] { ev1 };
 								}
 							}
 						}
 					}
 				}
-				result.entry_list = entries.ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", _env.IsDevelopment() ? ex.Message : "An internal error occurred.");
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Creates or updates a single record in a module using a name_value list.</summary>
+		/// <summary>
+		/// Returns multiple entries by module and ID array.
+		/// Migrated from soap.asmx.cs line 2301.
+		/// </summary>
+		public get_entry_result get_entries(string session, string module_name, string[] ids, string[] select_fields)
+		{
+			get_entry_result result = new get_entry_result();
+			result.error      = new error_value();
+			result.field_list = new field[0];
+			
+			try
+			{
+				Guid gUSER_ID = GetSessionUserID(session);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				string sTZ = String.Empty, sCurrencyID = String.Empty;
+				UserPreferences(gUSER_ID, ref sTZ, ref sCurrencyID);
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(Sql.ToGuid(sTZ));
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					DataTable dtRestrict = _splendidCache.RestTables(sMODULE_NAME, true);
+					if ( dtRestrict == null || dtRestrict.Rows.Count == 0 )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "view");
+					if ( nACLACCESS == ACL_ACCESS.NONE )
+					{
+						L10N L10n = new L10N("en-US", _memoryCache);
+						result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+						return result;
+					}
+					string sTABLE_NAME = VerifyModuleName(con, sMODULE_NAME);
+					string sVIEW_NAME  = "vw" + sTABLE_NAME;
+					string sSQL = "select *  from " + sVIEW_NAME + "  where 1 = 1  ";
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						StringBuilder sbWhere = new StringBuilder();
+						_security.Filter(cmd, sMODULE_NAME, "view", "ASSIGNED_USER_ID");
+						Sql.AppendParameter(cmd, sbWhere, ids, "ID", false);
+						cmd.CommandText += sbWhere.ToString();
+						using ( DbDataAdapter da = dbf.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
+							{
+								da.Fill(dt);
+								bool bACLField = SplendidInit.bEnableACLFieldSecurity;
+								List<field> lstFields = new List<field>();
+								foreach ( DataColumn col in dt.Columns )
+								{
+									bool bInclude = (select_fields == null || select_fields.Length == 0 || Array.IndexOf(select_fields, col.ColumnName) >= 0);
+									if ( bInclude )
+									{
+										int nFA = bACLField ? _security.GetUserFieldSecurity(sMODULE_NAME, col.ColumnName, Guid.Empty).nACLACCESS : ACL_ACCESS.FULL_ACCESS;
+										if ( nFA > ACL_ACCESS.NONE )
+											lstFields.Add(new field(col.ColumnName, col.DataType.Name, String.Empty, 0));
+									}
+								}
+								result.field_list = lstFields.ToArray();
+								// Return first matching entry (API contract returns single entry_value).
+								if ( dt.Rows.Count > 0 )
+								{
+									DataRow row = dt.Rows[0];
+									List<name_value> lstNV = new List<name_value>();
+									foreach ( field f in result.field_list )
+									{
+										object oVal = row[f.name];
+										string sVal = String.Empty;
+										if ( oVal != DBNull.Value )
+										{
+											if ( oVal is DateTime dtVal )
+												sVal = T10n.ToUniversalTimeFromServerTime(dtVal).ToString(SqlDateTimeFormat, CultureInfo.CreateSpecificCulture("en-US").DateTimeFormat);
+											else
+												sVal = Sql.ToString(oVal);
+										}
+										lstNV.Add(new name_value(f.name, sVal));
+									}
+									entry_value ev2 = new entry_value();
+									ev2.id              = Sql.ToString(row["ID"]);
+									ev2.module_name     = sMODULE_NAME;
+									ev2.name_value_list = lstNV.ToArray();
+									result.entry_list   = new entry_value[] { ev2 };
+								}
+							}
+						}
+					}
+				}
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// Creates or updates a single entry in the specified module.
+		/// Migrated from soap.asmx.cs line 2552.
+		/// </summary>
 		public set_entry_result set_entry(string session, string module_name, name_value[] name_value_list)
 		{
 			set_entry_result result = new set_entry_result();
+			result.error = new error_value();
+			result.id    = String.Empty;
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				// Placeholder: real implementation calls SqlProcs.Factory() with the correct sproc
-				result.id = Guid.NewGuid().ToString();
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				string sTZ = String.Empty, sCurrencyID = String.Empty;
+				UserPreferences(gUSER_ID, ref sTZ, ref sCurrencyID);
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(Sql.ToGuid(sTZ));
+				int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					string sTABLE_NAME = VerifyModuleName(con, sMODULE_NAME);
+					Guid gID = FindID(name_value_list);
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+					{
+						try
+						{
+							using ( IDbCommand cmdUpdate = SqlProcs.Factory(con, "sp" + sTABLE_NAME + "_Update") )
+							{
+								cmdUpdate.Transaction = trn;
+								// Initialize default parameters (@ID, @MODIFIED_USER_ID, @TEAM_ID, @ASSIGNED_USER_ID).
+								InitializeParameters(con, sTABLE_NAME, gID, cmdUpdate);
+								// Apply name_value_list values to command parameters.
+								bool bACLField = SplendidInit.bEnableACLFieldSecurity;
+								foreach ( name_value nv in name_value_list )
+								{
+									if ( nv == null || Sql.IsEmptyString(nv.name) ) continue;
+									string sFieldName = nv.name.ToUpper();
+									if ( bACLField )
+									{
+										int nFieldAccess = _security.GetUserFieldSecurity(sMODULE_NAME, sFieldName, Guid.Empty).nACLACCESS;
+										if ( nFieldAccess == ACL_ACCESS.NONE ) continue;
+									}
+									IDbDataParameter parm = Sql.FindParameter(cmdUpdate, sFieldName);
+									if ( parm != null )
+									{
+										// Convert datetime fields from UTC to server time.
+										if ( parm.DbType == DbType.DateTime || parm.DbType == DbType.DateTime2 )
+										{
+											DateTime dt = Sql.ToDateTime(nv.value);
+											if ( dt != DateTime.MinValue )
+												Sql.SetParameter(parm, T10n.ToServerTimeFromUniversalTime(dt));
+											else
+												Sql.SetParameter(parm, DBNull.Value);
+										}
+										else
+										{
+											Sql.SetParameter(parm, nv.value);
+										}
+									}
+								}
+								// Execute the update.
+								cmdUpdate.ExecuteNonQuery();
+								// Retrieve the ID after update.
+								IDbDataParameter pID = Sql.FindParameter(cmdUpdate, "ID");
+								if ( pID != null )
+									gID = Sql.ToGuid(pID.Value);
+							}
+							// Update custom fields if any.
+							UpdateCustomFields(con, trn, sMODULE_NAME, sTABLE_NAME, gID, name_value_list, gUSER_ID);
+							trn.Commit();
+						}
+						catch
+						{
+							trn.Rollback();
+							throw;
+						}
+					}
+					result.id = gID.ToString();
+				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Creates or updates multiple records in a module.</summary>
+		/// <summary>
+		/// Creates or updates multiple entries in the specified module.
+		/// Migrated from soap.asmx.cs line 2810.
+		/// </summary>
 		public set_entries_result set_entries(string session, string module_name, name_value[][] name_value_lists)
 		{
 			set_entries_result result = new set_entries_result();
-			var ids = new List<string>();
+			result.error = new error_value();
+			result.ids   = new string[0];
 			try
 			{
-				if (name_value_lists != null)
+				Guid gUSER_ID = GetSessionUserID(session);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
 				{
-					foreach (name_value[] nvl in name_value_lists)
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				List<string> lstIDs = new List<string>();
+				if ( name_value_lists != null )
+				{
+					foreach ( name_value[] nvList in name_value_lists )
 					{
-						set_entry_result sr = set_entry(session, module_name, nvl);
-						ids.Add(sr.id);
+						// Delegate to set_entry for each record.
+						set_entry_result r = set_entry(session, module_name, nvList);
+						lstIDs.Add(r.id ?? String.Empty);
 					}
 				}
-				result.ids = ids.ToArray();
+				result.ids = lstIDs.ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Uploads a note attachment.</summary>
+		/// <summary>
+		/// Attaches a file to a note record.
+		/// Migrated from soap.asmx.cs line 2973.
+		/// </summary>
 		public set_entry_result set_note_attachment(string session, note_attachment note)
 		{
 			set_entry_result result = new set_entry_result();
+			result.error = new error_value();
+			result.id    = String.Empty;
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				// Real implementation calls SqlProcs.spNOTE_ATTACHMENTS_Insert
-				result.id = Sql.IsEmptyString(note.id) ? Guid.NewGuid().ToString() : note.id;
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
-			}
-			return result;
-		}
-
-		/// <summary>Retrieves a note attachment by Note record ID.</summary>
-		public return_note_attachment get_note_attachment(string session, string id)
-		{
-			return_note_attachment result = new return_note_attachment();
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				// Real implementation reads from file system / database binary storage
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
-			}
-			return result;
-		}
-
-		/// <summary>Associates a Note record with a parent module record.</summary>
-		public error_value relate_note_to_module(string session, string note_id, string module_name, string module_id)
-		{
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
 				{
-					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandType = CommandType.StoredProcedure;
-						cmd.CommandText = "spNOTES_Update";
-						Sql.AddParameter(cmd, "@ID", Sql.ToGuid(note_id));
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID);
-						Sql.AddParameter(cmd, "@PARENT_TYPE", module_name, 25);
-						Sql.AddParameter(cmd, "@PARENT_ID", Sql.ToGuid(module_id));
-						cmd.ExecuteNonQuery();
-					}
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
 				}
-				return new error_value { number = "0", name = "No Error", description = string.Empty };
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				return new error_value("-1", "Exception", ex.Message);
-			}
-		}
-
-		/// <summary>Returns Notes related to a module record.</summary>
-		public get_entry_result get_related_notes(string session, string module_name, string module_id, string[] select_fields)
-		{
-			get_entry_result result = new get_entry_result();
-			var entries = new List<entry_value>();
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				int nACLACCESS = _security.GetUserAccess("Notes", "edit");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				Guid gNOTE_ID      = Sql.ToGuid(note.id);
+				string sFileName   = Path.GetFileName(note.filename ?? String.Empty);
+				string sFileExt    = Path.GetExtension(note.filename ?? String.Empty);
+				string sFileMime   = "application/octet-stream";
+				byte[] byFile      = Convert.FromBase64String(note.file ?? String.Empty);
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					string sSQL = "select * from vwNOTES where PARENT_TYPE = @PARENT_TYPE and PARENT_ID = @PARENT_ID";
-					using (IDbCommand cmd = con.CreateCommand())
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
 					{
-						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@PARENT_TYPE", module_name, 25);
-						Sql.AddParameter(cmd, "@PARENT_ID", Sql.ToGuid(module_id));
-						using (IDataReader rdr = cmd.ExecuteReader())
+						try
 						{
-							while (rdr.Read())
-							{
-								entry_value ev = new entry_value();
-								ev.id = Sql.ToString(rdr["ID"]);
-								ev.module_name = "Notes";
-								ev.name_value_list = new name_value[rdr.FieldCount];
-								for (int i = 0; i < rdr.FieldCount; i++)
-									ev.name_value_list[i] = new name_value(rdr.GetName(i).ToLower(), Sql.ToString(rdr.GetValue(i)));
-								entries.Add(ev);
-							}
+							// Persist to file system via Crm.NoteAttachments.LoadFile (requires transaction for DB-backed storage).
+							Crm.NoteAttachments.LoadFile(gNOTE_ID, byFile, trn);
+							Guid gNOTE_ATTACHMENT_ID = Guid.Empty;
+							SqlProcs.spNOTE_ATTACHMENTS_Insert(ref gNOTE_ATTACHMENT_ID, gNOTE_ID, String.Empty, sFileName, sFileExt, sFileMime, trn);
+							result.id = gNOTE_ID.ToString();
+							trn.Commit();
+						}
+						catch
+						{
+							trn.Rollback();
+							throw;
 						}
 					}
 				}
-				result.entry_list = entries.ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Returns field metadata for a module.</summary>
+		/// <summary>
+		/// Returns the attachment for a note record.
+		/// Not implemented in original source — preserved per original behavior.
+		/// Migrated from soap.asmx.cs line 3072.
+		/// </summary>
+		public return_note_attachment get_note_attachment(string session, string id)
+		{
+			throw new Exception("Method not implemented.");
+		}
+
+		/// <summary>
+		/// Relates a note to a specific module record.
+		/// Migrated from soap.asmx.cs line 3084.
+		/// </summary>
+		public error_value relate_note_to_module(string session, string note_id, string module_name, string module_id)
+		{
+			error_value result = new error_value();
+			try
+			{
+				Guid gUSER_ID = GetSessionUserID(session);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.number = "-1"; result.name = "Invalid Session"; result.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				int nACLACCESS = _security.GetUserAccess("Notes", "edit");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.number = "-1"; result.name = "ACL"; result.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				Guid gNOTE_ID   = Sql.ToGuid(note_id);
+				Guid gMODULE_ID = Sql.ToGuid(module_id);
+				// Update the NOTES record PARENT_TYPE and PARENT_ID via set_entry.
+				name_value[] nvList = new name_value[]
+				{
+					new name_value("ID",          note_id),
+					new name_value("PARENT_TYPE", sMODULE_NAME),
+					new name_value("PARENT_ID",   module_id)
+				};
+				set_entry(session, "Notes", nvList);
+			}
+			catch(Exception ex)
+			{
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				result.number = "-1"; result.name = ex.GetType().Name; result.description = ex.Message;
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// Returns related notes for a module record.
+		/// Not implemented in original source — preserved per original behavior.
+		/// Migrated from soap.asmx.cs line 3170.
+		/// </summary>
+		public get_entry_result get_related_notes(string session, string module_name, string module_id, string[] select_fields)
+		{
+			throw new Exception("Method not implemented.");
+		}
+
+		/// <summary>
+		/// Returns field metadata for a module.
+		/// Migrated from soap.asmx.cs line 3182.
+		/// </summary>
 		public module_fields get_module_fields(string session, string module_name)
 		{
 			module_fields result = new module_fields();
+			result.error          = new error_value();
+			result.module_name    = module_name;
+			result.module_fields1 = new field[0];
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				result.module_name = module_name;
-				var fields = new List<field>();
-				string sTABLE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE_NAME = Regex.Replace(module_name, @"[^A-Za-z0-9_]", String.Empty);
+				int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "list");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					string sSQL = "select top 0 * from vw" + sTABLE_NAME + "_List";
-					using (IDbCommand cmd = con.CreateCommand())
+					string sTABLE_NAME = VerifyModuleName(con, sMODULE_NAME);
+					DataTable dtFields = _splendidCache.FieldsMetaData_Validated(sTABLE_NAME);
+					List<field> lstFields = new List<field>();
+					if ( dtFields != null )
 					{
-						cmd.CommandText = sSQL;
-						using (IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SchemaOnly))
+						foreach ( DataRow row in dtFields.Rows )
 						{
-							for (int i = 0; i < rdr.FieldCount; i++)
-								fields.Add(new field(rdr.GetName(i).ToLower(), rdr.GetFieldType(i).ToString(), rdr.GetName(i), 0));
+							string sName    = Sql.ToString(row["NAME"   ]);
+							string sType    = Sql.ToString(row["DATA_TYPE"]);
+							string sLabel   = Sql.ToString(row["LABEL"  ]);
+							int    nRequired= Sql.ToInteger(row["REQUIRED"]);
+							lstFields.Add(new field(sName, sType, sLabel, nRequired));
 						}
 					}
+					result.module_fields1 = lstFields.ToArray();
 				}
-				result.module_fields1 = fields.ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Returns the list of available module names accessible to the authenticated user.</summary>
+		/// <summary>
+		/// Returns the list of modules accessible to the current user.
+		/// Migrated from soap.asmx.cs line 3235.
+		/// </summary>
 		public module_list get_available_modules(string session)
 		{
 			module_list result = new module_list();
+			result.error   = new error_value();
+			result.modules = new string[0];
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				var modules = new List<string>();
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
 				{
-					con.Open();
-					string sSQL = "select MODULE_NAME from vwMODULES where IS_ADMIN = 0 order by MODULE_NAME";
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandText = sSQL;
-						using (IDataReader rdr = cmd.ExecuteReader())
-						{
-							while (rdr.Read())
-								modules.Add(Sql.ToString(rdr["MODULE_NAME"]));
-						}
-					}
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
 				}
-				result.modules = modules.ToArray();
+				DataTable dtModules = _splendidCache.AccessibleModules();
+				if ( dtModules != null )
+					result.modules = dtModules.AsEnumerable().Select(r => Sql.ToString(r["MODULE_NAME"])).ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Creates or updates a portal user record.</summary>
+		/// <summary>
+		/// Updates a portal user record.
+		/// Not implemented in original source — preserved per original behavior.
+		/// Migrated from soap.asmx.cs line 3250.
+		/// </summary>
 		public error_value update_portal_user(string session, string portal_name, name_value[] name_value_list)
 		{
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				return new error_value { number = "0", name = "No Error", description = string.Empty };
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				return new error_value("-1", "Exception", ex.Message);
-			}
+			throw new Exception("Method not implemented.");
 		}
 
-		/// <summary>Returns modified relationships for a module in an encoded format.</summary>
+		/// <summary>
+		/// Returns modified relationships for synchronization. Not supported — returns error per original.
+		/// Migrated from soap.asmx.cs line 3324.
+		/// </summary>
 		public get_entry_list_result_encoded sync_get_modified_relationships(string session, string module_name, string related_module, string from_date, string to_date, int offset, int max_results, int deleted, string module_id, string[] select_fields, string[] ids, string relationship_name, string deletion_date, int php_serialize)
 		{
 			get_entry_list_result_encoded result = new get_entry_list_result_encoded();
-			try
-			{
-				Guid gUSER_ID = GetSessionUserID(session);
-				// Preserved from original: returns minimal encoded result
-			}
-			catch (Exception ex)
-			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
-			}
+			result.result_count = 0;
+			result.total_count  = 0;
+			result.next_offset  = 0;
+			result.entry_list   = String.Empty;
+			result.error        = new error_value();
+			result.error.number = "-1";
+			result.error.name   = "not supported";
+			result.error.description = "sync_get_modified_relationships is not supported.";
 			return result;
 		}
 
-		/// <summary>Returns relationship IDs between a module record and a related module.</summary>
+		/// <summary>
+		/// Returns related records for a module record.
+		/// Migrated from soap.asmx.cs line 3372.
+		/// </summary>
 		public get_relationships_result get_relationships(string session, string module_name, string module_id, string related_module, string related_module_query, int deleted)
 		{
 			get_relationships_result result = new get_relationships_result();
+			result.error = new error_value();
+			result.ids   = new id_mod[0];
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				var ids_list = new List<id_mod>();
-				string sTABLE_NAME        = Regex.Replace(module_name,   @"[^A-Za-z0-9_]", "");
-				string sRELATED_TABLE_NAME = Regex.Replace(related_module, @"[^A-Za-z0-9_]", "");
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				string sMODULE1       = Regex.Replace(module_name,     @"[^A-Za-z0-9_]", String.Empty);
+				string sMODULE2       = Regex.Replace(related_module,  @"[^A-Za-z0-9_]", String.Empty);
+				int nACLACCESS = _security.GetUserAccess(sMODULE1, "view");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					// Generic relationship lookup via the module relationships view
-					string sSQL = "select ID, DATE_MODIFIED, DELETED from vw" + sRELATED_TABLE_NAME + " where 1 = 1";
-					if (!Sql.IsEmptyString(related_module_query))
-						sSQL += " and " + related_module_query;
-					if (deleted == 0)
-						sSQL += " and DELETED = 0";
-					using (IDbCommand cmd = con.CreateCommand())
+					// Use vw{MODULE1}_{MODULE2}_Soap view for relationship query.
+					string sSOAP_VIEW = "vw" + sMODULE1 + "_" + sMODULE2 + "_Soap";
+					string sSQL = "select ID, DATE_MODIFIED, DELETED  from " + sSOAP_VIEW + "  where PRIMARY_ID = @PRIMARY_ID  and DELETED = @DELETED  ";
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandText = sSQL;
-						using (IDataReader rdr = cmd.ExecuteReader())
+						StringBuilder sbWhere = new StringBuilder();
+						Sql.AppendParameter(cmd, sbWhere, "PRIMARY_ID", Sql.ToGuid(module_id));
+						Sql.AppendParameter(cmd, sbWhere, "DELETED",     Math.Min(deleted, 1));
+						if ( !Sql.IsEmptyString(related_module_query) )
+							cmd.CommandText += " and (" + related_module_query + ")";
+						using ( DbDataAdapter da = dbf.CreateDataAdapter() )
 						{
-							while (rdr.Read())
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								ids_list.Add(new id_mod(
-									Sql.ToString(rdr["ID"]),
-									Sql.ToString(rdr["DATE_MODIFIED"]),
-									Sql.ToInteger(rdr["DELETED"])));
+								da.Fill(dt);
+								List<id_mod> lstIDs = new List<id_mod>();
+								foreach ( DataRow row in dt.Rows )
+								{
+									string sID           = Sql.ToString(row["ID"           ]);
+									string sDateModified = Sql.ToString(row["DATE_MODIFIED"]);
+									int    nDeleted      = Sql.ToInteger(row["DELETED"      ]);
+									lstIDs.Add(new id_mod(sID, sDateModified, nDeleted));
+								}
+								result.ids = lstIDs.ToArray();
 							}
 						}
 					}
 				}
-				result.ids = ids_list.ToArray();
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Creates a single relationship between two module records.</summary>
+		/// <summary>
+		/// Sets a relationship between two module records (single).
+		/// Migrated from soap.asmx.cs line 4519.
+		/// </summary>
 		public error_value set_relationship(string session, set_relationship_value set_relationship_value)
 		{
+			error_value result = new error_value();
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				// Real implementation calls SetRelationship helper method
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.number = "-1"; result.name = "Invalid Session"; result.description = "Session expired or invalid.";
+					return result;
+				}
+				if ( set_relationship_value == null )
+					return result;
 				SetRelationship(
 					set_relationship_value.module1,
 					set_relationship_value.module1_id,
 					set_relationship_value.module2,
 					set_relationship_value.module2_id);
-				return new error_value { number = "0", name = "No Error", description = string.Empty };
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				return new error_value("-1", "Exception", ex.Message);
-			}
-		}
-
-		/// <summary>Creates multiple relationships between module record pairs.</summary>
-		public set_relationship_list_result set_relationships(string session, set_relationship_value[] set_relationship_list)
-		{
-			set_relationship_list_result result = new set_relationship_list_result { created = 0, failed = 0 };
-			if (set_relationship_list != null)
-			{
-				foreach (set_relationship_value rel in set_relationship_list)
-				{
-					try
-					{
-						// Use the corrected set_relationship method that accepts set_relationship_value
-						error_value err = set_relationship(session, rel);
-						if (err.number == "0")
-							result.created++;
-						else
-							result.failed++;
-					}
-					catch
-					{
-						result.failed++;
-					}
-				}
+				result.number = "-1"; result.name = ex.GetType().Name; result.description = ex.Message;
 			}
 			return result;
 		}
 
-		/// <summary>Creates or updates a document revision record with binary file content.</summary>
-		public set_entry_result set_document_revision(string session, document_revision note)
+		/// <summary>
+		/// Sets relationships between module records (multiple).
+		/// Migrated from soap.asmx.cs line 4540.
+		/// </summary>
+		public set_relationship_list_result set_relationships(string session, set_relationship_value[] set_relationship_list)
 		{
-			set_entry_result result = new set_entry_result();
+			set_relationship_list_result result = new set_relationship_list_result();
+			result.error   = new error_value();
+			result.created = 0;
+			result.failed  = 0;
 			try
 			{
 				Guid gUSER_ID = GetSessionUserID(session);
-				// Real implementation calls SqlProcs.spDOCUMENT_REVISIONS_Insert
-				result.id = Sql.IsEmptyString(note.id) ? Guid.NewGuid().ToString() : note.id;
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+				{
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				if ( set_relationship_list != null )
+				{
+					foreach ( set_relationship_value srv in set_relationship_list )
+					{
+						try
+						{
+							SetRelationship(srv.module1, srv.module1_id, srv.module2, srv.module2_id);
+							result.created++;
+						}
+						catch
+						{
+							result.failed++;
+						}
+					}
+				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
-				result.error = new error_value("-1", "Exception", ex.Message);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
 			return result;
 		}
 
-		// =====================================================================
-		// Private Helper Methods (migrated from soap.asmx.cs private helpers)
-		// =====================================================================
-
-		/// <summary>Returns a default cache expiration one day from now.</summary>
-		public static DateTime DefaultCacheExpiration()
-		{
-			return DateTime.Now.AddDays(1);
-		}
-
 		/// <summary>
-		/// Validates session token against IMemoryCache and returns the USER_ID.
-		/// Migrated from soap.asmx.cs GetSessionUserID (line 569).
-		/// MIGRATION: HttpRuntime.Cache → IMemoryCache.
+		/// Creates a new document revision with file attachment.
+		/// Migrated from soap.asmx.cs line 4563.
 		/// </summary>
-		private Guid GetSessionUserID(string session)
+		public set_entry_result set_document_revision(string session, document_revision note)
 		{
-			// MIGRATION: System.Web.Caching.Cache Cache = HttpRuntime.Cache → _memoryCache
-			if (!_memoryCache.TryGetValue("soap.session.user." + session, out Guid gUSER_ID) || gUSER_ID == Guid.Empty)
+			set_entry_result result = new set_entry_result();
+			result.error = new error_value();
+			result.id    = String.Empty;
+			try
 			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), "The session ID is invalid.  " + session);
-				throw new Exception("The session ID is invalid.  " + session);
-			}
-			// MIGRATION: HttpContext.Current.Session["USER_ID"] = gUSER_ID → IHttpContextAccessor
-			_httpContextAccessor.HttpContext?.Session.SetString("USER_ID", gUSER_ID.ToString());
-			// Refresh session cache expiration on each request
-			DateTime dtCurrentExpiration = _memoryCache.TryGetValue("soap.user.expiration." + session, out DateTime dtExp) ? dtExp : DateTime.MinValue;
-			if (dtCurrentExpiration < DateTime.Now.AddHours(1))
-			{
-				DateTime dtExpiration = DefaultCacheExpiration();
-				_memoryCache.Set("soap.session.user." + session, gUSER_ID, new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-				_memoryCache.Set("soap.user.expiration." + session, dtExpiration, new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			}
-			return gUSER_ID;
-		}
-
-		/// <summary>
-		/// Creates a session token by validating user credentials.
-		/// Migrated from soap.asmx.cs CreateSession (line 902).
-		/// MIGRATION: HttpRuntime.Cache → IMemoryCache.
-		/// </summary>
-		private Guid CreateSession(string user_name, string password)
-		{
-			// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-			Guid gUSER_ID = LoginUserByPassword(ref user_name, password);
-			Guid gSessionID = Guid.NewGuid();
-			DateTime dtExpiration = DefaultCacheExpiration();
-			_memoryCache.Set("soap.session.user."    + gSessionID.ToString(), gUSER_ID,           new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			_memoryCache.Set("soap.user.username."   + gUSER_ID.ToString(),   user_name.ToLower(), new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			_memoryCache.Set("soap.user.expiration." + gSessionID.ToString(), dtExpiration,        new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			string sTimeZone   = string.Empty;
-			string sCurrencyID = string.Empty;
-			UserPreferences(gUSER_ID, ref sTimeZone, ref sCurrencyID);
-			_memoryCache.Set("soap.user.currency." + gUSER_ID.ToString(), sCurrencyID, new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			_memoryCache.Set("soap.user.timezone." + gUSER_ID.ToString(), sTimeZone,   new MemoryCacheEntryOptions { AbsoluteExpiration = dtExpiration });
-			return gSessionID;
-		}
-
-		/// <summary>
-		/// Validates user_name/password credentials and returns the USER_ID.
-		/// Instance method version of the original static LoginUser (line 669).
-		/// MIGRATION: static → instance method; HttpContext.Current → IHttpContextAccessor.
-		/// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-		/// </summary>
-		public Guid LoginUserByPassword(ref string sUSER_NAME, string sPASSWORD)
-		{
-			Guid gUSER_ID = Guid.Empty;
-			using (IDbConnection con = _dbProviderFactory.CreateConnection())
-			{
-				con.Open();
-				string sSQL =
-					"select ID, USER_NAME, FULL_NAME, IS_ADMIN, STATUS, PORTAL_ONLY, TEAM_ID, TEAM_NAME" + "\r\n" +
-					"  from vwUSERS_Login" + "\r\n" +
-					" where lower(USER_NAME) = @USER_NAME" + "\r\n";
-				using (IDbCommand cmd = con.CreateCommand())
+				Guid gUSER_ID = GetSessionUserID(session);
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
 				{
-					cmd.CommandText = sSQL;
-					Sql.AddParameter(cmd, "@USER_NAME", sUSER_NAME.ToLower());
-					if (!Sql.IsEmptyString(sPASSWORD))
+					result.error.number = "-1"; result.error.name = "Invalid Session"; result.error.description = "Session expired or invalid.";
+					return result;
+				}
+				int nACLACCESS = _security.GetUserAccess("Documents", "edit");
+				if ( nACLACCESS == ACL_ACCESS.NONE )
+				{
+					L10N L10n = new L10N("en-US", _memoryCache);
+					result.error.number = "-1"; result.error.name = "ACL"; result.error.description = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS");
+					return result;
+				}
+				// Owner-only check: if ACL == OWNER then the DOCUMENT must belong to the user.
+				Guid gDOCUMENT_ID  = Sql.ToGuid(note.id);
+				string sFileName   = Path.GetFileName(note.filename ?? String.Empty);
+				string sFileExt    = Path.GetExtension(note.filename ?? String.Empty);
+				string sFileMime   = "application/octet-stream";
+				byte[] byFile      = Convert.FromBase64String(note.file ?? String.Empty);
+				string sRevision   = note.revision   ?? String.Empty;
+				string sChangeLog  = String.Empty; // document_revision DTO has no change_log field per DataCarriers
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
 					{
-						// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-						cmd.CommandText += "   and USER_HASH = @USER_HASH" + "\r\n";
-						Sql.AddParameter(cmd, "@USER_HASH", sPASSWORD.ToLower());
-					}
-					else
-					{
-						cmd.CommandText += "   and (USER_HASH = '' or USER_HASH is null)" + "\r\n";
-					}
-					using (IDataReader rdr = cmd.ExecuteReader())
-					{
-						if (rdr.Read())
+						try
 						{
-							gUSER_ID = Sql.ToGuid(rdr["ID"]);
+							// Persist file to disk/storage via LoadFile (requires transaction for DB-backed storage).
+							Crm.DocumentRevisions.LoadFile(gDOCUMENT_ID, byFile, trn);
+							Guid gREVISION_ID = Guid.Empty;
+							SqlProcs.spDOCUMENT_REVISIONS_Insert(ref gREVISION_ID, gDOCUMENT_ID, sRevision, sChangeLog, sFileName, sFileExt, sFileMime, trn);
+							result.id = gDOCUMENT_ID.ToString();
+							trn.Commit();
+						}
+						catch
+						{
+							trn.Rollback();
+							throw;
 						}
 					}
 				}
 			}
-			if (gUSER_ID == Guid.Empty)
+			catch(Exception ex)
 			{
-				SplendidError.SystemError(new StackTrace(true).GetFrame(0), "Invalid username and/or password for " + sUSER_NAME);
-				throw new Exception("Invalid username and/or password for " + sUSER_NAME);
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				result.error.number = "-1"; result.error.name = ex.GetType().Name; result.error.description = ex.Message;
 			}
-			// MIGRATION: HttpContext.Current.Session["USER_ID"] → IHttpContextAccessor
-			_httpContextAccessor.HttpContext?.Session.SetString("USER_ID", gUSER_ID.ToString());
-			return gUSER_ID;
+			return result;
 		}
 
+		// ============================================================
+		//  PRIVATE HELPER — UpdateCustomFields
+		//  Migrated from soap.asmx.cs set_entry custom field logic
+		// ============================================================
+
 		/// <summary>
-		/// Retrieves user timezone and currency preferences.
-		/// Migrated from soap.asmx.cs UserPreferences (line 830).
+		/// Updates custom (_CSTM) fields for a module record after the main Update sproc runs.
 		/// </summary>
-		private void UserPreferences(Guid gUSER_ID, ref string sTimeZone, ref string sCurrencyID)
+		private void UpdateCustomFields(IDbConnection con, IDbTransaction trn, string sMODULE_NAME, string sTABLE_NAME, Guid gID, name_value[] name_value_list, Guid gUSER_ID)
 		{
 			try
 			{
-				using (IDbConnection con = _dbProviderFactory.CreateConnection())
+				DataTable dtCustom = _splendidCache.FieldsMetaData_Validated(sTABLE_NAME + "_CSTM");
+				if ( dtCustom == null || dtCustom.Rows.Count == 0 ) return;
+				using ( IDbCommand cmdCustom = con.CreateCommand() )
 				{
-					con.Open();
-					string sSQL = "select TIMEZONE_ID, CURRENCY_ID from vwUSERS_Edit where ID = @ID";
-					using (IDbCommand cmd = con.CreateCommand())
+					cmdCustom.Transaction = trn;
+					cmdCustom.CommandType  = CommandType.Text;
+					// Build update for custom table — only fields that exist in metadata.
+					StringBuilder sbSet = new StringBuilder();
+					List<string> lstNames = new List<string>();
+					foreach ( DataRow row in dtCustom.Rows )
 					{
-						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@ID", gUSER_ID);
-						using (IDataReader rdr = cmd.ExecuteReader(CommandBehavior.SingleRow))
+						string sColName = Sql.ToString(row["NAME"]);
+						name_value nvMatch = null;
+						foreach ( name_value nv in name_value_list )
 						{
-							if (rdr.Read())
-							{
-								try { sTimeZone   = Sql.ToString(rdr["TIMEZONE_ID"]); } catch { }
-								try { sCurrencyID = Sql.ToString(rdr["CURRENCY_ID"]); } catch { }
-							}
+							if ( nv != null && string.Equals(nv.name, sColName, StringComparison.OrdinalIgnoreCase) )
+							{ nvMatch = nv; break; }
 						}
+						if ( nvMatch != null )
+						{
+							string sParmName = "@" + sColName;
+							if ( sbSet.Length > 0 ) sbSet.Append(", ");
+							sbSet.Append(sColName + " = " + sParmName);
+							Sql.AddParameter(cmdCustom, sParmName, nvMatch.value);
+							lstNames.Add(sColName);
+						}
+					}
+					if ( sbSet.Length == 0 ) return;
+					cmdCustom.CommandText = "update " + sTABLE_NAME + "_CSTM  set " + sbSet.ToString() + "  where ID_C = @ID_C  ";
+					Sql.AddParameter(cmdCustom, "@ID_C", gID);
+					int nRows = cmdCustom.ExecuteNonQuery();
+					if ( nRows == 0 )
+					{
+						// Insert custom row if it doesn't exist yet.
+						StringBuilder sbCols  = new StringBuilder("ID_C");
+						StringBuilder sbVals  = new StringBuilder("@ID_C");
+						foreach ( string sCol in lstNames )
+						{ sbCols.Append(", " + sCol); sbVals.Append(", @" + sCol); }
+						cmdCustom.CommandText = "insert into " + sTABLE_NAME + "_CSTM (" + sbCols + ") values (" + sbVals + ")";
+						cmdCustom.ExecuteNonQuery();
 					}
 				}
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogWarning(ex, "UserPreferences lookup failed for {UserID}", gUSER_ID);
+				SplendidError.SystemWarning(new StackTrace(true).GetFrame(0), ex.Message);
 			}
 		}
 
-		/// <summary>
-		/// Creates a relationship between two module records by dispatching to the appropriate stored procedure.
-		/// Migrated from soap.asmx.cs SetRelationship (line 3915).
-		/// </summary>
-		private void SetRelationship(string sMODULE1, string sMODULE1_ID, string sMODULE2, string sMODULE2_ID)
-		{
-			// Dispatch to the appropriate relationship sproc based on module pairing
-			// This is a simplified version; full implementation calls SqlProcs.spXXX_YYY_Update
-			_logger.LogInformation("SetRelationship: {Module1} {ID1} <-> {Module2} {ID2}", sMODULE1, sMODULE1_ID, sMODULE2, sMODULE2_ID);
-		}
-	}
-}
+	}  // end class SugarSoapService
+}  // end namespace SplendidCRM

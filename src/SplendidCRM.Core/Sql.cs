@@ -2387,10 +2387,10 @@ namespace SplendidCRM
 		//   - HttpContext.Current.Application["CONFIG.*"] → _ambientCache
 		//   - SplendidDynamic.SearchGridColumns() — same assembly, preserved
 		// =====================================================================================
-		public static void UnifiedSearch(string sModuleName, string sSearchValue, IDbCommand cmd)
+		public static string UnifiedSearch(string sModuleName, string sSearchValue, IDbCommand cmd)
 		{
 			if ( Sql.IsEmptyString(sSearchValue) )
-				return;
+				return String.Empty;
 			IMemoryCache memoryCache = _ambientCache;
 			string sUNIFIED_SEARCH_RPT_VIEW = String.Empty;
 			if ( memoryCache != null )
@@ -2422,10 +2422,13 @@ namespace SplendidCRM
 				}
 			}
 			if ( colSearch.Count == 0 )
-				return;
+				return String.Empty;
 			string[] arrFields = new string[colSearch.Count];
 			colSearch.CopyTo(arrFields, 0);
-			AppendLikeParameters(cmd, new StringBuilder(), arrFields, sSearchValue);
+			// Fix: capture StringBuilder so the WHERE clause is returned to caller for appending.
+			StringBuilder sb = new StringBuilder();
+			AppendLikeParameters(cmd, sb, arrFields, sSearchValue);
+			return sb.ToString();
 		}
 
 		// =====================================================================================
