@@ -216,19 +216,27 @@ builder.Services.AddSingleton<SqlProcs>();
 builder.Services.AddSingleton<DbProviderFactories>();
 // NOTE: DbProviderFactory (singular) is NOT registered — it has a legacy 7-string-parameter constructor
 // incompatible with DI. DbProviderFactories (plural) provides all DI-friendly DB operations.
-builder.Services.AddSingleton<SqlClientFactory>();
+// NOTE: SqlClientFactory is NOT registered in DI — its constructor requires a runtime connection string
+// parameter (SqlClientFactory(string sConnectionString)). It is instantiated on-demand by
+// DbProviderFactories.CreateConnection() with the connection string from IConfiguration.
+// See src/SplendidCRM.Core/DbProviderFactories.cs line 394.
 builder.Services.AddSingleton<SplendidError>();
 builder.Services.AddSingleton<SplendidDefaults>();
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<SplendidCache>();
 builder.Services.AddSingleton<SplendidInit>();
-builder.Services.AddSingleton<L10N>();
+// NOTE: L10N is NOT registered in DI — its constructor requires a per-request culture name string
+// parameter (L10N(string sNAME, IMemoryCache memoryCache)). L10N instances are created on-demand
+// per request with the user's language preference. See SplendidControl.GetL10n() and REST controller
+// methods that create L10N instances with the request culture.
 builder.Services.AddSingleton<SplendidCRM.TimeZone>();
 builder.Services.AddSingleton<Currency>();
 builder.Services.AddSingleton<Crm>();
 builder.Services.AddSingleton<Utils>();
 builder.Services.AddSingleton<RestUtil>();
-builder.Services.AddSingleton<SearchBuilder>();
+// NOTE: SearchBuilder is NOT registered in DI — its constructor requires per-invocation parameters
+// (SearchBuilder(string str, IDbCommand cmd)). SearchBuilder instances are created on-demand per
+// query with the specific search string and database command for that operation.
 builder.Services.AddSingleton<ModuleUtils>();
 builder.Services.AddSingleton<EmailUtils>();
 builder.Services.AddSingleton<MimeUtils>();
@@ -255,7 +263,9 @@ builder.Services.AddSingleton<GoogleUtils>();
 builder.Services.AddSingleton<GoogleSync>();
 builder.Services.AddSingleton<GoogleApps>();
 builder.Services.AddSingleton<iCloudSync>();
-builder.Services.AddSingleton<FacebookUtils>();
+// NOTE: FacebookUtils is NOT registered in DI — its constructor requires per-request parameters
+// (FacebookUtils(string sAppID, string sAppSecret, IRequestCookieCollection cookies)).
+// FacebookUtils instances are created on-demand with the Facebook app credentials and request cookies.
 builder.Services.AddSingleton<SocialImport>();
 builder.Services.AddSingleton<ArchiveExternalDB>();
 builder.Services.AddSingleton<PortalCache>();
@@ -272,12 +282,12 @@ builder.Services.AddSingleton<SqlBuild>();
 builder.Services.AddSingleton<DbAcrhiveFactories>();
 builder.Services.AddSingleton<SplendidGrid>();
 
-// Mail transport subclasses registered for direct DI resolution when needed by services.
-// Note: SplendidMailClient.CreateMailClient() also instantiates these via factory pattern.
-// Registering them here provides optional direct resolution via IServiceProvider if needed.
-builder.Services.AddSingleton<SplendidMailOffice365>();
-builder.Services.AddSingleton<SplendidMailGmail>();
-builder.Services.AddSingleton<SplendidMailExchangePassword>();
+// NOTE: SplendidMailOffice365, SplendidMailGmail, and SplendidMailExchangePassword are NOT registered
+// in DI — their constructors require runtime parameters (Guid gOAUTH_TOKEN_ID for Office365/Gmail,
+// server credentials for ExchangePassword) that vary per invocation. These mail transport subclasses
+// are instantiated on-demand by SplendidMailClient.CreateMailClient() factory method and by
+// EmailUtils.CreateMailClient() with the appropriate OAuth token or server credentials.
+// See src/SplendidCRM.Core/SplendidMailClient.cs lines 159, 173 and EmailUtils.cs lines 413, 415.
 
 // SignalR manager services (business logic behind hub invocations).
 builder.Services.AddSingleton<ChatManager>();
@@ -301,14 +311,47 @@ builder.Services.AddControllers()
 		options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Include;
 	});
 
+// =====================================================================================
+// EARLY CONFIGURATION VALIDATION (defense-in-depth — runs BEFORE builder.Build())
+// =====================================================================================
+// Per AAP §0.8.2: Application MUST log the specific missing variable name and exit with non-zero code.
+// This early validation ensures that the most critical configuration errors are caught before the DI
+// container is built, providing clear error messages even if a DI registration issue is introduced.
+// The full StartupValidator.Validate() runs AFTER builder.Build() for comprehensive validation.
+{
+	string earlyConnStr = builder.Configuration.GetConnectionString("SplendidCRM");
+	if (string.IsNullOrWhiteSpace(earlyConnStr))
+	{
+		Console.Error.WriteLine("[ERROR] Required configuration 'ConnectionStrings:SplendidCRM' (env var: ConnectionStrings__SplendidCRM) is missing or empty. Application cannot start without a database connection string.");
+		Environment.Exit(1);
+	}
+	string earlySessionProvider = builder.Configuration["Session:Provider"] ?? string.Empty;
+	if (!string.Equals(earlySessionProvider, "Redis", StringComparison.OrdinalIgnoreCase)
+	 && !string.Equals(earlySessionProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
+	 && !string.IsNullOrWhiteSpace(earlySessionProvider))
+	{
+		Console.Error.WriteLine($"[ERROR] Required configuration 'SESSION_PROVIDER' has invalid value '{earlySessionProvider}'. Must be exactly 'Redis' or 'SqlServer'.");
+		Environment.Exit(1);
+	}
+	string earlyAuthMode = builder.Configuration["Authentication:Mode"] ?? string.Empty;
+	if (!string.IsNullOrWhiteSpace(earlyAuthMode)
+	 && !string.Equals(earlyAuthMode, "Windows", StringComparison.OrdinalIgnoreCase)
+	 && !string.Equals(earlyAuthMode, "Forms", StringComparison.OrdinalIgnoreCase)
+	 && !string.Equals(earlyAuthMode, "SSO", StringComparison.OrdinalIgnoreCase))
+	{
+		Console.Error.WriteLine($"[ERROR] Required configuration 'AUTH_MODE' has invalid value '{earlyAuthMode}'. Must be exactly 'Windows', 'Forms', or 'SSO'.");
+		Environment.Exit(1);
+	}
+}
+
 // CORS configuration (per AAP §0.8.2: CORS_ORIGINS env var — Required).
 // Defense-in-depth: no wildcard fallback. If CORS_ORIGINS is not configured, fail-fast
 // (StartupValidator also enforces this, but the CORS code itself must not have a permissive default).
 string corsOrigins = builder.Configuration["Cors:AllowedOrigins"];
 if (string.IsNullOrWhiteSpace(corsOrigins))
 {
-	throw new InvalidOperationException(
-		"CORS_ORIGINS configuration is required. Set the CORS_ORIGINS environment variable or Cors:AllowedOrigins in appsettings.");
+	Console.Error.WriteLine("[ERROR] Required configuration 'CORS_ORIGINS' is missing or empty. Set the CORS_ORIGINS environment variable or Cors:AllowedOrigins in appsettings.");
+	Environment.Exit(1);
 }
 builder.Services.AddCors(options =>
 {
