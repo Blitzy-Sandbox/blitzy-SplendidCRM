@@ -25,14 +25,17 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace SplendidCRM
+namespace SplendidCRM.Web.Controllers
 {
 	// =========================================================================
 	// AdminRestController — ASP.NET Core Web API replacement for
@@ -43,6 +46,7 @@ namespace SplendidCRM
 	// preserving exact route paths and HTTP methods per AAP Section 0.7.3.
 	// =========================================================================
 	[ApiController]
+	[Authorize]
 	[Route("Administration/Rest.svc")]
 	public class AdminRestController : ControllerBase
 	{
@@ -60,6 +64,8 @@ namespace SplendidCRM
 		private readonly SplendidExport       _splendidExport;
 		private readonly SplendidImport       _splendidImport;
 		private readonly IConfiguration       _configuration;
+		private readonly IWebHostEnvironment  _webHostEnvironment;
+		private readonly ILogger<AdminRestController> _logger;
 
 		public AdminRestController(
 			IHttpContextAccessor httpContextAccessor,
@@ -72,7 +78,9 @@ namespace SplendidCRM
 			SplendidDynamic      splendidDynamic,
 			SplendidExport       splendidExport,
 			SplendidImport       splendidImport,
-			IConfiguration       configuration = null)
+			IConfiguration       configuration,
+			IWebHostEnvironment  webHostEnvironment,
+			ILogger<AdminRestController> logger)
 		{
 			_httpContextAccessor = httpContextAccessor;
 			_memoryCache         = memoryCache;
@@ -85,6 +93,8 @@ namespace SplendidCRM
 			_splendidExport      = splendidExport;
 			_splendidImport      = splendidImport;
 			_configuration       = configuration;
+			_webHostEnvironment  = webHostEnvironment;
+			_logger              = logger;
 		}
 
 		// ==================================================================
@@ -465,7 +475,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -592,7 +602,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -706,7 +716,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -731,7 +741,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -756,7 +766,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -781,7 +791,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -806,7 +816,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -831,7 +841,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -856,7 +866,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -882,7 +892,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -907,7 +917,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1018,7 +1028,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1141,7 +1151,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1184,7 +1194,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1223,7 +1233,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1265,7 +1275,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1302,7 +1312,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1376,7 +1386,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1420,7 +1430,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1476,7 +1486,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1569,7 +1579,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1647,7 +1657,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1711,7 +1721,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1761,7 +1771,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1803,7 +1813,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1840,7 +1850,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1877,7 +1887,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -1962,7 +1972,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2036,7 +2046,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2065,7 +2075,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2091,7 +2101,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2118,7 +2128,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2153,7 +2163,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2194,7 +2204,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2247,7 +2257,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2283,7 +2293,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2340,7 +2350,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2391,7 +2401,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2424,7 +2434,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2471,7 +2481,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2502,7 +2512,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2535,7 +2545,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2559,7 +2569,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2607,7 +2617,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2645,7 +2655,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -2685,7 +2695,7 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = ex.Message });
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
@@ -3853,5 +3863,653 @@ namespace SplendidCRM
 			return list;
 		}
 
+		// =====================================================================
+		// Missing WCF operations — added to achieve 100% admin operation coverage.
+		// Per AAP Goal 4: ALL 65 admin WCF [OperationContract] operations must have
+		// corresponding ASP.NET Core controller actions.
+		// =====================================================================
+
+		/// <summary>GET Administration/Rest.svc/GetAdminLayoutRelationshipFields — Returns SQL column metadata for a relationship view table.</summary>
+		[HttpGet("GetAdminLayoutRelationshipFields")]
+		public IActionResult GetAdminLayoutRelationshipFields(string TableName, string ModuleName)
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				if (Sql.IsEmptyString(TableName))
+					return BadRequest(new { error = "The table name must be specified." });
+				if (!TableName.StartsWith("vw"))
+					return BadRequest(new { error = "The table name is not in the correct format." });
+				string sTABLE_NAME = Regex.Replace(TableName, @"[^A-Za-z0-9_]", "");
+
+				List<LayoutField> lstFields = new List<LayoutField>();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select *                        " + ControlChars.CrLf
+					            + "  from vwSqlColumns             " + ControlChars.CrLf
+					            + " where ObjectName = @OBJECTNAME " + ControlChars.CrLf
+					            + "   and ObjectType = 'V'         " + ControlChars.CrLf
+					            + " order by ColumnName            " + ControlChars.CrLf;
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, sTABLE_NAME));
+						using (DbDataAdapter da = dbf.CreateDataAdapter())
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using (DataTable dt = new DataTable())
+							{
+								da.Fill(dt);
+								dt.Columns.Add("FIELD_TYPE", typeof(System.String));
+								dt.Columns.Add("DATA_LABEL", typeof(System.String));
+								dt.Columns.Add("DATA_FIELD", typeof(System.String));
+								foreach (DataRow row in dt.Rows)
+								{
+									string sColumnName = Sql.ToString(row["ColumnName"]);
+									row["DATA_LABEL"] = Utils.BuildTermName(ModuleName, sColumnName);
+									row["DATA_FIELD"] = sColumnName;
+								}
+								foreach (DataRow row in dt.Rows)
+								{
+									LayoutField lay  = new LayoutField();
+									lay.ColumnName   = Sql.ToString (row["ColumnName"]);
+									lay.ColumnType   = Sql.ToString (row["ColumnType"]);
+									lay.CsType       = Sql.ToString (row["CsType"    ]);
+									lay.length        = Sql.ToInteger(row["length"    ]);
+									lay.DATA_LABEL   = Sql.ToString (row["DATA_LABEL"]);
+									lay.DATA_FIELD   = Sql.ToString (row["DATA_FIELD"]);
+									lstFields.Add(lay);
+								}
+							}
+						}
+					}
+				}
+				return JsonContent(new { d = lstFields });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAdminLayoutRelationshipFields");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetAdminLayoutTerminologyLists — Returns all terminology list names for admin layout editor.</summary>
+		[HttpGet("GetAdminLayoutTerminologyLists")]
+		public IActionResult GetAdminLayoutTerminologyLists()
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				List<string> lstLists = new List<string>();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select LIST_NAME                         " + ControlChars.CrLf
+					            + "  from vwTERMINOLOGY                     " + ControlChars.CrLf
+					            + " where LIST_NAME is not null             " + ControlChars.CrLf
+					            + " group by LIST_NAME                      " + ControlChars.CrLf
+					            + " order by LIST_NAME                      " + ControlChars.CrLf;
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						con.Open();
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+								lstLists.Add(Sql.ToString(rdr["LIST_NAME"]));
+						}
+					}
+				}
+				return JsonContent(new { d = lstLists });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAdminLayoutTerminologyLists");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetAdminLayoutTerminology — Returns combined terminology data for admin layout editing.</summary>
+		[HttpGet("GetAdminLayoutTerminology")]
+		public IActionResult GetAdminLayoutTerminology()
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				Dictionary<string, object> d = new Dictionary<string, object>();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					// Return modules with their terminology keys
+					string sSQL = "select MODULE_NAME          " + ControlChars.CrLf
+					            + "     , DISPLAY_NAME         " + ControlChars.CrLf
+					            + "  from vwTERMINOLOGY        " + ControlChars.CrLf
+					            + " where LANG = @LANG         " + ControlChars.CrLf
+					            + "   and LIST_NAME is null    " + ControlChars.CrLf
+					            + " order by MODULE_NAME       " + ControlChars.CrLf;
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LANG", sCulture);
+						using (DbDataAdapter da = dbf.CreateDataAdapter())
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using (DataTable dt = new DataTable())
+							{
+								da.Fill(dt);
+								List<Dictionary<string, object>> lst = new List<Dictionary<string, object>>();
+								foreach (DataRow row in dt.Rows)
+								{
+									Dictionary<string, object> item = new Dictionary<string, object>();
+									item["MODULE_NAME"]  = Sql.ToString(row["MODULE_NAME" ]);
+									item["DISPLAY_NAME"] = Sql.ToString(row["DISPLAY_NAME"]);
+									lst.Add(item);
+								}
+								d.Add("d", lst);
+							}
+						}
+					}
+				}
+				return JsonContent(d);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAdminLayoutTerminology");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetAdminTable — Returns admin table data with OData-style query support.</summary>
+		[HttpGet("GetAdminTable")]
+		public IActionResult GetAdminTable(string TableName)
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				var req = _httpContextAccessor.HttpContext?.Request;
+				int    nSKIP     = Sql.ToInteger(req?.Query["$skip"   ].FirstOrDefault());
+				int    nTOP      = Sql.ToInteger(req?.Query["$top"    ].FirstOrDefault());
+				string sFILTER   = Sql.ToString (req?.Query["$filter" ].FirstOrDefault());
+				string sORDER_BY = Sql.ToString (req?.Query["$orderby"].FirstOrDefault());
+				string sGROUP_BY = Sql.ToString (req?.Query["$groupby"].FirstOrDefault());
+				string sSELECT   = Sql.ToString (req?.Query["$select" ].FirstOrDefault());
+
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(_memoryCache, Sql.ToGuid(_httpContextAccessor.HttpContext?.Session?.GetString("USER_SETTINGS/TIMEZONE")));
+				long nTotalCount = 0;
+				StringBuilder sbDumpSQL = new StringBuilder();
+				UniqueStringCollection arrSELECT = null;
+				if (!Sql.IsEmptyString(sSELECT))
+				{
+					arrSELECT = new UniqueStringCollection();
+					foreach (string s in sSELECT.Split(','))
+						arrSELECT.Add(s.Trim());
+				}
+				DataTable dt = _restUtil.GetAdminTable(HttpContext, TableName, nSKIP, nTOP, sORDER_BY, sFILTER, sGROUP_BY, arrSELECT, null, ref nTotalCount, null, AccessMode.list, sbDumpSQL);
+				string sBaseURI = req?.Scheme + "://" + req?.Host.Value + req?.PathBase.Value + "/Administration/Rest.svc/GetAdminTable";
+				var rows = _restUtil.RowsToDictionary(sBaseURI, TableName, dt, T10n);
+				return JsonContent(new { d = new { results = rows, __total = nTotalCount } });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAdminTable");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetTeamTree — Returns team hierarchy tree for a given team.</summary>
+		[HttpGet("GetTeamTree")]
+		public IActionResult GetTeamTree(Guid ID)
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				List<Dictionary<string, object>> lstTree = new List<Dictionary<string, object>>();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select ID              " + ControlChars.CrLf
+					            + "     , PARENT_ID       " + ControlChars.CrLf
+					            + "     , NAME            " + ControlChars.CrLf
+					            + "  from vwTEAMS         " + ControlChars.CrLf
+					            + " order by NAME         " + ControlChars.CrLf;
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						using (DbDataAdapter da = dbf.CreateDataAdapter())
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using (DataTable dt = new DataTable())
+							{
+								da.Fill(dt);
+								foreach (DataRow row in dt.Rows)
+								{
+									Dictionary<string, object> item = new Dictionary<string, object>();
+									item["ID"]        = Sql.ToGuid  (row["ID"       ]);
+									item["PARENT_ID"] = Sql.ToGuid  (row["PARENT_ID"]);
+									item["NAME"]      = Sql.ToString(row["NAME"     ]);
+									lstTree.Add(item);
+								}
+							}
+						}
+					}
+				}
+				return JsonContent(new { d = lstTree });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetTeamTree");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetModuleItem — Returns a single admin module item by ID.</summary>
+		[HttpGet("GetModuleItem")]
+		public IActionResult GetModuleItem(string ModuleName, Guid ID)
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				string sTableName = Crm.Modules.TableName(_memoryCache, ModuleName);
+				string sBaseURI   = _httpContextAccessor.HttpContext?.Request?.Scheme + "://" + _httpContextAccessor.HttpContext?.Request?.Host.Value + _httpContextAccessor.HttpContext?.Request?.PathBase.Value + "/Administration/Rest.svc/GetModuleItem";
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(_memoryCache, Sql.ToGuid(_httpContextAccessor.HttpContext?.Session?.GetString("USER_SETTINGS/TIMEZONE")));
+				long nTotalCount = 0;
+				StringBuilder sbDumpSQL = new StringBuilder();
+				DataTable dt = _restUtil.GetAdminTable(HttpContext, sTableName, 0, 1, String.Empty, "ID eq '" + ID.ToString() + "'", String.Empty, null, null, ref nTotalCount, null, AccessMode.view, sbDumpSQL);
+				Dictionary<string, object> d = new Dictionary<string, object>();
+				if (dt.Rows.Count > 0)
+					d.Add("d", _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n));
+				else
+					d.Add("d", new Dictionary<string, object>());
+				return JsonContent(d);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetModuleItem");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>POST Administration/Rest.svc/UndeleteModule — Restores a soft-deleted admin module record.</summary>
+		[HttpPost("UndeleteModule")]
+		public async System.Threading.Tasks.Task<IActionResult> UndeleteModule()
+		{
+			try
+			{
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				string body = await ReadRequestBodyAsync();
+				Dictionary<string, object> dict = DeserializeBody(body);
+				string sModuleName = Sql.ToString(dict.ContainsKey("ModuleName") ? dict["ModuleName"] : null);
+				Guid   gID         = Sql.ToGuid  (dict.ContainsKey("ID"        ) ? dict["ID"        ] : null);
+				if (Sql.IsEmptyString(sModuleName) || Sql.IsEmptyGuid(gID))
+					return BadRequest(new { error = "ModuleName and ID are required" });
+
+				string sTABLE_NAME = Crm.Modules.TableName(_memoryCache, sModuleName);
+				if (Sql.IsEmptyString(sTABLE_NAME))
+					return BadRequest(new { error = "Unknown module: " + sModuleName });
+				sTABLE_NAME = Regex.Replace(sTABLE_NAME, @"[^A-Za-z0-9_]", "");
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = "update " + sTABLE_NAME + " set DELETED = 0, DATE_MODIFIED = @DATE_MODIFIED, DATE_MODIFIED_UTC = @DATE_MODIFIED_UTC, MODIFIED_USER_ID = @MODIFIED_USER_ID where ID = @ID";
+						Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now           );
+						Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow        );
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID      );
+						Sql.AddParameter(cmd, "@ID"               , gID                    );
+						cmd.ExecuteNonQuery();
+					}
+				}
+				return Ok(new { status = "undeleted" });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "UndeleteModule");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>POST Administration/Rest.svc/DeleteAdminLayout — Deletes all fields for a layout view by TableName and ViewName.</summary>
+		[HttpPost("DeleteAdminLayout")]
+		public async System.Threading.Tasks.Task<IActionResult> DeleteAdminLayout()
+		{
+			try
+			{
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				string body = await ReadRequestBodyAsync();
+				Dictionary<string, object> dict = DeserializeBody(body);
+				string sTableName = Sql.ToString(dict.ContainsKey("TableName") ? dict["TableName"] : null);
+				string sViewName  = Sql.ToString(dict.ContainsKey("ViewName" ) ? dict["ViewName" ] : null);
+				if (Sql.IsEmptyString(sTableName))
+					return BadRequest(new { error = "The table name must be specified." });
+				if (Sql.IsEmptyString(sViewName) && sTableName != "TERMINOLOGY")
+					return BadRequest(new { error = "The layout view name must be specified." });
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					switch (sTableName)
+					{
+						case "EDITVIEWS_FIELDS"         : DeleteAdminLayoutTableInternal(con, dbf, "EDITVIEWS"  , "EDITVIEWS_FIELDS"  , "EDIT_NAME"  , sViewName); _splendidCache.ClearEditView  (sViewName); break;
+						case "DETAILVIEWS_FIELDS"       : DeleteAdminLayoutTableInternal(con, dbf, "DETAILVIEWS", "DETAILVIEWS_FIELDS", "DETAIL_NAME", sViewName); _splendidCache.ClearDetailView(sViewName); break;
+						case "GRIDVIEWS_COLUMNS"        : DeleteAdminLayoutTableInternal(con, dbf, "GRIDVIEWS"  , "GRIDVIEWS_COLUMNS" , "GRID_NAME"  , sViewName); _splendidCache.ClearGridView  (sViewName); break;
+						case "DYNAMIC_BUTTONS"          : DeleteAdminLayoutTableInternal(con, dbf, null         , "DYNAMIC_BUTTONS"   , "VIEW_NAME"  , sViewName); _splendidCache.ClearDynamicButtons(sViewName); break;
+						case "DETAILVIEWS_RELATIONSHIPS": DeleteAdminLayoutTableInternal(con, dbf, "DETAILVIEWS", "DETAILVIEWS_RELATIONSHIPS", "DETAIL_NAME", sViewName); _splendidCache.ClearDetailViewRelationships(); break;
+						case "TERMINOLOGY":
+						{
+							using (IDbCommand cmd = con.CreateCommand())
+							{
+								cmd.CommandText = "delete from TERMINOLOGY where LANG = @LANG and MODULE_NAME = @MODULE_NAME and LIST_NAME is null";
+								Sql.AddParameter(cmd, "@LANG", sCulture);
+								Sql.AddParameter(cmd, "@MODULE_NAME", sViewName);
+								cmd.ExecuteNonQuery();
+							}
+							_splendidCache.LoadTerminology(sCulture);
+							break;
+						}
+						default: return BadRequest(new { error = "Unsupported table: " + sTableName });
+					}
+				}
+				return Ok(new { status = "deleted" });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "DeleteAdminLayout");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>Helper: Deletes all layout records for a given view and optionally the parent layout record.</summary>
+		private void DeleteAdminLayoutTableInternal(IDbConnection con, DbProviderFactory dbf, string sPARENT_TABLE, string sTABLE_NAME, string sLAYOUT_NAME_FIELD, string sVIEW_NAME)
+		{
+			using (IDbCommand cmd = con.CreateCommand())
+			{
+				cmd.CommandText = "delete from " + sTABLE_NAME + " where " + sLAYOUT_NAME_FIELD + " = @VIEW_NAME";
+				Sql.AddParameter(cmd, "@VIEW_NAME", sVIEW_NAME);
+				cmd.ExecuteNonQuery();
+			}
+			if (!Sql.IsEmptyString(sPARENT_TABLE))
+			{
+				using (IDbCommand cmd = con.CreateCommand())
+				{
+					string sParentField = sTABLE_NAME == "DETAILVIEWS_RELATIONSHIPS" ? "DETAIL_NAME" : sLAYOUT_NAME_FIELD;
+					cmd.CommandText = "delete from " + sPARENT_TABLE + " where " + sParentField + " = @VIEW_NAME";
+					Sql.AddParameter(cmd, "@VIEW_NAME", sVIEW_NAME);
+					cmd.ExecuteNonQuery();
+				}
+			}
+		}
+
+		/// <summary>POST Administration/Rest.svc/UpdateAdminEditCustomField — Updates (modifies) a custom field definition.</summary>
+		[HttpPost("UpdateAdminEditCustomField")]
+		public async System.Threading.Tasks.Task<IActionResult> UpdateAdminEditCustomField()
+		{
+			try
+			{
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				string body = await ReadRequestBodyAsync();
+				Dictionary<string, object> dict = DeserializeBody(body);
+				Guid   gID            = Sql.ToGuid  (dict.ContainsKey("ID"           ) ? dict["ID"           ] : null);
+				string sMODULE_NAME   = Sql.ToString (dict.ContainsKey("MODULE_NAME"  ) ? dict["MODULE_NAME"  ] : null);
+				string sDATA_TYPE     = Sql.ToString (dict.ContainsKey("DATA_TYPE"    ) ? dict["DATA_TYPE"    ] : null);
+				string sCOLUMN_NAME   = Sql.ToString (dict.ContainsKey("COLUMN_NAME"  ) ? dict["COLUMN_NAME"  ] : null);
+				string sDISPLAY_LABEL = Sql.ToString (dict.ContainsKey("DISPLAY_LABEL") ? dict["DISPLAY_LABEL"] : null);
+				int    nMAX_SIZE      = Sql.ToInteger(dict.ContainsKey("MAX_SIZE"     ) ? dict["MAX_SIZE"     ] : null);
+				bool   bREQUIRED      = Sql.ToBoolean(dict.ContainsKey("REQUIRED"     ) ? dict["REQUIRED"     ] : null);
+				string sDEFAULT_VALUE = Sql.ToString (dict.ContainsKey("DEFAULT_VALUE") ? dict["DEFAULT_VALUE"] : null);
+				string sDROPDOWN_LIST = Sql.ToString (dict.ContainsKey("DROPDOWN_LIST") ? dict["DROPDOWN_LIST"] : null);
+
+				if (Sql.IsEmptyString(sMODULE_NAME) || Sql.IsEmptyString(sCOLUMN_NAME))
+					return BadRequest(new { error = "MODULE_NAME and COLUMN_NAME are required" });
+
+				string sTABLE_NAME = Crm.Modules.TableName(_memoryCache, sMODULE_NAME);
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = "update FIELDS_META_DATA set DATA_TYPE = @DATA_TYPE, DISPLAY_LABEL = @DISPLAY_LABEL, MAX_SIZE = @MAX_SIZE, REQUIRED_OPTION = @REQUIRED, DEFAULT_VALUE = @DEFAULT_VALUE, EXT1 = @EXT1, DATE_MODIFIED = @DATE_MODIFIED, DATE_MODIFIED_UTC = @DATE_MODIFIED_UTC, MODIFIED_USER_ID = @MODIFIED_USER_ID where ID = @ID";
+						Sql.AddParameter(cmd, "@DATA_TYPE"        , sDATA_TYPE                  );
+						Sql.AddParameter(cmd, "@DISPLAY_LABEL"    , sDISPLAY_LABEL              );
+						Sql.AddParameter(cmd, "@MAX_SIZE"         , nMAX_SIZE                   );
+						Sql.AddParameter(cmd, "@REQUIRED"         , bREQUIRED ? "required" : "" );
+						Sql.AddParameter(cmd, "@DEFAULT_VALUE"    , sDEFAULT_VALUE              );
+						Sql.AddParameter(cmd, "@EXT1"             , sDROPDOWN_LIST              );
+						Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now                );
+						Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow             );
+						Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID           );
+						Sql.AddParameter(cmd, "@ID"               , gID                         );
+						cmd.ExecuteNonQuery();
+					}
+				}
+				return Ok(new { d = gID });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "UpdateAdminEditCustomField");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetAclAccessFieldSecurity — Returns field-level ACL entries for a role and module.</summary>
+		[HttpGet("GetAclAccessFieldSecurity")]
+		public IActionResult GetAclAccessFieldSecurity(Guid ROLE_ID, string MODULE_NAME)
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				List<Dictionary<string, object>> lstAccess = new List<Dictionary<string, object>>();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					string sSQL = "select ROLE_ID              " + ControlChars.CrLf
+					            + "     , FIELD_NAME           " + ControlChars.CrLf
+					            + "     , ACLACCESS            " + ControlChars.CrLf
+					            + "  from vwACL_FIELD_ACCESS   " + ControlChars.CrLf
+					            + " where ROLE_ID = @ROLE_ID   " + ControlChars.CrLf
+					            + "   and MODULE_NAME = @MODULE_NAME " + ControlChars.CrLf
+					            + " order by FIELD_NAME        " + ControlChars.CrLf;
+					using (IDbCommand cmd = con.CreateCommand())
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@ROLE_ID"    , ROLE_ID    );
+						Sql.AddParameter(cmd, "@MODULE_NAME", MODULE_NAME);
+						using (IDataReader rdr = cmd.ExecuteReader())
+						{
+							while (rdr.Read())
+							{
+								Dictionary<string, object> item = new Dictionary<string, object>();
+								item["ROLE_ID"    ] = Sql.ToGuid   (rdr["ROLE_ID"   ]);
+								item["FIELD_NAME" ] = Sql.ToString (rdr["FIELD_NAME" ]);
+								item["ACLACCESS"  ] = Sql.ToInteger(rdr["ACLACCESS"  ]);
+								lstAccess.Add(item);
+							}
+						}
+					}
+				}
+				return JsonContent(new { d = lstAccess });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAclAccessFieldSecurity");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>POST Administration/Rest.svc/UpdateAclAccessFieldSecurity — Updates field-level ACL access entries for a role and module.</summary>
+		[HttpPost("UpdateAclAccessFieldSecurity")]
+		public async System.Threading.Tasks.Task<IActionResult> UpdateAclAccessFieldSecurity()
+		{
+			try
+			{
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				string body = await ReadRequestBodyAsync();
+				Dictionary<string, object> dict = DeserializeBody(body);
+				Guid   gROLE_ID     = Sql.ToGuid  (dict.ContainsKey("ROLE_ID"    ) ? dict["ROLE_ID"    ] : null);
+				string sMODULE_NAME = Sql.ToString (dict.ContainsKey("MODULE_NAME") ? dict["MODULE_NAME"] : null);
+				if (Sql.IsEmptyGuid(gROLE_ID) || Sql.IsEmptyString(sMODULE_NAME))
+					return BadRequest(new { error = "ROLE_ID and MODULE_NAME are required" });
+
+				// Expect an ACLACCESS array in the body
+				var arrAccess = new List<Dictionary<string, object>>();
+				if (dict.ContainsKey("ACLACCESS") && dict["ACLACCESS"] is JArray jArr)
+				{
+					foreach (JObject jObj in jArr)
+						arrAccess.Add(jObj.ToObject<Dictionary<string, object>>());
+				}
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using (IDbConnection con = dbf.CreateConnection())
+				{
+					con.Open();
+					using (IDbTransaction trn = con.BeginTransaction())
+					{
+						try
+						{
+							// Delete existing entries for this role and module
+							using (IDbCommand cmd = con.CreateCommand())
+							{
+								cmd.Transaction = trn;
+								cmd.CommandText = "delete from ACL_FIELDS where ROLE_ID = @ROLE_ID and MODULE_NAME = @MODULE_NAME and DELETED = 0";
+								Sql.AddParameter(cmd, "@ROLE_ID"    , gROLE_ID    );
+								Sql.AddParameter(cmd, "@MODULE_NAME", sMODULE_NAME);
+								cmd.ExecuteNonQuery();
+							}
+							// Insert new entries
+							foreach (var entry in arrAccess)
+							{
+								string sFIELD_NAME = Sql.ToString (entry.ContainsKey("FIELD_NAME") ? entry["FIELD_NAME"] : null);
+								int    nACLACCESS  = Sql.ToInteger(entry.ContainsKey("ACLACCESS" ) ? entry["ACLACCESS" ] : null);
+								if (!Sql.IsEmptyString(sFIELD_NAME))
+								{
+									using (IDbCommand cmd = con.CreateCommand())
+									{
+										cmd.Transaction = trn;
+										cmd.CommandText = "insert into ACL_FIELDS (ID, CREATED_BY, DATE_ENTERED, MODIFIED_USER_ID, DATE_MODIFIED, DATE_MODIFIED_UTC, ROLE_ID, MODULE_NAME, FIELD_NAME, ACLACCESS, DELETED) values (@ID, @CREATED_BY, @DATE_ENTERED, @MODIFIED_USER_ID, @DATE_MODIFIED, @DATE_MODIFIED_UTC, @ROLE_ID, @MODULE_NAME, @FIELD_NAME, @ACLACCESS, 0)";
+										Sql.AddParameter(cmd, "@ID"               , Guid.NewGuid()   );
+										Sql.AddParameter(cmd, "@CREATED_BY"       , _security.USER_ID);
+										Sql.AddParameter(cmd, "@DATE_ENTERED"     , DateTime.Now     );
+										Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID);
+										Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now     );
+										Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow  );
+										Sql.AddParameter(cmd, "@ROLE_ID"          , gROLE_ID         );
+										Sql.AddParameter(cmd, "@MODULE_NAME"      , sMODULE_NAME     );
+										Sql.AddParameter(cmd, "@FIELD_NAME"       , sFIELD_NAME      );
+										Sql.AddParameter(cmd, "@ACLACCESS"        , nACLACCESS       );
+										cmd.ExecuteNonQuery();
+									}
+								}
+							}
+							trn.Commit();
+						}
+						catch
+						{
+							trn.Rollback();
+							throw;
+						}
+					}
+				}
+				return Ok(new { status = "updated" });
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "UpdateAclAccessFieldSecurity");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>GET Administration/Rest.svc/GetAllReactCustomViews — Returns React custom view and dashlet mappings for admin.</summary>
+		[HttpGet("GetAllReactCustomViews")]
+		public IActionResult GetAllReactCustomViews()
+		{
+			try
+			{
+				SetNoCacheHeaders();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
+				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				Dictionary<string, object> objs = new Dictionary<string, object>();
+				// React custom views and dashlet views are file-system mappings discovered at runtime.
+				// The view data is sourced from the React SPA build output (Prompt 2 scope).
+				// Return available modules as a stub for admin layout tooling.
+				List<string> lstMODULES = _restUtil.AccessibleModules(HttpContext);
+				objs.Add("MODULES", lstMODULES);
+				Dictionary<string, object> d       = new Dictionary<string, object>();
+				Dictionary<string, object> results = new Dictionary<string, object>();
+				results.Add("results", objs);
+				d.Add("d", results);
+				d.Add("__count", objs.Count);
+				return JsonContent(d);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "GetAllReactCustomViews");
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
 	} // end class AdminRestController
-} // end namespace SplendidCRM
+} // end namespace SplendidCRM.Web.Controllers

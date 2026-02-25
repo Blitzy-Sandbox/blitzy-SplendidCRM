@@ -339,11 +339,11 @@ namespace SplendidCRM
 			, EmailUtils                    emailUtils
 			)
 		{
-			_httpContextAccessor = httpContextAccessor;
-			_memoryCache         = memoryCache        ;
-			_hubContext          = hubContext         ;
-			_dbProviderFactories = dbProviderFactories;
-			_emailUtils          = emailUtils         ;
+			_httpContextAccessor = httpContextAccessor  ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+			_memoryCache         = memoryCache          ?? throw new ArgumentNullException(nameof(memoryCache));
+			_hubContext          = hubContext            ?? throw new ArgumentNullException(nameof(hubContext));
+			_dbProviderFactories = dbProviderFactories   ?? throw new ArgumentNullException(nameof(dbProviderFactories));
+			_emailUtils          = emailUtils            ?? throw new ArgumentNullException(nameof(emailUtils));
 		}
 		#endregion
 
@@ -509,11 +509,9 @@ namespace SplendidCRM
 											_emailUtils.FillEmail(sPARENT_TYPE, sPARENT_TYPE.ToUpper(), dtParent.Rows[0], null, ref sSUBJECT, ref sBody);
 											break;
 									}
-									// Suppress unused-variable warnings: vwParentColumns and enumColumns were explicitly
-									// used in the original FillEmail call signature; preserved here for structural fidelity.
-									GC.KeepAlive(vwParentColumns);
-									GC.KeepAlive(enumColumns     );
-									GC.KeepAlive(hashCurrencyColumns);
+									// vwParentColumns, enumColumns, and hashCurrencyColumns were used in the original
+									// FillEmail call signature. After migration to the instance-method overload,
+									// they are no longer passed directly but are resolved internally by EmailUtils.
 								}
 							}
 						}

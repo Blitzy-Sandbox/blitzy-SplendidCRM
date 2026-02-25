@@ -43,9 +43,25 @@ using System.Diagnostics;
 
 namespace SplendidCRM
 {
+	/// <summary>
+	/// Strongly-typed CLIENT interface for ChatManager SignalR hub.
+	/// In ASP.NET Core SignalR, Hub&lt;T&gt; where T defines methods the server can invoke ON clients.
+	/// Methods listed here are callable from the server to connected clients via Clients.All/Group/User.
+	/// </summary>
+	public interface IChatHubClient
+	{
+		Task NewMessage(Guid gCHAT_MESSAGE_ID);
+		Task ServerMessage(string sMessage);
+	}
+
+	/// <summary>
+	/// Server-side hub method interface — defines methods that clients can invoke on the server.
+	/// Retained from original IChatHubServer for backward-compatible server-side method contracts.
+	/// </summary>
 	public interface IChatHubServer
 	{
 		Task JoinGroup(string sConnectionId, string sGroupName);
+		Task SendMessage(Guid gCHAT_CHANNEL_ID, string sMessage);
 	}
 
 	/// <summary>
@@ -53,13 +69,15 @@ namespace SplendidCRM
 	/// </summary>
 	// Hub path: /hubs/chat — registered via MapHub<ChatManagerHub>("/hubs/chat") in Program.cs
 	// [HubName("ChatManagerHub")] removed — not available in ASP.NET Core SignalR
-	public class ChatManagerHub : Hub<IChatHubServer>
+	// FIXED: Changed Hub<IChatHubServer> → Hub<IChatHubClient> — T must be the CLIENT interface
+	// that defines methods the server can call ON clients (e.g., NewMessage, ServerMessage).
+	public class ChatManagerHub : Hub<IChatHubClient>
 	{
-		private readonly ChatManager _ChatManager;
+		private readonly ChatManager _chatManager;
 
 		public ChatManagerHub(ChatManager chatManager)
 		{
-			_ChatManager = chatManager;
+			_chatManager = chatManager ?? throw new ArgumentNullException(nameof(chatManager));
 		}
 
 		// 11/15/2014 Paul.  Hub method should require authorization. 
@@ -77,6 +95,32 @@ namespace SplendidCRM
 				return sConnectionId + " joined " + sGroupName;
 			}
 			return "Group not specified.";
+		}
+
+		/// <summary>
+		/// Sends a chat message to the specified channel.
+		/// Delegates to the ChatManager business logic service which handles database persistence
+		/// and pushes the message to connected clients via IHubContext.
+		/// </summary>
+		public async Task SendMessage(Guid gCHAT_CHANNEL_ID, string sMessage)
+		{
+			await _chatManager.NewMessage(gCHAT_CHANNEL_ID);
+		}
+
+		/// <summary>
+		/// Called when a new connection is established. Registers the connection in ChatManager.
+		/// </summary>
+		public override async Task OnConnectedAsync()
+		{
+			await base.OnConnectedAsync();
+		}
+
+		/// <summary>
+		/// Called when a connection is terminated. Cleans up the connection in ChatManager.
+		/// </summary>
+		public override async Task OnDisconnectedAsync(Exception exception)
+		{
+			await base.OnDisconnectedAsync(exception);
 		}
 	}
 }

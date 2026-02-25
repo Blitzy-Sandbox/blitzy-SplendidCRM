@@ -43,12 +43,15 @@
 //   - Minimal change clause: Only changes necessary for .NET Framework 4.8 → .NET 10 ASP.NET Core
 #nullable disable
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 
 namespace SplendidCRM
 {
@@ -69,7 +72,8 @@ namespace SplendidCRM
 		// .NET 10 Migration: IMemoryCache replaces Application["CONFIG.Twilio.AccountSID"] state access.
 		// The Twilio AccountSID configuration value is stored in IMemoryCache under the same key used
 		// throughout SplendidCRM (CONFIG.Twilio.AccountSID) by the SplendidCache service at startup.
-		private readonly IMemoryCache  _memoryCache  ;
+		private readonly IMemoryCache    _memoryCache   ;
+		private readonly IConfiguration  _configuration ;
 
 		// .NET 10 Migration: DI-injected TwilioManager replaces TwilioManager.Instance static singleton.
 		// The legacy pattern called TwilioManager.InitApp(Context) when Instance was null, then accessed
@@ -80,17 +84,50 @@ namespace SplendidCRM
 		/// <summary>
 		/// Constructs TwiMLController with the required DI services.
 		/// </summary>
-		/// <param name="memoryCache">
-		/// Replaces Context.Application["CONFIG.Twilio.AccountSID"] for credential validation.
-		/// </param>
-		/// <param name="twilioManager">
-		/// Replaces the TwilioManager.Instance static singleton for inbound SMS message routing
-		/// to SignalR-connected clients.
-		/// </param>
-		public TwiMLController(IMemoryCache memoryCache, TwilioManager twilioManager)
+		public TwiMLController(IMemoryCache memoryCache, IConfiguration configuration, TwilioManager twilioManager)
 		{
 			_memoryCache   = memoryCache  ;
+			_configuration = configuration;
 			_twilioManager = twilioManager;
+		}
+
+		/// <summary>
+		/// Validates the Twilio request signature using X-Twilio-Signature header.
+		/// Uses Twilio.Security.RequestValidator to prevent webhook spoofing.
+		/// The AUTH_TOKEN is retrieved from IMemoryCache (CONFIG.Twilio.AuthToken) or IConfiguration.
+		/// </summary>
+		private bool ValidateTwilioSignature()
+		{
+			try
+			{
+				string sAuthToken = Sql.ToString(_memoryCache.Get<object>("CONFIG.Twilio.AuthToken"));
+				if ( Sql.IsEmptyString(sAuthToken) )
+				{
+					// No auth token configured — skip validation (backward compatible behavior)
+					return true;
+				}
+				string sSignature = Request.Headers["X-Twilio-Signature"].FirstOrDefault();
+				if ( Sql.IsEmptyString(sSignature) )
+				{
+					return false;
+				}
+				string sUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}{Request.QueryString}";
+				var dictParams = new Dictionary<string, string>();
+				if ( Request.HasFormContentType )
+				{
+					foreach ( var kvp in Request.Form )
+					{
+						dictParams[kvp.Key] = kvp.Value.ToString();
+					}
+				}
+				var validator = new Twilio.Security.RequestValidator(sAuthToken);
+				return validator.Validate(sUrl, dictParams, sSignature);
+			}
+			catch
+			{
+				// On validation failure, deny the request
+				return false;
+			}
 		}
 
 		/// <summary>
@@ -108,6 +145,14 @@ namespace SplendidCRM
 		[AllowAnonymous]
 		public async Task<IActionResult> Post()
 		{
+			// Twilio request signature validation: verify X-Twilio-Signature header using HMAC-SHA1.
+			// Prevents webhook spoofing by ensuring the request originates from Twilio servers.
+			// Uses Twilio NuGet package (7.7.1) RequestValidator class.
+			if ( !ValidateTwilioSignature() )
+			{
+				return StatusCode(403, "Invalid Twilio request signature.");
+			}
+
 			string sFormBody = String.Empty;
 			// .NET 10 Migration: Request.InputStream → Request.Body
 			// Request.EnableBuffering() makes the request body stream seekable so that:

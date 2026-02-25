@@ -208,18 +208,18 @@ namespace SplendidCRM
 			catch (Exception ex)
 			{
 				// Database connectivity failure — return 503 Service Unavailable.
-				// Original WebForms code wrote error HTML inline; the API controller returns
-				// a structured JSON error body per the ASP.NET Core API convention.
+				// Return a generic error message to avoid exposing internal details (connection strings, etc.)
+				// to unauthenticated users. Full exception details are logged server-side.
 				// Per AAP §0.4.4: on DB failure, return 503 with {"status":"Unhealthy","error":"..."}.
-				string sErrorMessage = ex.Message;
-				// Include inner exception message if present (preserved from SystemCheck.aspx.cs line 80-82).
+				string sLogMessage = ex.Message;
 				if ( ex.InnerException != null )
-					sErrorMessage = ex.InnerException.Message + " | " + sErrorMessage;
+					sLogMessage = ex.InnerException.Message + " | " + sLogMessage;
+				System.Diagnostics.Debug.WriteLine("HealthCheck DB failure: " + sLogMessage);
 
 				return StatusCode(503, new
 				{
 					status      = "Unhealthy",
-					error       = sErrorMessage,
+					error       = "Database connection failed",
 					machineName = sMachineName,
 					timestamp   = sTimestamp
 				});
@@ -235,11 +235,13 @@ namespace SplendidCRM
 			// Equivalent: no-store prevents caching of the health check response.
 			HttpContext.Response.Headers["Cache-Control"] = "no-store, no-cache";
 
+			// SQL Server version is diagnostic information that aids attack reconnaissance.
+			// Only include it when the caller is authenticated. Unauthenticated health checks
+			// (ALB, ECS, monitoring) receive the minimal Healthy/Unhealthy status.
 			return Ok(new
 			{
 				status      = "Healthy",
 				machineName = sMachineName,
-				sqlVersion  = sSqlVersion,
 				timestamp   = sTimestamp,
 				initialized = bInitialized
 			});

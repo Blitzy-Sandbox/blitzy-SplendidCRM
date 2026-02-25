@@ -46,10 +46,24 @@ using System.Diagnostics;
 
 namespace SplendidCRM
 {
+	/// <summary>
+	/// Strongly-typed CLIENT interface for Twilio SignalR hub.
+	/// In ASP.NET Core SignalR, Hub&lt;T&gt; where T defines methods the server can invoke ON clients.
+	/// Methods listed here are callable from the server to connected clients via Clients.All/Group/User.
+	/// </summary>
+	public interface ITwilioClient
+	{
+		Task IncomingMessage(string sMESSAGE_SID, string sFROM_NUMBER, string sTO_NUMBER, string sSUBJECT);
+	}
+
+	/// <summary>
+	/// Server-side hub method interface — defines methods that clients can invoke on the server.
+	/// Retained from original ITwilioServer for backward-compatible server-side method contracts.
+	/// </summary>
 	public interface ITwilioServer
 	{
 		Task JoinGroup(string sConnectionId, string sGroupName);
-		Task CreateSmsMessage(string sMESSAGE_SID, string sFROM_NUMBER, string sTO_NUMBER, string sSUBJECT);
+		Task<Guid> CreateSmsMessage(string sMESSAGE_SID, string sFROM_NUMBER, string sTO_NUMBER, string sSUBJECT);
 	}
 
 	/// <summary>
@@ -57,13 +71,15 @@ namespace SplendidCRM
 	/// </summary>
 	// Hub path: /hubs/twilio — registered via MapHub<TwilioManagerHub>("/hubs/twilio") in Program.cs
 	// [HubName("TwilioManagerHub")] removed — not available in ASP.NET Core SignalR
-	public class TwilioManagerHub : Hub<ITwilioServer>
+	// FIXED: Changed Hub<ITwilioServer> → Hub<ITwilioClient> — T must be the CLIENT interface
+	// that defines methods the server can call ON clients (e.g., IncomingMessage).
+	public class TwilioManagerHub : Hub<ITwilioClient>
 	{
 		private readonly TwilioManager _twilioManager;
 
 		public TwilioManagerHub(TwilioManager twilioManager)
 		{
-			_twilioManager = twilioManager;
+			_twilioManager = twilioManager ?? throw new ArgumentNullException(nameof(twilioManager));
 		}
 
 		// 11/15/2014 Paul.  Hub method should require authorization. 
@@ -86,9 +102,10 @@ namespace SplendidCRM
 		// 11/15/2014 Paul.  Hub method should require authorization. 
 		// http://eworldproblems.mbaynton.com/2012/12/signalr-hub-authorization/
 		// Authorization handled by global SplendidHubAuthorize IHubFilter registered in Program.cs
-		public Guid CreateSmsMessage(string sMESSAGE_SID, string sFROM_NUMBER, string sTO_NUMBER, string sSUBJECT)
+		// FIXED: Changed return type from Guid to async Task<Guid> for proper ASP.NET Core SignalR async support
+		public async Task<Guid> CreateSmsMessage(string sMESSAGE_SID, string sFROM_NUMBER, string sTO_NUMBER, string sSUBJECT)
 		{
-			return _twilioManager.CreateSmsMessage(sMESSAGE_SID, sFROM_NUMBER, sTO_NUMBER, sSUBJECT, String.Empty, String.Empty);
+			return await Task.FromResult(_twilioManager.CreateSmsMessage(sMESSAGE_SID, sFROM_NUMBER, sTO_NUMBER, sSUBJECT, String.Empty, String.Empty));
 		}
 	}
 }

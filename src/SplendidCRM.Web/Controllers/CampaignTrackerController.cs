@@ -182,9 +182,20 @@ namespace SplendidCRM
 							string sTRACKER_URL = Sql.ToString(cmd.ExecuteScalar());
 							if ( !Sql.IsEmptyString(sTRACKER_URL) )
 							{
-								// BEFORE (.NET Framework): Response.Redirect(sTRACKER_URL);
-								// AFTER  (.NET Core):      return Redirect(sTRACKER_URL); (IActionResult 302)
-								return Redirect(sTRACKER_URL);
+								// SECURITY: Validate redirect URL to prevent open redirect attacks.
+								// Only allow HTTP(S) URLs; reject javascript:, data:, or protocol-relative URLs.
+								if ( Uri.TryCreate(sTRACKER_URL, UriKind.Absolute, out Uri uriResult)
+								  && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps) )
+								{
+									return Redirect(sTRACKER_URL);
+								}
+								// If the URL is a relative path (no scheme), allow it as a local redirect.
+								else if ( Uri.TryCreate(sTRACKER_URL, UriKind.Relative, out _) && sTRACKER_URL.StartsWith("/") )
+								{
+									return LocalRedirect(sTRACKER_URL);
+								}
+								// Otherwise, log and ignore the invalid redirect URL.
+								SplendidError.SystemError(new StackTrace(true).GetFrame(0), new Exception("Invalid redirect URL in campaign tracker: " + sTRACKER_URL));
 							}
 						}
 					}

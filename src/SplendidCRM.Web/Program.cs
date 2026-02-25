@@ -266,6 +266,9 @@ builder.Services.AddSingleton<WorkflowInit>();
 builder.Services.AddSingleton<SyncUtils>();
 builder.Services.AddSingleton<SyncError>();
 builder.Services.AddSingleton<SqlBuild>();
+// NOTE: Class name has a known typo (DbAcrhiveFactories vs DbArchiveFactories).
+// The typo is in the Core library class definition (src/SplendidCRM.Core/DbAcrhiveFactories.cs)
+// and must be fixed there first. This registration correctly references the actual class name.
 builder.Services.AddSingleton<DbAcrhiveFactories>();
 builder.Services.AddSingleton<SplendidGrid>();
 
@@ -448,6 +451,13 @@ app.Run();
 // =====================================================================================
 // HELPER — Map environment variable to structured configuration key
 // =====================================================================================
+// NOTE: Environment variables mapped via MapEnvVarToConfig are written directly into the
+// IConfiguration root, which gives them effective override priority ABOVE AWS Secrets Manager
+// entries loaded via the provider hierarchy. This is an intentional design decision that
+// enables container orchestrators (ECS, Kubernetes) to inject runtime overrides at deployment
+// time. See AAP §0.8.2 for the 5-tier provider hierarchy. For Prompt 3 container deployments,
+// the ECS task definition may set env vars that override Secrets Manager values for local
+// development or per-container tuning.
 static void MapEnvVarToConfig(ConfigurationManager config, string envVarName, string configKey)
 {
 	string value = Environment.GetEnvironmentVariable(envVarName);

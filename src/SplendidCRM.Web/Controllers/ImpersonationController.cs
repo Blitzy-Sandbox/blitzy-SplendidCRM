@@ -64,6 +64,7 @@
 //   - Minimal change clause (AAP 0.8.1): only changes required for .NET Framework 4.8 → .NET 10 ASP.NET Core
 #nullable disable
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
@@ -233,8 +234,14 @@ namespace SplendidCRM
 		/// </param>
 		/// <returns>200 OK on success; 403 Forbidden on authorization failure; 500 on unexpected error.</returns>
 		[HttpPost("Impersonate")]
-		public IActionResult Impersonate([FromBody] Guid ID)
+		public IActionResult Impersonate([FromBody] Dictionary<string, object> dict)
 		{
+			// WCF WrappedRequest body format: {"ID":"guid-value"}
+			// ASP.NET Core [FromBody] Dictionary matches this JSON structure.
+			Guid ID = Guid.Empty;
+			if ( dict != null && dict.ContainsKey("ID") )
+				ID = Sql.ToGuid(dict["ID"]);
+
 			// Instantiate L10N with the current user's culture for localized error messages
 			// BEFORE: L10N L10n = new L10N(Sql.ToString(HttpContext.Current.Session["USER_SETTINGS/CULTURE"]));
 			// AFTER:  Per-request L10N via GetL10N() helper using IHttpContextAccessor and IMemoryCache
@@ -285,9 +292,9 @@ namespace SplendidCRM
 			}
 			catch ( Exception ex )
 			{
-				// Preserve WCF [ServiceBehavior(IncludeExceptionDetailInFaults=true)] behavior:
-				// Return exception details in the response body for diagnostics
-				return StatusCode(500, new { error = ex.Message });
+				// Environment-conditional error detail: expose exception message only in Development
+				string sErrorMessage = _env.EnvironmentName == "Development" ? ex.Message : "An internal error occurred.";
+				return StatusCode(500, new { error = sErrorMessage });
 			}
 		}
 	}
