@@ -1711,6 +1711,46 @@ namespace SplendidCRM
 			return dt;
 		}
 
+		/// <summary>
+		/// Retrieves a specific report rule by its event ID GUID.
+		/// Queries vwRULES_Edit (not vwREPORT_RULES) to fetch the MODULE_NAME and XOML
+		/// for the rule with the matching ID. Result is cached per ID.
+		/// </summary>
+		/// <param name="gID">The event rule ID (as stored in gPRE_LOAD_EVENT_ID / gPOST_LOAD_EVENT_ID).</param>
+		/// <returns>DataTable with MODULE_NAME and XOML columns, or empty table if not found.</returns>
+		// MIGRATION NOTE: This overload replaces the original SplendidCache.ReportRules(Guid gID) which
+		// queried vwRULES_Edit. Added to support ApplyReportRules(L10N, Guid, Guid, DataTable).
+		public DataTable ReportRules(Guid gID)
+		{
+			if ( Sql.IsEmptyGuid(gID) ) return new DataTable();
+			string sKey = "vwREPORT_RULES." + gID.ToString();
+			DataTable dt = _memoryCache.Get<DataTable>(sKey);
+			if ( dt != null ) return dt;
+			try
+			{
+				using IDbConnection con = NewConnection();
+				con.Open();
+				using IDbCommand cmd = con.CreateCommand();
+				cmd.CommandText =
+					  "select MODULE_NAME" + ControlChars.CrLf
+					+ "     , XOML       " + ControlChars.CrLf
+					+ "  from vwRULES_Edit" + ControlChars.CrLf
+					+ " where ID = @ID   " + ControlChars.CrLf;
+				Sql.AddParameter(cmd, "@ID", gID);
+				using DbDataAdapter da = NewDataAdapter();
+				((IDbDataAdapter)da).SelectCommand = cmd;
+				dt = new DataTable();
+				da.Fill(dt);
+				CacheSet(sKey, dt);
+			}
+			catch ( Exception ex )
+			{
+				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				dt = new DataTable();
+			}
+			return dt;
+		}
+
 		public DataTable ReportRules(string sMODULE_NAME)
 		{
 			if (Sql.IsEmptyString(sMODULE_NAME)) return new DataTable();

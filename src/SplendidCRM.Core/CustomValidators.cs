@@ -92,6 +92,17 @@ namespace SplendidCRM
 		/// return false from ControlPropertiesValid(), which is the correct safe default.
 		/// </summary>
 		public virtual Control FindControl(string id) => null;
+
+		/// <summary>
+		/// Triggers validation on the control.
+		/// BEFORE: System.Web.UI.WebControls.BaseValidator.Validate() executed validation logic.
+		/// AFTER:  No-op stub — WebForms validation pipeline does not exist in .NET 10.
+		///         All validation calls in SplendidDynamic.ValidateEditViewFields() are no-ops
+		///         because FindControl() always returns null, so this method is never reached.
+		/// Added for .NET 10 compilation compatibility with ValidateEditViewFields.
+		/// </summary>
+		// .NET 10 Migration: Added for SplendidDynamic.ValidateEditViewFields() compilation.
+		public virtual void Validate() { }
 	}
 
 	/// <summary>
@@ -241,6 +252,17 @@ namespace SplendidCRM
 		public string ErrorMessage { get; set; }
 
 		/// <summary>
+		/// Whether this validator is active. Maps to System.Web.UI.WebControls.BaseValidator.Enabled.
+		/// BEFORE: Setting Enabled = true activated the validator in the WebForms validation pipeline.
+		/// AFTER:  Property is stored but has no effect — WebForms validation pipeline does not exist
+		///         in .NET 10 ReactOnlyUI. All validation in SplendidDynamic is a no-op since
+		///         FindControl() always returns null.
+		/// Added for .NET 10 compilation compatibility with SplendidDynamic.ValidateEditViewFields().
+		/// </summary>
+		// .NET 10 Migration: Added for SplendidDynamic.ValidateEditViewFields() compilation.
+		public bool Enabled { get; set; } = true;
+
+		/// <summary>
 		/// Determines whether the control being validated has properties consistent with validation.
 		/// Returns false if the target control cannot be found (stub FindControl always returns null).
 		/// Exposed as public to satisfy the .NET 10 class library members_exposed contract.
@@ -253,6 +275,34 @@ namespace SplendidCRM
 		/// Exposed as public to satisfy the .NET 10 class library members_exposed contract.
 		/// </summary>
 		public abstract bool EvaluateIsValid();
+	}
+
+	/// <summary>
+	/// Stub replacing SplendidCRM._controls.DateTimePicker for .NET 10 compilation compatibility.
+	/// Used by SplendidDynamic.ValidateEditViewFields() to cast FindControl() results.
+	/// BEFORE: System.Web.UI.UserControl-derived DateTimePicker WebForms control.
+	/// AFTER:  Minimal stub — FindControl() always returns null so this class is never instantiated.
+	/// Added for .NET 10 migration of SplendidDynamic.ValidateEditViewFields().
+	/// </summary>
+	// .NET 10 Migration: Added for SplendidDynamic.ValidateEditViewFields() compilation.
+	public class DateTimePicker : Control
+	{
+		/// <summary>Text value of the date-time picker input. Unused at runtime in ReactOnlyUI.</summary>
+		public string DateTimeText { get; set; } = string.Empty;
+	}
+
+	/// <summary>
+	/// Stub replacing SplendidCRM._controls.DateTimeEdit for .NET 10 compilation compatibility.
+	/// Used by SplendidDynamic.ValidateEditViewFields() to cast FindControl() results.
+	/// BEFORE: System.Web.UI.UserControl-derived DateTimeEdit WebForms control.
+	/// AFTER:  Minimal stub — FindControl() always returns null so this class is never instantiated.
+	/// Added for .NET 10 migration of SplendidDynamic.ValidateEditViewFields().
+	/// </summary>
+	// .NET 10 Migration: Added for SplendidDynamic.ValidateEditViewFields() compilation.
+	public class DateTimeEdit : Control
+	{
+		/// <summary>Text value of the date-time edit input. Unused at runtime in ReactOnlyUI.</summary>
+		public string DateTimeText { get; set; } = string.Empty;
 	}
 
 	// ====================================================================================
