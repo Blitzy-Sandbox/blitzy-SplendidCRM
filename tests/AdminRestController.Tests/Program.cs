@@ -13,8 +13,8 @@ void Check(bool cond, string name)
     else      { Console.ForegroundColor = ConsoleColor.Red; Console.WriteLine($"  [FAIL] {name}"); Console.ResetColor(); failed++; }
 }
 
-var asm  = typeof(SplendidCRM.AdminRestController).Assembly;
-var ctrl = typeof(SplendidCRM.AdminRestController);
+var asm  = typeof(SplendidCRM.Web.Controllers.AdminRestController).Assembly;
+var ctrl = typeof(SplendidCRM.Web.Controllers.AdminRestController);
 Console.WriteLine($"Testing assembly: {asm.GetName().Name} v{asm.GetName().Version}");
 
 // ── Suite 1: Type existence ────────────────────────────────────────────────
