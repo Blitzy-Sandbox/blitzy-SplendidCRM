@@ -59,7 +59,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Replaces Web.config <httpRuntime maxRequestLength="104857600" /> (line 111) and
 // <system.webServer>/<security>/<requestFiltering>/<requestLimits maxAllowedContentLength="104857600"/>
 // (Web.config line 139) with Kestrel-native limits.
-// Kestrel port is configurable via ASPNETCORE_URLS env var (default http://+:5000).
+// Kestrel port is configurable via ASPNETCORE_URLS env var (default http://localhost:5000).
 builder.WebHost.ConfigureKestrel(options =>
 {
 	// Security hardening: suppress Kestrel Server header to prevent technology disclosure.
@@ -72,20 +72,46 @@ builder.WebHost.ConfigureKestrel(options =>
 	options.Limits.MaxRequestBodySize = 104857600;
 });
 
-// Tier 5 (lowest priority): appsettings.json — already loaded by default.
-// Tier 4: appsettings.{Environment}.json — already loaded by default.
+// Five-tier configuration provider hierarchy (highest priority wins):
+// Tier 1 (highest): AWS Secrets Manager — secrets (DB creds, SMTP, SSO, Duo).
+// Tier 2: Environment variables — runtime overrides (already loaded by default via AddEnvironmentVariables).
 // Tier 3: AWS Systems Manager Parameter Store — environment-specific non-secret config.
-// Tier 2: Environment variables — already loaded by default (AddEnvironmentVariables).
-// Tier 1 (highest priority): AWS Secrets Manager — secrets (DB creds, SMTP, SSO, Duo).
+// Tier 4: appsettings.{Environment}.json — per-environment defaults (already loaded by default).
+// Tier 5 (lowest): appsettings.json — base defaults (already loaded by default).
 //
-// The default WebApplicationBuilder already registers:
+// The default WebApplicationBuilder registers sources in this order (later overrides earlier):
 //   appsettings.json → appsettings.{env}.json → env vars → command-line args
-// We add AWS providers between env vars and the defaults via Insert.
+// We INSERT Parameter Store BEFORE the env vars source (so env vars override it),
+// and APPEND Secrets Manager at the end (highest priority).
 // NOTE: AWS providers are optional; they gracefully no-op if AWS credentials are unavailable.
 try
 {
 	string ssmBasePath = builder.Configuration["Aws:ParameterStore:BasePath"] ?? "/splendidcrm/";
-	builder.Configuration.AddAwsParameterStore(ssmBasePath, optional: true);
+	var parameterStoreSource = new AwsParameterStoreConfigurationSource
+	{
+		BasePath = ssmBasePath,
+		Optional = true
+	};
+	// Insert Parameter Store before the environment variables source so that
+	// env vars (tier 2) override Parameter Store (tier 3) per the 5-tier hierarchy.
+	int envVarIndex = -1;
+	for (int i = 0; i < builder.Configuration.Sources.Count; i++)
+	{
+		if (builder.Configuration.Sources[i].GetType().Name == "EnvironmentVariablesConfigurationSource")
+		{
+			envVarIndex = i;
+			break;
+		}
+	}
+	if (envVarIndex >= 0)
+	{
+		builder.Configuration.Sources.Insert(envVarIndex, parameterStoreSource);
+	}
+	else
+	{
+		// Fallback: append if env vars source not found (should not happen in normal ASP.NET Core).
+		((IConfigurationBuilder)builder.Configuration).Add(parameterStoreSource);
+	}
 }
 catch (Exception ex)
 {
@@ -95,6 +121,7 @@ catch (Exception ex)
 try
 {
 	string secretId = builder.Configuration["Aws:SecretsManager:SecretId"] ?? "splendidcrm/secrets";
+	// Append Secrets Manager as the last source — highest priority (tier 1).
 	builder.Configuration.AddAwsSecretsManager(secretId, optional: true, reloadInterval: TimeSpan.FromMinutes(5));
 }
 catch (Exception ex)

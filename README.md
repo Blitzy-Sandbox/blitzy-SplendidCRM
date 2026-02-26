@@ -69,7 +69,7 @@ dotnet restore && dotnet build
 
 | Project | Path | Description |
 |---|---|---|
-| **SplendidCRM.Core** | `src/SplendidCRM.Core/` | .NET 10 class library containing all extracted business logic (74 utility classes originally from `_code/`), data access, caching, security, and integration stubs. |
+| **SplendidCRM.Core** | `src/SplendidCRM.Core/` | .NET 10 class library containing all extracted business logic (78 utility classes originally from `_code/`), data access, caching, security, and integration stubs. |
 | **SplendidCRM.Web** | `src/SplendidCRM.Web/` | ASP.NET Core MVC web project providing REST API controllers, SOAP service, SignalR hubs, background services, authentication, authorization, and middleware. References `SplendidCRM.Core`. |
 
 All NuGet package references are declared in the respective `.csproj` files and restored automatically by `dotnet restore`. Key packages include:
@@ -77,13 +77,13 @@ All NuGet package references are declared in the respective `.csproj` files and 
 - `Microsoft.Data.SqlClient` 6.1.4 — SQL Server data access
 - `SoapCore` 1.2.1.12 — SOAP middleware for ASP.NET Core
 - `MailKit` 4.15.0 / `MimeKit` 4.15.0 — Email client
-- `Newtonsoft.Json` 13.0.3 — JSON serialization (fallback)
+- `Newtonsoft.Json` 13.0.3 — JSON serialization (primary)
 - `Twilio` 7.8.0 — Twilio SMS/Voice API
 - `DocumentFormat.OpenXml` 3.3.0 — OpenXML document handling
 - `AWSSDK.SecretsManager` / `AWSSDK.SimpleSystemsManagement` — AWS configuration providers
 
 ### React Build
-We recommend that you use yarn to bulid the React files. We are currently using version 1.22, npm version 6.14 adn node 16.20. These versions can be important as newer versions can have build failures. The first time you build, you will need to have yarn install all packages.
+We recommend that you use yarn to build the React files. We are currently using version 1.22, npm version 6.14 and node 16.20. These versions can be important as newer versions can have build failures. The first time you build, you will need to have yarn install all packages.
 
 > yarn install
 
@@ -95,7 +95,7 @@ The result will be the file React\dist\js\SteviaCRM.js
 
 ### SQL Build
 The SQL Scripts folder contains all the code to create or update a database to the current level. The Build.bat file is designed to create a single Build.sql file that combines all the SQL code into a single Build.sql file. If this is the first time you are building the database, you will need to create the SQL database yourself and define a SQL user that has ownership access.
-We have designed the SQL scripts to be run to upgrade any existing database to the current level. In addition, we designed the SQL scripts to be run over and over again, without any errors. We encourage you to continue this design. It includes data modifications that are designed to only be applied once. The basic logic is to check if the operation needs to occur before performing the acction.
+We have designed the SQL scripts to be run to upgrade any existing database to the current level. In addition, we designed the SQL scripts to be run over and over again, without any errors. We encourage you to continue this design. It includes data modifications that are designed to only be applied once. The basic logic is to check if the operation needs to occur before performing the action.
 
 > if ( condition to test ) begin -- then
 >	operation to perform
@@ -160,14 +160,14 @@ src/
 │   ├── Sql.cs                     SQL helper utilities
 │   ├── [60+ more utility classes]
 │   ├── DuoUniversal/              DuoUniversal 2FA integration
-│   └── Integrations/              Dormant integration stubs (16 subdirectories)
+│   └── Integrations/              Dormant integration stubs (17 subdirectories)
 │
 └── SplendidCRM.Web/               ASP.NET Core MVC — hosting
     ├── Program.cs                 Entry point, DI container, middleware pipeline
     ├── appsettings.json           Base configuration defaults
     ├── Controllers/
-    │   ├── RestController.cs      Main REST API (81 endpoints)
-    │   ├── AdminRestController.cs Admin REST API (41 endpoints)
+    │   ├── RestController.cs      Main REST API (82 endpoints)
+    │   ├── AdminRestController.cs Admin REST API (58 endpoints)
     │   ├── ImpersonationController.cs
     │   ├── HealthCheckController.cs   GET /api/health
     │   ├── CampaignTrackerController.cs
@@ -180,13 +180,14 @@ src/
     │   ├── ArchiveHostedService.cs        IHostedService — archive processing
     │   └── CacheInvalidationService.cs    Cache invalidation monitor
     ├── Soap/
-    │   ├── ISugarSoapService.cs   SOAP service interface (45 methods)
+    │   ├── ISugarSoapService.cs   SOAP service interface (41 methods)
     │   ├── SugarSoapService.cs    SOAP implementation
     │   └── DataCarriers.cs        SOAP DTOs (contact_detail, entry_value, etc.)
     ├── Hubs/
     │   ├── ChatManagerHub.cs      ASP.NET Core SignalR
     │   ├── TwilioManagerHub.cs    ASP.NET Core SignalR
     │   └── PhoneBurnerHub.cs      ASP.NET Core SignalR
+    ├── SignalR/                    Chat, Twilio, PhoneBurner managers, SignalRUtils
     ├── Authentication/            Windows, Forms, SSO, DuoUniversal 2FA setup
     ├── Authorization/             4-tier ACL: Module → Team → Field → Record
     ├── Middleware/                 SPA redirect, cookie policy
@@ -195,10 +196,10 @@ src/
 
 ### Key Components
 
-- **REST API** — All 81 main REST endpoints and 41 admin endpoints are served via ASP.NET Core Web API controllers. Routes are preserved at `/Rest.svc/{operation}` and `/Administration/Rest.svc/{operation}` for backward compatibility.
-- **SOAP Service** — The 45-method SOAP interface is hosted via SoapCore middleware, preserving the `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`) and WSDL contract.
+- **REST API** — All 82 main REST endpoints and 58 admin endpoints are served via ASP.NET Core Web API controllers. Routes are preserved at `/Rest.svc/{operation}` and `/Administration/Rest.svc/{operation}` for backward compatibility.
+- **SOAP Service** — The 41-method SOAP interface is hosted via SoapCore middleware, preserving the `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`) and WSDL contract.
 - **SignalR** — Real-time hubs for Chat, Twilio, and PhoneBurner are implemented using ASP.NET Core SignalR.
-- **Background Services** — Three `IHostedService` implementations handle scheduled jobs, email polling, and archive processing with configurable intervals and reentrancy guards.
+- **Background Services** — Four `IHostedService` implementations handle scheduled jobs, email polling, archive processing, and cache invalidation with configurable intervals and reentrancy guards.
 - **Authentication** — Supports Windows (Negotiate/NTLM), Forms (cookie-based), and SSO (OIDC/SAML) authentication modes, selectable via the `AUTH_MODE` environment variable. Optional DuoUniversal 2FA integration is available.
 - **Authorization** — A 4-tier ACL model enforces access control at the Module, Team, Field, and Record levels, replicating the original `Security.Filter` SQL predicate injection.
 - **Distributed Session** — Session state is backed by Redis or SQL Server (configurable via `SESSION_PROVIDER`), replacing the legacy in-process session.
@@ -212,7 +213,7 @@ Start the application from the repository root:
 dotnet run --project src/SplendidCRM.Web
 ```
 
-By default, Kestrel listens on `http://+:5000`. Override the listening URL with the `ASPNETCORE_URLS` environment variable:
+By default, Kestrel listens on `http://localhost:5000`. Override the listening URL with the `ASPNETCORE_URLS` environment variable:
 
 ```bash
 ASPNETCORE_URLS="http://+:8080" dotnet run --project src/SplendidCRM.Web
@@ -266,7 +267,7 @@ All REST API routes are preserved at their original paths (`/Rest.svc/{operation
 
 ### SOAP WSDL Contract Preserved
 
-The SOAP service WSDL contract is preserved with the original `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`). All 45 SOAP methods and data carriers (`contact_detail`, `entry_value`, `name_value`, `document_revision`, etc.) maintain byte-comparable serialization.
+The SOAP service WSDL contract is preserved with the original `sugarsoap` XML namespace (`http://www.sugarcrm.com/sugarcrm`). All 41 SOAP methods and data carriers (`contact_detail`, `entry_value`, `name_value`, `document_revision`, etc.) maintain byte-comparable serialization.
 
 ### JSON Serialization
 
