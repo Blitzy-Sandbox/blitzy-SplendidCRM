@@ -848,6 +848,9 @@ namespace SplendidCRM.Web.Controllers
 			return objs;
 		}
 
+		/// <summary>GetModuleAccessInternal — Returns per-module ACL access rights for the current user.
+		/// Ported from SplendidCache.GetModuleAccess. Queries vwACL_ACCESS_ByModule_USERS
+		/// and pivots individual ACLACCESS_* columns into {acltype → value} dictionaries.</summary>
 		private Dictionary<string, object> GetModuleAccessInternal(List<string> lstMODULES)
 		{
 			string sCacheKey = "ACL_ACCESS.ReactClient." + _security.USER_ID.ToString();
@@ -862,10 +865,19 @@ namespace SplendidCRM.Web.Controllers
 					con.Open();
 					using IDbCommand cmd = con.CreateCommand();
 					cmd.CommandText =
-						"select MODULE_NAME, ACLTYPE, ACLACCESS " + ControlChars.CrLf
-					  + "  from vwACL_ACCESS_ByModule             " + ControlChars.CrLf
-					  + " where USER_ID = @USER_ID               " + ControlChars.CrLf
-					  + " order by MODULE_NAME                   " + ControlChars.CrLf;
+						"select MODULE_NAME       " + ControlChars.CrLf
+					  + "     , ACLACCESS_ADMIN   " + ControlChars.CrLf
+					  + "     , ACLACCESS_ACCESS  " + ControlChars.CrLf
+					  + "     , ACLACCESS_VIEW    " + ControlChars.CrLf
+					  + "     , ACLACCESS_LIST    " + ControlChars.CrLf
+					  + "     , ACLACCESS_EDIT    " + ControlChars.CrLf
+					  + "     , ACLACCESS_DELETE  " + ControlChars.CrLf
+					  + "     , ACLACCESS_IMPORT  " + ControlChars.CrLf
+					  + "     , ACLACCESS_EXPORT  " + ControlChars.CrLf
+					  + "     , ACLACCESS_ARCHIVE " + ControlChars.CrLf
+					  + "  from vwACL_ACCESS_ByModule_USERS" + ControlChars.CrLf
+					  + " where USER_ID = @USER_ID" + ControlChars.CrLf
+					  + " order by MODULE_NAME    " + ControlChars.CrLf;
 					Sql.AddParameter(cmd, "@USER_ID", _security.USER_ID);
 					using var da = _dbProviderFactories.CreateDataAdapter();
 					((IDbDataAdapter)da).SelectCommand = cmd;
@@ -874,11 +886,19 @@ namespace SplendidCRM.Web.Controllers
 					foreach (DataRow row in dt.Rows)
 					{
 						string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
-						string sACLTYPE     = Sql.ToString(row["ACLTYPE"    ]);
-						int    nACLACCESS   = Sql.ToInteger(row["ACLACCESS" ]);
-						if (!objs.ContainsKey(sMODULE_NAME))
-							objs[sMODULE_NAME] = new Dictionary<string, int>();
-						((Dictionary<string, int>)objs[sMODULE_NAME])[sACLTYPE] = nACLACCESS;
+						if ( lstMODULES != null && !lstMODULES.Contains(sMODULE_NAME) )
+							continue;
+						Dictionary<string, int> dictAccess = new Dictionary<string, int>();
+						dictAccess["admin"  ] = Sql.ToInteger(row["ACLACCESS_ADMIN"  ]);
+						dictAccess["access" ] = Sql.ToInteger(row["ACLACCESS_ACCESS" ]);
+						dictAccess["view"   ] = Sql.ToInteger(row["ACLACCESS_VIEW"   ]);
+						dictAccess["list"   ] = Sql.ToInteger(row["ACLACCESS_LIST"   ]);
+						dictAccess["edit"   ] = Sql.ToInteger(row["ACLACCESS_EDIT"   ]);
+						dictAccess["delete" ] = Sql.ToInteger(row["ACLACCESS_DELETE" ]);
+						dictAccess["import" ] = Sql.ToInteger(row["ACLACCESS_IMPORT" ]);
+						dictAccess["export" ] = Sql.ToInteger(row["ACLACCESS_EXPORT" ]);
+						dictAccess["archive"] = Sql.ToInteger(row["ACLACCESS_ARCHIVE"]);
+						objs[sMODULE_NAME] = dictAccess;
 					}
 					_memoryCache.Set(sCacheKey, objs, _splendidCache.DefaultCacheExpiration());
 				}
@@ -1045,10 +1065,10 @@ namespace SplendidCRM.Web.Controllers
 					con.Open();
 					using IDbCommand cmd = con.CreateCommand();
 					cmd.CommandText =
-						"select USER_ID, USER_NAME, FULL_NAME, STATUS " + ControlChars.CrLf
-					  + "  from vwUSERS_List                           " + ControlChars.CrLf
-					  + " where STATUS = 'Active'                      " + ControlChars.CrLf
-					  + " order by FULL_NAME                           " + ControlChars.CrLf;
+						"select ID, USER_NAME, FULL_NAME, STATUS " + ControlChars.CrLf
+					  + "  from vwUSERS_List                     " + ControlChars.CrLf
+					  + " where STATUS = 'Active'                " + ControlChars.CrLf
+					  + " order by FULL_NAME                     " + ControlChars.CrLf;
 					using var da = _dbProviderFactories.CreateDataAdapter();
 					((IDbDataAdapter)da).SelectCommand = cmd;
 					using var dt = new DataTable();
@@ -1085,9 +1105,9 @@ namespace SplendidCRM.Web.Controllers
 					con.Open();
 					using IDbCommand cmd = con.CreateCommand();
 					cmd.CommandText =
-						"select TEAM_ID, NAME, DESCRIPTION " + ControlChars.CrLf
-					  + "  from vwTEAMS_List                " + ControlChars.CrLf
-					  + " order by NAME                     " + ControlChars.CrLf;
+						"select ID, NAME, DESCRIPTION " + ControlChars.CrLf
+					  + "  from vwTEAMS               " + ControlChars.CrLf
+					  + " order by NAME                " + ControlChars.CrLf;
 					using var da = _dbProviderFactories.CreateDataAdapter();
 					((IDbDataAdapter)da).SelectCommand = cmd;
 					using var dt = new DataTable();
@@ -1521,6 +1541,257 @@ namespace SplendidCRM.Web.Controllers
 			}
 			return lst;
 		}
+
+		// =====================================================================
+		// #region GetReactState Missing Helpers — Added per Req #8c
+		// =====================================================================
+
+		/// <summary>Returns all module metadata (TableName, DisplayName, Valid, etc.) for accessible modules.</summary>
+		private Dictionary<string, object> GetAllModulesInternal(List<string> lstMODULES)
+		{
+			var dict = new Dictionary<string, object>();
+			try
+			{
+				DataTable dtModules = _splendidCache.GetAllModules();
+				if ( dtModules != null )
+				{
+					foreach ( DataRow row in dtModules.Rows )
+					{
+						string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
+						if ( lstMODULES.Contains(sMODULE_NAME) || _security.IS_ADMIN )
+						{
+							var mod = new Dictionary<string, object>();
+							for ( int j = 0; j < dtModules.Columns.Count; j++ )
+								mod[dtModules.Columns[j].ColumnName] = row[j] == DBNull.Value ? null : row[j];
+							dict[sMODULE_NAME] = mod;
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return dict;
+		}
+
+		/// <summary>Returns per-user per-module ACL access (ACLACCESS_VIEW, ACLACCESS_LIST, etc.).</summary>
+		private Dictionary<string, object> GetUserAccessInternal(List<string> lstMODULES)
+		{
+			var dict = new Dictionary<string, object>();
+			try
+			{
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					string sSQL = "select MODULE_NAME                    " + ControlChars.CrLf
+					            + "     , ACLACCESS_ADMIN                " + ControlChars.CrLf
+					            + "     , ACLACCESS_ACCESS               " + ControlChars.CrLf
+					            + "     , ACLACCESS_VIEW                 " + ControlChars.CrLf
+					            + "     , ACLACCESS_LIST                 " + ControlChars.CrLf
+					            + "     , ACLACCESS_EDIT                 " + ControlChars.CrLf
+					            + "     , ACLACCESS_DELETE               " + ControlChars.CrLf
+					            + "     , ACLACCESS_IMPORT               " + ControlChars.CrLf
+					            + "     , ACLACCESS_EXPORT               " + ControlChars.CrLf
+					            + "     , ACLACCESS_ARCHIVE              " + ControlChars.CrLf
+					            + "     , IS_ADMIN                       " + ControlChars.CrLf
+					            + "  from vwACL_ACCESS_ByModule_USERS    " + ControlChars.CrLf
+					            + " where USER_ID = @USER_ID             " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@USER_ID", _security.USER_ID);
+						using ( IDataReader rdr = cmd.ExecuteReader() )
+						{
+							while ( rdr.Read() )
+							{
+								string sMOD = Sql.ToString(rdr["MODULE_NAME"]);
+								if ( lstMODULES.Contains(sMOD) || _security.IS_ADMIN )
+								{
+									var access = new Dictionary<string, object>();
+									string[] aclTypes = new string[] { "admin", "access", "view", "list", "edit", "delete", "import", "export", "archive" };
+									foreach ( string sType in aclTypes )
+									{
+										int nAccess = Sql.ToInteger(rdr["ACLACCESS_" + sType.ToUpper()]);
+										access[sType] = nAccess;
+									}
+									access["is_admin"] = Sql.ToBoolean(rdr["IS_ADMIN"]);
+									dict[sMOD] = access;
+								}
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return dict;
+		}
+
+		/// <summary>Returns per-user per-module per-field security settings.</summary>
+		private Dictionary<string, object> GetUserFieldSecurityInternal(List<string> lstMODULES)
+		{
+			var dict = new Dictionary<string, object>();
+			try
+			{
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					string sSQL = "select MODULE_NAME, FIELD_NAME, ACLACCESS " + ControlChars.CrLf
+					            + "  from vwACL_FIELD_ACCESS_ByUserAlias      " + ControlChars.CrLf
+					            + " where USER_ID = @USER_ID                  " + ControlChars.CrLf
+					            + " order by MODULE_NAME, FIELD_NAME          " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@USER_ID", _security.USER_ID);
+						using ( IDataReader rdr = cmd.ExecuteReader() )
+						{
+							while ( rdr.Read() )
+							{
+								string sMOD   = Sql.ToString (rdr["MODULE_NAME"]);
+								string sFIELD = Sql.ToString (rdr["FIELD_NAME" ]);
+								int    nACCESS= Sql.ToInteger(rdr["ACLACCESS"  ]);
+								if ( lstMODULES.Contains(sMOD) || _security.IS_ADMIN )
+								{
+									if ( !dict.ContainsKey(sMOD) )
+										dict[sMOD] = new Dictionary<string, object>();
+									((Dictionary<string, object>)dict[sMOD])[sFIELD] = nACCESS;
+								}
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return dict;
+		}
+
+		/// <summary>Returns all module relationships for SubPanelsView.</summary>
+		private Dictionary<string, object> GetAllRelationshipsInternal()
+		{
+			var dict = new Dictionary<string, object>();
+			try
+			{
+				DataTable dt = _splendidCache.GetAllRelationships();
+				if ( dt != null )
+				{
+					var rows = new List<object>();
+					foreach ( DataRow row in dt.Rows )
+					{
+						var drow = new Dictionary<string, object>();
+						for ( int j = 0; j < dt.Columns.Count; j++ )
+							drow[dt.Columns[j].ColumnName] = row[j] == DBNull.Value ? null : row[j];
+						rows.Add(drow);
+					}
+					dict["results"] = rows;
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return dict;
+		}
+
+		/// <summary>Returns all timezones for user profile selection.</summary>
+		private List<object> GetAllTimezonesInternal()
+		{
+			var lst = new List<object>();
+			try
+			{
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = "select * from vwTIMEZONES order by BIAS desc, NAME";
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
+							{
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									var d = new Dictionary<string, object>();
+									for ( int j = 0; j < dt.Columns.Count; j++ )
+										d[dt.Columns[j].ColumnName] = row[j] == DBNull.Value ? null : row[j];
+									lst.Add(d);
+								}
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return lst;
+		}
+
+		/// <summary>Returns all active currencies.</summary>
+		private List<object> GetAllCurrenciesInternal()
+		{
+			var lst = new List<object>();
+			try
+			{
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = "select * from vwCURRENCIES where STATUS = 'Active' order by NAME";
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
+							{
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									var d = new Dictionary<string, object>();
+									for ( int j = 0; j < dt.Columns.Count; j++ )
+										d[dt.Columns[j].ColumnName] = row[j] == DBNull.Value ? null : row[j];
+									lst.Add(d);
+								}
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return lst;
+		}
+
+		/// <summary>Returns all active languages.</summary>
+		private List<object> GetAllLanguagesInternal()
+		{
+			var lst = new List<object>();
+			try
+			{
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = "select * from vwLANGUAGES where ACTIVE = 1 order by NAME";
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
+							{
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									var d = new Dictionary<string, object>();
+									for ( int j = 0; j < dt.Columns.Count; j++ )
+										d[dt.Columns[j].ColumnName] = row[j] == DBNull.Value ? null : row[j];
+									lst.Add(d);
+								}
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex ) { SplendidError.SystemError(new StackFrame(1, true), ex); }
+			return lst;
+		}
+
+		// =====================================================================
+		// #endregion GetReactState Missing Helpers
+		// =====================================================================
 
 		/// <summary>
 		/// DuoUniversal redirect URL generator (private helper).
@@ -1979,7 +2250,8 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Rest.svc/Logout — Terminates user session.</summary>
+		/// <summary>POST Rest.svc/Logout — Terminates user session.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 630-632.</summary>
 		[HttpPost("Logout")]
 		public IActionResult Logout()
 		{
@@ -1987,16 +2259,17 @@ namespace SplendidCRM.Web.Controllers
 			{
 				if (_security.IsAuthenticated())
 				{
-					Guid gUSER_ID  = _security.USER_ID;
-					string sASPNET_SESSIONID = HttpContext.Session?.Id ?? String.Empty;
+					Guid gUSER_LOGIN_ID = _security.USER_LOGIN_ID;
 					try
 					{
-						using IDbConnection con = _dbProviderFactories.CreateConnection();
-						con.Open();
-						using IDbCommand cmd = SqlProcs.Factory(con, "spUSERS_LOGINS_Logout");
-						Sql.AddParameter(cmd, "@USER_ID"         , gUSER_ID         );
-						Sql.AddParameter(cmd, "@ASPNET_SESSIONID", sASPNET_SESSIONID);
-						cmd.ExecuteNonQuery();
+						if ( !Sql.IsEmptyGuid(gUSER_LOGIN_ID) )
+						{
+							using IDbConnection con = _dbProviderFactories.CreateConnection();
+							con.Open();
+							using IDbCommand cmd = SqlProcs.Factory(con, "spUSERS_LOGINS_Logout");
+							Sql.AddParameter(cmd, "@ID", gUSER_LOGIN_ID);
+							cmd.ExecuteNonQuery();
+						}
 					}
 					catch (Exception ex)
 					{
@@ -2244,9 +2517,11 @@ namespace SplendidCRM.Web.Controllers
 				// Custom React views
 				result["REACT_CUSTOM_VIEWS"] = GetAllReactCustomViewsInternal(lstMODULES);
 
-				// ACL access
+				// ACL access — module-level, user-level, field-level, roles
 				result["MODULE_ACL_ACCESS"] = GetModuleAccessInternal(lstMODULES);
-				result["USER_ACL_ROLES"    ] = GetUserACLRolesInternal();
+				result["ACL_ACCESS"       ] = GetUserAccessInternal(lstMODULES);
+				result["ACL_FIELD_ACCESS" ] = GetUserFieldSecurityInternal(lstMODULES);
+				result["ACL_ROLES"        ] = GetUserACLRolesInternal();
 
 				// User team tree
 				result["TEAM_TREE"] = _splendidCache.GetUserTeamTree();
@@ -2254,19 +2529,33 @@ namespace SplendidCRM.Web.Controllers
 				// Config
 				result["CONFIG"] = _splendidCache.GetAllConfig();
 
-				// Tab menus
-				result["TAB_MENUS"] = GetAllTabMenusInternal();
+				// Module metadata — TableName, DisplayName, Valid, etc.
+				result["MODULES"] = GetAllModulesInternal(lstMODULES);
 
-				// Users and Teams (for assignment fields)
-				if (_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE)
-				{
-					result["USERS"] = GetAllUsersInternal();
-					result["TEAMS"] = GetAllTeamsInternal();
-				}
+				// Search/Module columns
+				result["MODULE_COLUMNS"] = GetAllSearchColumnsInternal(lstMODULES);
+
+				// Tab menus (key: TAB_MENU to match legacy)
+				result["TAB_MENU"] = GetAllTabMenusInternal();
+
+				// GridViews (sort defaults — separate from GRIDVIEWS_COLUMNS)
+				result["GRIDVIEWS"] = GetAllGridViewsInternal(lstMODULES);
+
+				// Users and Teams — NOT admin-only; needed for assignment dropdowns for all users
+				result["USERS"] = GetAllUsersInternal();
+				result["TEAMS"] = GetAllTeamsInternal();
+
+				// Relationships — needed by SubPanelsView
+				result["RELATIONSHIPS"] = GetAllRelationshipsInternal();
+
+				// Timezones, currencies, languages — needed by user profile
+				result["TIMEZONES" ] = GetAllTimezonesInternal();
+				result["CURRENCIES"] = GetAllCurrenciesInternal();
+				result["LANGUAGES" ] = GetAllLanguagesInternal();
 
 				// Tax rates and discounts (for AOS modules)
 				result["TAX_RATES"] = GetTaxRatesInternal();
-				result["DISCOUNTS" ] = GetDiscountsInternal();
+				result["DISCOUNTS"] = GetDiscountsInternal();
 
 				// Favorites, last viewed, saved search
 				result["FAVORITES"   ] = GetAllFavoritesInternal();
@@ -2278,13 +2567,13 @@ namespace SplendidCRM.Web.Controllers
 				result["DASHBOARDS_PANELS"] = GetAllDashboardPanelsInternal();
 
 				// Signatures and outbound email/SMS
-				result["USER_SIGNATURES"] = GetUserSignaturesInternal();
+				result["SIGNATURES"     ] = GetUserSignaturesInternal();
 				result["OUTBOUND_EMAILS"] = GetOutboundMailInternal();
 				result["OUTBOUND_SMS"   ] = GetOutboundSmsInternal();
 
-				// Session timeout
+				// Session timeout (minutes, matching legacy Session.Timeout)
 				int nSessionStateTimeout = Sql.ToInteger(_configuration["SessionStateTimeout"] ?? "20");
-				result["SessionStateTimeout"] = nSessionStateTimeout * 60; // seconds
+				result["SessionStateTimeout"] = nSessionStateTimeout;
 
 				return JsonContent(new { d = result });
 			}
@@ -2301,35 +2590,80 @@ namespace SplendidCRM.Web.Controllers
 
 		/// <summary>
 		/// GET Rest.svc/PhoneSearch — Phone number search across all modules.
-		/// Queries vwPHONE_NUMBERS with normalized phone for CTI popup.
+		/// Iterates all modules from DetailViewRelationships("Home.PhoneSearch"),
+		/// queries vwPHONE_NUMBERS_{TABLE_NAME} per module with per-module ACL.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 1321-1410.
 		/// </summary>
 		[HttpGet("PhoneSearch")]
-		public IActionResult PhoneSearch(string Phone)
+		public IActionResult PhoneSearch(string PhoneNumber)
 		{
 			try
 			{
 				if (!_security.IsAuthenticated())
 					return Unauthorized();
+
+				PhoneNumber = Utils.NormalizePhone(PhoneNumber);
+
+				StringBuilder sbDumpSQL = new StringBuilder();
+				DataTable dtPhones = new DataTable();
+				dtPhones.Columns.Add("ID"         , Type.GetType("System.Guid"  ));
+				dtPhones.Columns.Add("NAME"       , Type.GetType("System.String"));
+				dtPhones.Columns.Add("MODULE_NAME", Type.GetType("System.String"));
+				if ( !Sql.IsEmptyString(PhoneNumber) )
+				{
+					DataTable dtFields = _splendidCache.DetailViewRelationships("Home.PhoneSearch");
+					using IDbConnection con = _dbProviderFactories.CreateConnection();
+					con.Open();
+					using IDbCommand cmd = con.CreateCommand();
+					foreach ( DataRow rowModule in dtFields.Rows )
+					{
+						string sMODULE_NAME = Sql.ToString(rowModule["MODULE_NAME"]);
+						int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "list");
+						if ( sMODULE_NAME != "Calls" && nACLACCESS >= 0 )
+						{
+							string sTABLE_NAME = _splendidCache.ModuleTableName(sMODULE_NAME);
+							string sSQL = String.Empty;
+							sSQL = "select ID              " + ControlChars.CrLf
+							     + "     , NAME            " + ControlChars.CrLf
+							     + "  from vwPHONE_NUMBERS_" + sTABLE_NAME + ControlChars.CrLf;
+							cmd.CommandText = sSQL;
+							cmd.Parameters.Clear();
+							_security.Filter(cmd, sMODULE_NAME, "list");
+							SearchBuilder sb = new SearchBuilder(PhoneNumber, cmd);
+							cmd.CommandText += sb.BuildQuery("   and ", "NORMALIZED_NUMBER");
+							cmd.CommandText += "order by NAME";
+
+							string sDumbSQL = Sql.ExpandParameters(cmd);
+							sbDumpSQL.Append(sDumbSQL);
+							using ( var da = _dbProviderFactories.CreateDataAdapter() )
+							{
+								((IDbDataAdapter)da).SelectCommand = cmd;
+								using ( DataTable dt = new DataTable() )
+								{
+									da.Fill(dt);
+									foreach ( DataRow row in dt.Rows )
+									{
+										DataRow rowPhone = dtPhones.NewRow();
+										rowPhone["ID"         ] = row["ID"  ];
+										rowPhone["NAME"       ] = row["NAME"];
+										rowPhone["MODULE_NAME"] = sMODULE_NAME;
+										dtPhones.Rows.Add(rowPhone);
+									}
+								}
+							}
+						}
+					}
+				}
+
 				string sBaseURI = GetBaseURI("/PhoneSearch");
 				SplendidCRM.TimeZone T10n = GetUserTimezone();
-				string sCulture = GetUserCulture();
-
-				string sNORMALIZED_PHONE = Utils.NormalizePhone(Phone);
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbCommand cmd = con.CreateCommand();
-				cmd.CommandText =
-					"select *                          " + ControlChars.CrLf
-				  + "  from vwPHONE_NUMBERS             " + ControlChars.CrLf
-				  + " where NORMALIZED_PHONE = @NORMALIZED_PHONE" + ControlChars.CrLf;
-				Sql.AddParameter(cmd, "@NORMALIZED_PHONE", sNORMALIZED_PHONE);
-				_security.Filter(cmd, "Contacts", "view");
-				using var da = _dbProviderFactories.CreateDataAdapter();
-				((IDbDataAdapter)da).SelectCommand = cmd;
-				using var dt = new DataTable();
-				da.Fill(dt);
-				var results = _restUtil.RowsToDictionary(sBaseURI, "Contacts", dt, T10n);
-				return JsonContent(new { d = new { results } });
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, "Leads", dtPhones, T10n);
+				dictResponse.Add("__total", dtPhones.Rows.Count);
+				if ( Sql.ToBoolean(_memoryCache.Get("CONFIG.show_sql")) )
+				{
+					dictResponse.Add("__sql", sbDumpSQL.ToString());
+				}
+				return JsonContent(new { d = dictResponse });
 			}
 			catch (Exception ex)
 			{
@@ -2477,8 +2811,8 @@ namespace SplendidCRM.Web.Controllers
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
 				int nACLACCESS = _security.GetUserAccess(ModuleName, "view");
-				if (nACLACCESS < 0)
-					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+				if ( !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + ModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
 				Guid gID = Sql.ToGuid(ID);
 				string sBaseURI  = GetBaseURI("/GetModuleItem");
@@ -2502,6 +2836,31 @@ namespace SplendidCRM.Web.Controllers
 				if (dt.Rows.Count == 0)
 					return NotFound(new { error = ModuleName + " record not found: " + ID });
 				var d = _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n);
+				// 04/28/2019 Paul.  Add tracker for React client.
+				if ( dt.Columns.Contains("NAME") )
+				{
+					string sName = Sql.ToString(dt.Rows[0]["NAME"]);
+					try
+					{
+						string sAccessMode = Sql.ToString(Request.Query["$accessMode"].FirstOrDefault());
+						// 11/25/2020 Paul.  Correct the action.
+						string sAction = (sAccessMode == "edit") ? "save" : "detailview";
+						using ( IDbCommand cmdTracker = SqlProcs.Factory(con, "spTRACKER_Update") )
+						{
+							Sql.SetParameter(cmdTracker, "@USER_ID"     , _security.USER_ID);
+							Sql.SetParameter(cmdTracker, "@MODULE_NAME" , ModuleName        );
+							Sql.SetParameter(cmdTracker, "@ITEM_ID"     , gID               );
+							Sql.SetParameter(cmdTracker, "@ITEM_SUMMARY", sName             );
+							Sql.SetParameter(cmdTracker, "@ACTION"      , sAction           );
+							cmdTracker.ExecuteNonQuery();
+						}
+					}
+					catch(Exception ex2)
+					{
+						// 04/28/2019 Paul.  There is no compelling reason to send this error to the user.
+						SplendidError.SystemError(new StackFrame(1, true), ex2);
+					}
+				}
 				return JsonContent(new { d });
 			}
 			catch (Exception ex)
@@ -2623,8 +2982,6 @@ namespace SplendidCRM.Web.Controllers
 		{
 			try
 			{
-				if (!_security.IsAuthenticated())
-					return Unauthorized();
 				string sModuleName = String.Empty;
 				if (dict != null && dict.ContainsKey("ModuleName"))
 					sModuleName = Sql.ToString(dict["ModuleName"]);
@@ -2633,12 +2990,57 @@ namespace SplendidCRM.Web.Controllers
 
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
+				// 08/22/2011 Paul.  Add admin control to REST API.
 				int nACLACCESS = _security.GetUserAccess(sModuleName, "edit");
-				if (nACLACCESS < 0)
-					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName);
 
 				string sTableName = Crm.Modules.TableName(_memoryCache, sModuleName);
+				if ( Sql.IsEmptyString(sTableName) )
+					return BadRequest(new { error = "Unknown module: " + sModuleName });
+
+				// 04/01/2020 Paul.  Move UpdateTable to RestUtil.
 				Guid gID = _restUtil.UpdateTable(HttpContext, sTableName, dict);
+				// 04/28/2019 Paul.  Add tracker for React client.
+				if ( dict.ContainsKey("NAME") || dict.ContainsKey("DOCUMENT_NAME") || dict.ContainsKey("FIRST_NAME") )
+				{
+					string sName = String.Empty;
+					if ( dict.ContainsKey("NAME") )
+						sName = Sql.ToString(dict["NAME"]);
+					else if ( dict.ContainsKey("DOCUMENT_NAME") )
+						sName = Sql.ToString(dict["DOCUMENT_NAME"]);
+					else
+					{
+						if ( dict.ContainsKey("FIRST_NAME") )
+							sName = Sql.ToString(dict["FIRST_NAME"]);
+						if ( dict.ContainsKey("LAST_NAME") )
+							sName = (sName + " " + Sql.ToString(dict["LAST_NAME"])).Trim();
+					}
+					try
+					{
+						if ( !Sql.IsEmptyString(sName) )
+						{
+							using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+							{
+								con.Open();
+								using ( IDbCommand cmdTracker = SqlProcs.Factory(con, "spTRACKER_Update") )
+								{
+									Sql.SetParameter(cmdTracker, "@USER_ID"     , _security.USER_ID);
+									Sql.SetParameter(cmdTracker, "@MODULE_NAME" , sModuleName       );
+									Sql.SetParameter(cmdTracker, "@ITEM_ID"     , gID               );
+									Sql.SetParameter(cmdTracker, "@ITEM_SUMMARY", sName             );
+									Sql.SetParameter(cmdTracker, "@ACTION"      , "save"            );
+									cmdTracker.ExecuteNonQuery();
+								}
+							}
+						}
+					}
+					catch(Exception ex2)
+					{
+						// 04/28/2019 Paul.  There is no compelling reason to send this error to the user.
+						SplendidError.SystemError(new StackFrame(1, true), ex2);
+					}
+				}
 				return JsonContent(new { d = gID });
 			}
 			catch (Exception ex)
@@ -2678,8 +3080,8 @@ namespace SplendidCRM.Web.Controllers
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
 				int nACLACCESS = _security.GetUserAccess(sModuleName, "edit");
-				if (nACLACCESS < 0)
-					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+				if ( !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
 				System.Collections.Stack stkIDs = _utils.FilterByACL_Stack(sModuleName, "edit", arrIDs, Crm.Modules.TableName(_memoryCache, sModuleName));
 				string sTableName = Crm.Modules.TableName(_memoryCache, sModuleName);
@@ -2865,8 +3267,8 @@ namespace SplendidCRM.Web.Controllers
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
 				int nACLACCESS = _security.GetUserAccess(sModuleName, "delete");
-				if (nACLACCESS < 0)
-					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+				if ( !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
 				Guid gID = Sql.ToGuid(sID);
 				string sTableName = Crm.Modules.TableName(_memoryCache, sModuleName);
@@ -2913,8 +3315,8 @@ namespace SplendidCRM.Web.Controllers
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
 				int nACLACCESS = _security.GetUserAccess(sModuleName, "delete");
-				if (nACLACCESS < 0)
-					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+				if ( !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
 				string sTableName = Crm.Modules.TableName(_memoryCache, sModuleName);
 				System.Collections.Stack stkIDs = _utils.FilterByACL_Stack(sModuleName, "delete", arrIDs, sTableName);
@@ -3618,49 +4020,355 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>GET Rest.svc/GetInviteesList — Returns invitees matching search criteria.</summary>
+		/// <summary>GET Rest.svc/GetInviteesList — Returns invitees matching search criteria.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 3889-4120 — UNION ALL of Users, Contacts, Leads
+		/// with per-invitee activity fetch from vwACTIVITIES_List.</summary>
 		[HttpGet("GetInviteesList")]
 		public IActionResult GetInviteesList(string FIRST_NAME, string LAST_NAME, string EMAIL, string DATE_START, string DATE_END)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
 				SplendidCRM.TimeZone T10n = GetUserTimezone();
-				string sBaseURI = GetBaseURI("/GetInviteesList");
-				string sFILTER = "1 = 1";
-				if (!Sql.IsEmptyString(FIRST_NAME)) sFILTER += " and FIRST_NAME like '%" + Sql.EscapeSQL(FIRST_NAME) + "%'";
-				if (!Sql.IsEmptyString(LAST_NAME )) sFILTER += " and LAST_NAME like '%"  + Sql.EscapeSQL(LAST_NAME ) + "%'";
-				if (!Sql.IsEmptyString(EMAIL     )) sFILTER += " and EMAIL1 like '%"     + Sql.EscapeSQL(EMAIL     ) + "%'";
-				long nTotalCount = 0;
+				if ( !_security.IsAuthenticated() )
+					return Unauthorized();
+				int nCONTACTS_ACLACCESS = _security.GetUserAccess("Contacts", "list");
+				int nLEADS_ACLACCESS    = _security.GetUserAccess("Leads"   , "list");
+				if ( !(Sql.ToBoolean(_memoryCache.Get<object>("Modules.Contacts.RestEnabled")) || Sql.ToBoolean(_memoryCache.Get<object>("Modules.Leads.RestEnabled"))) || (nCONTACTS_ACLACCESS < 0 && nLEADS_ACLACCESS < 0) )
+					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": Contacts and Leads");
+
+				DateTime dtDATE_START = RestUtil.FromJsonDate(DATE_START);
+				DateTime dtDATE_END   = RestUtil.FromJsonDate(DATE_END  );
+				string   sFIRST_NAME = Sql.ToString(FIRST_NAME);
+				string   sLAST_NAME  = Sql.ToString(LAST_NAME );
+				string   sEMAIL      = Sql.ToString(EMAIL     );
+				int      nSKIP       = Sql.ToInteger(Request.Query["$skip"   ].FirstOrDefault());
+				int      nTOP        = Sql.ToInteger(Request.Query["$top"    ].FirstOrDefault());
+				string   sORDER_BY   = Sql.ToString (Request.Query["$orderby"].FirstOrDefault());
+
 				StringBuilder sbDumpSQL = new StringBuilder();
-				DataTable dt = _restUtil.GetTable(HttpContext, "USERS", 0, 20, "LAST_NAME asc", sFILTER, String.Empty, null, null, ref nTotalCount, null, AccessMode.list, false, null, sbDumpSQL);
-				var rows = _restUtil.RowsToDictionary(sBaseURI, "Users", dt, T10n);
-				return JsonContent(new { d = new { results = rows, __total = nTotalCount } });
+				DataTable dt = new DataTable();
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						bool bTeamFilter = Crm.Config.enable_team_management();
+						if ( bTeamFilter )
+						{
+							cmd.CommandText += "select ID          as ID                   " + ControlChars.CrLf;
+							cmd.CommandText += "     , N'Users'    as INVITEE_TYPE         " + ControlChars.CrLf;
+							cmd.CommandText += "     , FULL_NAME   as NAME                 " + ControlChars.CrLf;
+							cmd.CommandText += "     , FIRST_NAME  as FIRST_NAME           " + ControlChars.CrLf;
+							cmd.CommandText += "     , LAST_NAME   as LAST_NAME            " + ControlChars.CrLf;
+							cmd.CommandText += "     , EMAIL1      as EMAIL                " + ControlChars.CrLf;
+							cmd.CommandText += "     , PHONE_WORK  as PHONE                " + ControlChars.CrLf;
+							cmd.CommandText += "     , null        as ASSIGNED_USER_ID     " + ControlChars.CrLf;
+							cmd.CommandText += "  from vwTEAMS_ASSIGNED_TO_List            " + ControlChars.CrLf;
+							cmd.CommandText += " where MEMBERSHIP_USER_ID = @MEMBERSHIP_USER_ID" + ControlChars.CrLf;
+							Sql.AddParameter(cmd, "@MEMBERSHIP_USER_ID", _security.USER_ID);
+						}
+						else
+						{
+							cmd.CommandText += "select ID          as ID                   " + ControlChars.CrLf;
+							cmd.CommandText += "     , N'Users'    as INVITEE_TYPE         " + ControlChars.CrLf;
+							cmd.CommandText += "     , FULL_NAME   as NAME                 " + ControlChars.CrLf;
+							cmd.CommandText += "     , FIRST_NAME  as FIRST_NAME           " + ControlChars.CrLf;
+							cmd.CommandText += "     , LAST_NAME   as LAST_NAME            " + ControlChars.CrLf;
+							cmd.CommandText += "     , EMAIL1      as EMAIL                " + ControlChars.CrLf;
+							cmd.CommandText += "     , PHONE_WORK  as PHONE                " + ControlChars.CrLf;
+							cmd.CommandText += "     , null        as ASSIGNED_USER_ID     " + ControlChars.CrLf;
+							cmd.CommandText += "  from vwUSERS_ASSIGNED_TO_List            " + ControlChars.CrLf;
+							cmd.CommandText += " where 1 = 1                               " + ControlChars.CrLf;
+						}
+						{
+							StringBuilder sbUsers = new StringBuilder();
+							Sql.AppendParameter(cmd, sbUsers, "FIRST_NAME", sFIRST_NAME, Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbUsers, "LAST_NAME" , sLAST_NAME , Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbUsers, "EMAIL1"    , sEMAIL     , Sql.SqlFilterMode.StartsWith);
+							cmd.CommandText += sbUsers.ToString();
+						}
+
+						cmd.CommandText += "union all                                  " + ControlChars.CrLf;
+						cmd.CommandText += "select ID               as ID              " + ControlChars.CrLf;
+						cmd.CommandText += "     , N'Contacts'      as INVITEE_TYPE    " + ControlChars.CrLf;
+						cmd.CommandText += "     , NAME             as NAME            " + ControlChars.CrLf;
+						cmd.CommandText += "     , FIRST_NAME       as FIRST_NAME      " + ControlChars.CrLf;
+						cmd.CommandText += "     , LAST_NAME        as LAST_NAME       " + ControlChars.CrLf;
+						cmd.CommandText += "     , EMAIL1           as EMAIL           " + ControlChars.CrLf;
+						cmd.CommandText += "     , PHONE_WORK       as PHONE           " + ControlChars.CrLf;
+						cmd.CommandText += "     , ASSIGNED_USER_ID as ASSIGNED_USER_ID" + ControlChars.CrLf;
+						cmd.CommandText += "  from vwCONTACTS                          " + ControlChars.CrLf;
+						_security.Filter(cmd, "Contacts", "list");
+						cmd.CommandText += "   and EMAIL1 is not null                  " + ControlChars.CrLf;
+						{
+							StringBuilder sbContacts = new StringBuilder();
+							Sql.AppendParameter(cmd, sbContacts, "FIRST_NAME", sFIRST_NAME, Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbContacts, "LAST_NAME" , sLAST_NAME , Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbContacts, "EMAIL1"    , sEMAIL     , Sql.SqlFilterMode.StartsWith);
+							cmd.CommandText += sbContacts.ToString();
+						}
+
+						cmd.CommandText += "union all                                  " + ControlChars.CrLf;
+						cmd.CommandText += "select ID               as ID              " + ControlChars.CrLf;
+						cmd.CommandText += "     , N'Leads'         as INVITEE_TYPE    " + ControlChars.CrLf;
+						cmd.CommandText += "     , NAME             as NAME            " + ControlChars.CrLf;
+						cmd.CommandText += "     , FIRST_NAME       as FIRST_NAME      " + ControlChars.CrLf;
+						cmd.CommandText += "     , LAST_NAME        as LAST_NAME       " + ControlChars.CrLf;
+						cmd.CommandText += "     , EMAIL1           as EMAIL           " + ControlChars.CrLf;
+						cmd.CommandText += "     , PHONE_WORK       as PHONE           " + ControlChars.CrLf;
+						cmd.CommandText += "     , ASSIGNED_USER_ID as ASSIGNED_USER_ID" + ControlChars.CrLf;
+						cmd.CommandText += "  from vwLEADS                             " + ControlChars.CrLf;
+						_security.Filter(cmd, "Leads", "list");
+						cmd.CommandText += "   and EMAIL1 is not null                  " + ControlChars.CrLf;
+						{
+							StringBuilder sbLeads = new StringBuilder();
+							Sql.AppendParameter(cmd, sbLeads, "FIRST_NAME", sFIRST_NAME, Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbLeads, "LAST_NAME" , sLAST_NAME , Sql.SqlFilterMode.StartsWith);
+							Sql.AppendParameter(cmd, sbLeads, "EMAIL1"    , sEMAIL     , Sql.SqlFilterMode.StartsWith);
+							cmd.CommandText += sbLeads.ToString();
+						}
+
+						if ( Sql.IsEmptyString(sORDER_BY?.Trim()) )
+						{
+							cmd.CommandText += " order by INVITEE_TYPE desc, LAST_NAME asc, FIRST_NAME asc" + ControlChars.CrLf;
+						}
+						else
+						{
+							Regex r = new Regex(@"[^A-Za-z0-9_, ]");
+							cmd.CommandText += " order by " + r.Replace(sORDER_BY, "") + ControlChars.CrLf;
+						}
+						sbDumpSQL.Append(Sql.ExpandParameters(cmd));
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							da.Fill(dt);
+						}
+					}
+
+					// Build response with Activities sub-list per invitee
+					long lCount      = 0;
+					long lTotalCount = dt.Rows.Count;
+					List<Guid> arrINVITEE_LIST = new List<Guid>();
+
+					List<Dictionary<string, object>> objs = new List<Dictionary<string, object>>();
+					for ( int j = nSKIP; j < dt.Rows.Count && (nTOP <= 0 || lCount < nTOP); j++, lCount++ )
+					{
+						DataRow dr = dt.Rows[j];
+						if ( Sql.ToString(dr["INVITEE_TYPE"]) == "Users" )
+							arrINVITEE_LIST.Add(Sql.ToGuid(dr["ID"]));
+						Dictionary<string, object> drow = new Dictionary<string, object>();
+						for ( int i = 0; i < dt.Columns.Count; i++ )
+						{
+							if ( dt.Columns[i].DataType.FullName == "System.DateTime" )
+								drow.Add(dt.Columns[i].ColumnName, RestUtil.ToJsonDate(T10n.FromServerTime(dr[i])));
+							else
+								drow.Add(dt.Columns[i].ColumnName, dr[i]);
+						}
+						drow.Add("Activities", new List<Dictionary<string, object>>());
+						objs.Add(drow);
+					}
+
+					// Phase 2: fetch activities for User-type invitees
+					if ( arrINVITEE_LIST.Count > 0 )
+					{
+						using ( IDbCommand cmd2 = con.CreateCommand() )
+						{
+							string sSQL = "select ID               " + ControlChars.CrLf
+							            + "     , ASSIGNED_USER_ID " + ControlChars.CrLf
+							            + "     , DATE_START       " + ControlChars.CrLf
+							            + "     , DATE_END         " + ControlChars.CrLf
+							            + "  from vwACTIVITIES_List" + ControlChars.CrLf
+							            + " where 1 = 1           " + ControlChars.CrLf;
+							cmd2.CommandText = sSQL;
+							// Build IN clause for ASSIGNED_USER_ID
+							{
+								string[] arrIDs = arrINVITEE_LIST.Select(g => g.ToString()).ToArray();
+								StringBuilder sbIN = new StringBuilder();
+								Sql.AppendParameter(cmd2, sbIN, arrIDs, "ASSIGNED_USER_ID", false);
+								cmd2.CommandText += sbIN.ToString();
+							}
+							cmd2.CommandText += "   and (   DATE_START >= @DATE_START and DATE_START < @DATE_END" + ControlChars.CrLf;
+							cmd2.CommandText += "        or DATE_END   >= @DATE_START and DATE_END   < @DATE_END" + ControlChars.CrLf;
+							cmd2.CommandText += "        or DATE_START <  @DATE_START and DATE_END   > @DATE_END" + ControlChars.CrLf;
+							cmd2.CommandText += "       )                                                       " + ControlChars.CrLf;
+							cmd2.CommandText += " order by ASSIGNED_USER_ID, DATE_START asc                     " + ControlChars.CrLf;
+							Sql.AddParameter(cmd2, "@DATE_START", T10n.ToServerTime(dtDATE_START));
+							Sql.AddParameter(cmd2, "@DATE_END"  , T10n.ToServerTime(dtDATE_END  ));
+							sbDumpSQL.Append(";" + ControlChars.CrLf + Sql.ExpandParameters(cmd2));
+							using ( var da2 = _dbProviderFactories.CreateDataAdapter() )
+							{
+								((IDbDataAdapter)da2).SelectCommand = cmd2;
+								using ( DataTable dtActivities = new DataTable() )
+								{
+									da2.Fill(dtActivities);
+									foreach ( DataRow rowActivity in dtActivities.Rows )
+									{
+										Guid     gACTIVITY_USER_ID  = Sql.ToGuid    (rowActivity["ASSIGNED_USER_ID"]);
+										DateTime dtACTIVITY_START   = Sql.ToDateTime(rowActivity["DATE_START"      ]);
+										DateTime dtACTIVITY_END     = Sql.ToDateTime(rowActivity["DATE_END"        ]);
+										Dictionary<string, object> dictActivity = new Dictionary<string, object>();
+										dictActivity.Add("DATE_START", RestUtil.ToJsonDate(T10n.FromServerTime(dtACTIVITY_START)));
+										dictActivity.Add("DATE_END"  , RestUtil.ToJsonDate(T10n.FromServerTime(dtACTIVITY_END  )));
+										for ( int k = 0; k < objs.Count; k++ )
+										{
+											if ( Sql.ToGuid(objs[k]["ID"]) == gACTIVITY_USER_ID )
+											{
+												List<Dictionary<string, object>> lstActivities = objs[k]["Activities"] as List<Dictionary<string, object>>;
+												lstActivities.Add(dictActivity);
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+
+					Dictionary<string, object> results = new Dictionary<string, object>();
+					results.Add("results", objs);
+					Dictionary<string, object> d = new Dictionary<string, object>();
+					d.Add("d"      , results   );
+					d.Add("__count", lCount    );
+					d.Add("__total", lTotalCount);
+					if ( Sql.ToBoolean(_memoryCache.Get<object>("CONFIG.show_sql")) )
+						d.Add("__sql", sbDumpSQL.ToString());
+					return JsonContent(d);
+				}
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "GetInviteesList");
-				return StatusCode(500, new { status = "error", error = new { message = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." } });
+				SplendidError.SystemError(new StackFrame(1, true), ex);
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
 		}
 
-		/// <summary>GET Rest.svc/GetInviteesActivities — Returns activities for specified invitees within a date range.</summary>
+		/// <summary>GET Rest.svc/GetInviteesActivities — Returns activities for specified invitees within a date range.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 4125-4278 — two-phase query: first vwINVITEES, then per-invitee vwACTIVITIES_List.</summary>
 		[HttpGet("GetInviteesActivities")]
 		public IActionResult GetInviteesActivities(string DATE_START, string DATE_END, string INVITEE_LIST)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
 				SplendidCRM.TimeZone T10n = GetUserTimezone();
-				string sBaseURI = GetBaseURI("/GetInviteesActivities");
-				string sFILTER = "1 = 1";
-				if (!Sql.IsEmptyString(DATE_START)) sFILTER += " and DATE_START ge '" + Sql.EscapeSQL(DATE_START) + "'";
-				if (!Sql.IsEmptyString(DATE_END  )) sFILTER += " and DATE_END le '"   + Sql.EscapeSQL(DATE_END  ) + "'";
-				long nTotalCount = 0;
+				L10N L10n = new L10N(GetUserCulture(), _memoryCache);
+				int nACTIVITIES_ACLACCESS = _security.GetUserAccess("Activities", "list");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get("Modules.Activities.RestEnabled")) || nACTIVITIES_ACLACCESS < 0 )
+				{
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": Activities" });
+				}
+
+				DateTime dtDATE_START    = RestUtil.FromJsonDate(DATE_START  );
+				DateTime dtDATE_END      = RestUtil.FromJsonDate(DATE_END    );
+				string   sINVITEE_LIST   = Sql.ToString(INVITEE_LIST);
+				string[] arrINVITEE_LIST = sINVITEE_LIST.Split(',');
+
 				StringBuilder sbDumpSQL = new StringBuilder();
-				DataTable dt = _restUtil.GetTable(HttpContext, "ACTIVITIES", 0, 0, "DATE_START asc", sFILTER, String.Empty, null, null, ref nTotalCount, null, AccessMode.list, false, null, sbDumpSQL);
-				var rows = _restUtil.RowsToDictionary(sBaseURI, "Activities", dt, T10n);
-				return JsonContent(new { d = new { results = rows, __total = nTotalCount } });
+				DataTable dt = new DataTable();
+				if ( arrINVITEE_LIST.Length > 0 )
+				{
+					using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+					{
+						con.Open();
+						string sSQL = String.Empty;
+						sSQL = "select ID          " + ControlChars.CrLf
+						     + "     , FULL_NAME   " + ControlChars.CrLf
+						     + "     , INVITEE_TYPE" + ControlChars.CrLf
+						     + "  from vwINVITEES  " + ControlChars.CrLf
+						     + " where 1 = 1       " + ControlChars.CrLf;
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.CommandText = sSQL;
+							StringBuilder sbInvitees = new StringBuilder();
+							Sql.AppendParameter(cmd, sbInvitees, arrINVITEE_LIST, "ID", true);
+							cmd.CommandText += sbInvitees.ToString();
+							cmd.CommandText += " order by FULL_NAME" + ControlChars.CrLf;
+							sbDumpSQL.Append(Sql.ExpandParameters(cmd));
+							using ( var da = _dbProviderFactories.CreateDataAdapter() )
+							{
+								((IDbDataAdapter)da).SelectCommand = cmd;
+								da.Fill(dt);
+							}
+						}
+					}
+				}
+
+				Dictionary<string, object> d = new Dictionary<string, object>();
+				Dictionary<string, object> results = new Dictionary<string, object>();
+				List<Dictionary<string, object>> objs = new List<Dictionary<string, object>>();
+				for ( int j = 0; j < dt.Rows.Count; j++ )
+				{
+					DataRow dr = dt.Rows[j];
+					Dictionary<string, object> drow = new Dictionary<string, object>();
+					for ( int i = 0; i < dt.Columns.Count; i++ )
+					{
+						if ( dt.Columns[i].DataType.FullName == "System.DateTime" )
+							drow.Add(dt.Columns[i].ColumnName, RestUtil.ToJsonDate(T10n.FromServerTime(dr[i])));
+						else
+							drow.Add(dt.Columns[i].ColumnName, dr[i]);
+					}
+					drow.Add("Activities", new List<Dictionary<string, object>>());
+					objs.Add(drow);
+				}
+				if ( arrINVITEE_LIST.Length > 0 )
+				{
+					using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+					{
+						con.Open();
+						for ( int k = 0; k < objs.Count; k++ )
+						{
+							Dictionary<string, object> dictInvitee = objs[k];
+							Guid gASSIGNED_USER_ID = Sql.ToGuid(dictInvitee["ID"]);
+							List<Dictionary<string, object>> lstActivities = dictInvitee["Activities"] as List<Dictionary<string, object>>;
+							string sSQL = String.Empty;
+							sSQL = "select ID                                                      " + ControlChars.CrLf
+							     + "     , ASSIGNED_USER_ID                                        " + ControlChars.CrLf
+							     + "     , DATE_START                                              " + ControlChars.CrLf
+							     + "     , DATE_END                                                " + ControlChars.CrLf
+							     + "  from vwACTIVITIES_List                                       " + ControlChars.CrLf
+							     + " where ASSIGNED_USER_ID = @ASSIGNED_USER_ID                    " + ControlChars.CrLf
+							     + "   and (   DATE_START >= @DATE_START and DATE_START < @DATE_END" + ControlChars.CrLf
+							     + "        or DATE_END   >= @DATE_START and DATE_END   < @DATE_END" + ControlChars.CrLf
+							     + "        or DATE_START <  @DATE_START and DATE_END   > @DATE_END" + ControlChars.CrLf
+							     + "       )                                                       " + ControlChars.CrLf
+							     + " order by ASSIGNED_USER_ID, DATE_START asc                     " + ControlChars.CrLf;
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.CommandText = sSQL;
+								Sql.AddParameter(cmd, "@ASSIGNED_USER_ID", gASSIGNED_USER_ID              );
+								Sql.AddParameter(cmd, "@DATE_START"      , T10n.ToServerTime(dtDATE_START));
+								Sql.AddParameter(cmd, "@DATE_END"        , T10n.ToServerTime(dtDATE_END  ));
+								sbDumpSQL.Append(";" + ControlChars.CrLf + Sql.ExpandParameters(cmd));
+								using ( var da = _dbProviderFactories.CreateDataAdapter() )
+								{
+									((IDbDataAdapter)da).SelectCommand = cmd;
+									using ( DataTable dtActivities = new DataTable() )
+									{
+										da.Fill(dtActivities);
+										foreach ( DataRow rowActivity in dtActivities.Rows )
+										{
+											DateTime dtACTIVITY_DATE_START = Sql.ToDateTime(rowActivity["DATE_START"]);
+											DateTime dtACTIVITY_DATE_END   = Sql.ToDateTime(rowActivity["DATE_END"  ]);
+											Dictionary<string, object> dictActivity = new Dictionary<string, object>();
+											dictActivity.Add("DATE_START", RestUtil.ToJsonDate(T10n.FromServerTime(dtACTIVITY_DATE_START)));
+											dictActivity.Add("DATE_END"  , RestUtil.ToJsonDate(T10n.FromServerTime(dtACTIVITY_DATE_END  )));
+											lstActivities.Add(dictActivity);
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				results.Add("results", objs);
+				d.Add("d"      , results      );
+				d.Add("__count", dt.Rows.Count);
+				d.Add("__total", dt.Rows.Count);
+				if ( Sql.ToBoolean(_memoryCache.Get("CONFIG.show_sql")) )
+				{
+					d.Add("__sql", sbDumpSQL.ToString());
+				}
+				return JsonContent(d);
 			}
 			catch (Exception ex)
 			{
@@ -3669,15 +4377,63 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Rest.svc/UpdateActivityStatus — Updates an activity record's status.</summary>
+		/// <summary>POST Rest.svc/UpdateActivityStatus — Updates an activity record's status.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 4280-4355. Uses spACTIVITIES_UpdateStatus.</summary>
 		[HttpPost("UpdateActivityStatus")]
 		public IActionResult UpdateActivityStatus([FromBody] Dictionary<string, object> dict)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
-				// Delegate to UpdateTable which handles the module update logic
-				_restUtil.UpdateTable(HttpContext, "CALLS", dict);
+				L10N L10n = new L10N(GetUserCulture(), _memoryCache);
+				string sModuleName = "Activities";
+				int nACLACCESS = _security.GetUserAccess(sModuleName, "edit");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+				{
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName });
+				}
+
+				Guid   gID     = Guid.Empty;
+				string sSTATUS = String.Empty;
+				foreach ( string sColumnName in dict.Keys )
+				{
+					switch ( sColumnName )
+					{
+						case "STATUS": sSTATUS = Sql.ToString(dict[sColumnName]); break;
+						case "ID"    : gID     = Sql.ToGuid  (dict[sColumnName]); break;
+					}
+				}
+
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					string sSQL;
+					sSQL = "select count(*)           " + ControlChars.CrLf
+					     + "  from vwACTIVITIES_MyList" + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						_security.Filter(cmd, "Calls", "list");
+						cmd.CommandText += "   and ID = @ID" + ControlChars.CrLf;
+						Sql.AddParameter(cmd, "@ID", gID);
+						cmd.CommandText += "   and ASSIGNED_USER_ID = @ASSIGNED_USER_ID" + ControlChars.CrLf;
+						Sql.AddParameter(cmd, "@ASSIGNED_USER_ID", _security.USER_ID);
+						int nRecordExists = Sql.ToInteger(cmd.ExecuteScalar());
+						if ( nRecordExists > 0 )
+						{
+							using ( IDbCommand cmdUpdate = SqlProcs.Factory(con, "spACTIVITIES_UpdateStatus") )
+							{
+								Sql.AddParameter(cmdUpdate, "@ID"              , gID              );
+								Sql.AddParameter(cmdUpdate, "@MODIFIED_USER_ID", _security.USER_ID);
+								Sql.AddParameter(cmdUpdate, "@STATUS"          , sSTATUS          );
+								cmdUpdate.ExecuteNonQuery();
+							}
+						}
+						else
+						{
+							throw new Exception(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+						}
+					}
+				}
 				return Ok(new { d = (object)null });
 			}
 			catch (Exception ex)
@@ -3687,22 +4443,83 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>GET Rest.svc/GetModuleStream — Returns activity stream for a module record.</summary>
+		/// <summary>GET Rest.svc/GetModuleStream — Returns activity stream for a module record.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 4359-4468.</summary>
 		[HttpGet("GetModuleStream")]
 		public IActionResult GetModuleStream(string ModuleName, Guid ID, bool RecentActivity)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
-				SplendidCRM.TimeZone T10n = GetUserTimezone();
-				string sBaseURI = GetBaseURI("/GetModuleStream");
-				string sFILTER = "PARENT_ID eq '" + ID.ToString() + "' and PARENT_TYPE eq '" + Sql.EscapeSQL(ModuleName) + "'";
-				string sORDER_BY = RecentActivity ? "DATE_ENTERED desc" : "DATE_ENTERED asc";
-				long nTotalCount = 0;
+				if ( Sql.IsEmptyString(ModuleName) )
+					return BadRequest(new { error = "The module name must be specified." });
+				string sTABLE_NAME = Sql.ToString(_memoryCache.Get("Modules." + ModuleName + ".TableName"));
+				// 08/23/2019 Paul.  ActivityStream does not have a table name and is not marked as stream enabled.
+				if ( ModuleName == "ActivityStream" )
+					sTABLE_NAME = "vwACTIVITY_STREAMS";
+				if ( Sql.IsEmptyString(sTABLE_NAME) )
+					return BadRequest(new { error = "Unknown module: " + ModuleName });
+				if ( ModuleName != "ActivityStream" && (!Sql.ToBoolean(_memoryCache.Get("Modules." + ModuleName + ".StreamEnabled")) || sTABLE_NAME == "USERS") )
+					return BadRequest(new { error = "Module is not stream enabled: " + ModuleName });
+				int nACLACCESS = _security.GetUserAccess(ModuleName, "list");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get("Modules." + ModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+				{
+					L10N L10n = new L10N(GetUserCulture(), _memoryCache);
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + Sql.ToString(ModuleName) });
+				}
+
+				int    nSKIP     = Sql.ToInteger(Request.Query["$skip"  ].FirstOrDefault());
+				int    nTOP      = Sql.ToInteger(Request.Query["$top"   ].FirstOrDefault());
+				string sFILTER   = Sql.ToString (Request.Query["$filter"].FirstOrDefault());
+				string sSELECT   = Sql.ToString (Request.Query["$select"].FirstOrDefault());
+
+				Regex r = new Regex(@"[^A-Za-z0-9_]");
+				string sFILTER_KEYWORDS = Sql.SqlFilterLiterals(sFILTER);
+				sFILTER_KEYWORDS = (" " + r.Replace(sFILTER_KEYWORDS, " ") + " ").ToLower();
+				int nSelectIndex = sFILTER_KEYWORDS.IndexOf(" select ");
+				int nFromIndex   = sFILTER_KEYWORDS.IndexOf(" from ");
+				if ( nSelectIndex >= 0 && nFromIndex > nSelectIndex )
+					return BadRequest(new { error = "Subqueries are not allowed." });
+
+				UniqueStringCollection arrSELECT = new UniqueStringCollection();
+				sSELECT = sSELECT.Replace(" ", "");
+				if ( !Sql.IsEmptyString(sSELECT) )
+				{
+					foreach ( string s in sSELECT.Split(',') )
+					{
+						string sColumnName = r.Replace(s, "");
+						if ( !Sql.IsEmptyString(sColumnName) )
+							arrSELECT.Add(sColumnName);
+					}
+				}
+				arrSELECT.Add("ID"                   );
+				arrSELECT.Add("AUDIT_ID"             );
+				arrSELECT.Add("STREAM_DATE"          );
+				arrSELECT.Add("STREAM_ACTION"        );
+				arrSELECT.Add("STREAM_COLUMNS"       );
+				arrSELECT.Add("STREAM_RELATED_ID"    );
+				arrSELECT.Add("STREAM_RELATED_MODULE");
+				arrSELECT.Add("STREAM_RELATED_NAME"  );
+				arrSELECT.Add("NAME"                 );
+				arrSELECT.Add("CREATED_BY_ID"        );
+				arrSELECT.Add("CREATED_BY"           );
+				arrSELECT.Add("CREATED_BY_PICTURE"   );
+				arrSELECT.Add("ASSIGNED_USER_ID"     );
+				string sORDER_BY = " order by STREAM_DATE desc, STREAM_VERSION desc";
+
+				long lTotalCount = 0;
 				StringBuilder sbDumpSQL = new StringBuilder();
-				DataTable dt = _restUtil.GetTable(HttpContext, "STREAM", 0, 20, sORDER_BY, sFILTER, String.Empty, null, null, ref nTotalCount, null, AccessMode.list, false, null, sbDumpSQL);
-				var rows = _restUtil.RowsToDictionary(sBaseURI, ModuleName, dt, T10n);
-				return JsonContent(new { d = new { results = rows, __total = nTotalCount } });
+				// Delegate to the GetStream helper (ported from Rest.svc.cs private GetStream method).
+				DataTable dt = GetStream(sTABLE_NAME, nSKIP, nTOP, sFILTER, sORDER_BY, arrSELECT, ID, ref lTotalCount, RecentActivity, sbDumpSQL);
+
+				string sBaseURI = GetBaseURI("/GetModuleStream");
+				SplendidCRM.TimeZone T10n = GetUserTimezone();
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, ModuleName, dt, T10n);
+				dictResponse.Add("__total", lTotalCount);
+				if ( Sql.ToBoolean(_memoryCache.Get("CONFIG.show_sql")) )
+				{
+					dictResponse.Add("__sql", sbDumpSQL.ToString());
+				}
+				return JsonContent(new { d = dictResponse });
 			}
 			catch (Exception ex)
 			{
@@ -3728,42 +4545,33 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>GET Rest.svc/GetSqlColumns — Returns SQL column metadata for a module.</summary>
+		/// <summary>GET Rest.svc/GetSqlColumns — Returns SQL column metadata for a module.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 4777-4815. Uses SplendidCache delegates.</summary>
 		[HttpGet("GetSqlColumns")]
 		public IActionResult GetSqlColumns(string ModuleName, string Mode)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
-				string sTableName = Crm.Modules.TableName(_memoryCache, ModuleName);
-				string sVIEW_NAME = "vw" + sTableName;
-				if (Mode == "edit") sVIEW_NAME = sTableName;
-				List<Dictionary<string, object>> lst = new List<Dictionary<string, object>>();
-				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
-				using (IDbConnection con = dbf.CreateConnection())
+				if ( Sql.IsEmptyString(ModuleName) )
+					return BadRequest(new { error = "The module name must be specified." });
+				if ( !_security.IsAuthenticated() )
+					return Unauthorized();
+
+				DataTable dt = new DataTable();
+				if ( Mode == "import" )
 				{
-					con.Open();
-					string sSQL = "select ColumnName, ColumnType, CsType, length from vwSqlColumns where ObjectName = @OBJECTNAME and ObjectType = 'V' order by ColumnName";
-					using (IDbCommand cmd = con.CreateCommand())
-					{
-						cmd.CommandText = sSQL;
-						Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, sVIEW_NAME));
-						using (IDataReader rdr = cmd.ExecuteReader())
-						{
-							while (rdr.Read())
-							{
-								lst.Add(new Dictionary<string, object>
-								{
-									{ "ColumnName", Sql.ToString (rdr["ColumnName"]) },
-									{ "ColumnType", Sql.ToString (rdr["ColumnType"]) },
-									{ "CsType"    , Sql.ToString (rdr["CsType"    ]) },
-									{ "length"    , Sql.ToInteger(rdr["length"    ]) }
-								});
-							}
-						}
-					}
+					dt = _splendidCache.ImportColumns(ModuleName);
 				}
-				return JsonContent(new { d = lst });
+				else
+				{
+					string sTableName = _splendidCache.ModuleTableName(ModuleName);
+					dt = _splendidCache.SqlColumns(sTableName);
+				}
+
+				string sBaseURI = GetBaseURI("/GetSqlColumns");
+				SplendidCRM.TimeZone T10n = GetUserTimezone();
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, ModuleName, dt, T10n);
+				return JsonContent(dictResponse);
 			}
 			catch (Exception ex)
 			{
@@ -3802,25 +4610,235 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Rest.svc/UpdateRelatedItem — Links a related record to a module record.</summary>
+		/// <summary>POST Rest.svc/UpdateRelatedItem — Links a related record to a module record.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 5576-5878.
+		/// Includes all special-case relationship table corrections for PROJECT, ACCOUNTS_MEMBERS,
+		/// CONTACTS_DIRECT_REPORTS, USERS_TEAM_MEMBERSHIPS, ACL_ROLES, Azure relationships.
+		/// Validates RestTables registration and record-level access before insert.</summary>
 		[HttpPost("UpdateRelatedItem")]
 		public IActionResult UpdateRelatedItem([FromBody] Dictionary<string, object> dict)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
+				string sCulture = GetUserCulture();
+				L10N L10n = new L10N(sCulture, _memoryCache);
 				string sModuleName    = Sql.ToString(dict.ContainsKey("ModuleName"   ) ? dict["ModuleName"   ] : null);
+				Guid   gID            = Sql.ToGuid  (dict.ContainsKey("ID"           ) ? dict["ID"           ] : null);
 				string sRelatedModule = Sql.ToString(dict.ContainsKey("RelatedModule") ? dict["RelatedModule"] : null);
-				// Delegate to UpdateTable to handle the relationship table
-				string sRELATIONSHIP_TABLE = LookupRelationshipTable(sModuleName, sRelatedModule);
-				if (!Sql.IsEmptyString(sRELATIONSHIP_TABLE))
-					_restUtil.UpdateTable(HttpContext, sRELATIONSHIP_TABLE, dict);
+				Guid   gRelatedID     = Sql.ToGuid  (dict.ContainsKey("RelatedID"    ) ? dict["RelatedID"    ] : null);
+				if ( Sql.IsEmptyString(sModuleName) )
+					return BadRequest(new { error = "The module name must be specified." });
+				string sTABLE_NAME = Sql.ToString(_memoryCache.Get<object>("Modules." + sModuleName + ".TableName"));
+				if ( Sql.IsEmptyString(sTABLE_NAME) )
+					return BadRequest(new { error = "Unknown module: " + sModuleName });
+				int nACLACCESS = _security.GetUserAccess(sModuleName, "edit");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName);
+
+				if ( Sql.IsEmptyString(sRelatedModule) )
+					return BadRequest(new { error = "The related module name must be specified." });
+				string sRELATED_TABLE = Sql.ToString(_memoryCache.Get<object>("Modules." + sRelatedModule + ".TableName"));
+				if ( Sql.IsEmptyString(sRELATED_TABLE) )
+					return BadRequest(new { error = "Unknown module: " + sRelatedModule });
+				nACLACCESS = _security.GetUserAccess(sRelatedModule, "edit");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sRelatedModule + ".RestEnabled")) || nACLACCESS < 0 )
+					return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sRelatedModule);
+
+				string sRELATIONSHIP_TABLE = sTABLE_NAME + "_" + sRELATED_TABLE;
+				// 05/08/2023 Paul.  Only change the relationship table, not the base table.
+				if ( sTABLE_NAME == "PROJECT" || sTABLE_NAME == "PROJECT_TASK" )
+					sRELATIONSHIP_TABLE = sTABLE_NAME + "S_" + sRELATED_TABLE;
+				if ( sRELATED_TABLE == "PROJECT" || sRELATED_TABLE == "PROJECT_TASK" )
+					sRELATIONSHIP_TABLE = sTABLE_NAME + "_" + sRELATED_TABLE + "S";
+
+				string sMODULE_FIELD_NAME  = Crm.Modules.SingularTableName(sTABLE_NAME   ) + "_ID";
+				string sRELATED_FIELD_NAME = Crm.Modules.SingularTableName(sRELATED_TABLE) + "_ID";
+				// 11/24/2012 Paul.  Special cases for self-referencing relationships.
+				if ( sMODULE_FIELD_NAME == "ACCOUNT_ID" && sRELATED_FIELD_NAME == "ACCOUNT_ID" )
+				{
+					sRELATIONSHIP_TABLE = "ACCOUNTS_MEMBERS";
+					sRELATED_FIELD_NAME = "PARENT_ID";
+				}
+				else if ( sMODULE_FIELD_NAME == "CONTACT_ID" && sRELATED_FIELD_NAME == "CONTACT_ID" )
+				{
+					sRELATIONSHIP_TABLE = "CONTACTS_DIRECT_REPORTS";
+					sRELATED_FIELD_NAME = "REPORTS_TO_ID";
+				}
+				else if ( sRELATIONSHIP_TABLE == "USERS_TEAMS" || sRELATIONSHIP_TABLE == "TEAMS_USERS" )
+				{
+					sRELATIONSHIP_TABLE = "USERS_TEAM_MEMBERSHIPS";
+				}
+				// 03/09/2021 Paul.  Correct ROLE_ID field name.
+				else if ( sRELATIONSHIP_TABLE == "ACL_ROLES_USERS" && sMODULE_FIELD_NAME == "ACL_ROLE_ID" )
+				{
+					sMODULE_FIELD_NAME = "ROLE_ID";
+				}
+				// 08/23/2021 Paul.  Azure relationship corrections.
+				else if ( sRELATIONSHIP_TABLE == "AZURE_ORDERS_AZURE_APP_UPDATES" )
+				{
+					sRELATIONSHIP_TABLE = "AZURE_APP_UPDATES_ORDERS";
+					sRELATED_FIELD_NAME = "APP_UPDATE_ID";
+				}
+				else if ( sRELATIONSHIP_TABLE == "AZURE_APP_UPDATES_AZURE_ORDERS" )
+				{
+					sRELATIONSHIP_TABLE = "AZURE_APP_UPDATES_ORDERS";
+					sMODULE_FIELD_NAME  = "APP_UPDATE_ID";
+				}
+				else if ( sRELATIONSHIP_TABLE == "AZURE_APP_PRICES_AZURE_SERVICE_LEVELS" )
+				{
+					sRELATIONSHIP_TABLE = "AZURE_APP_SERVICE_LEVELS";
+					sMODULE_FIELD_NAME  = "APP_PRICE_ID";
+					sRELATED_FIELD_NAME = "SERVICE_LEVEL_ID";
+				}
+				else if ( sRELATIONSHIP_TABLE == "AZURE_SERVICE_LEVELS_AZURE_APP_PRICES" )
+				{
+					sRELATIONSHIP_TABLE = "AZURE_APP_SERVICE_LEVELS";
+					sMODULE_FIELD_NAME  = "SERVICE_LEVEL_ID";
+					sRELATED_FIELD_NAME = "APP_PRICE_ID";
+				}
+
+				bool bExcludeSystemTables = true;
+				if ( _security.AdminUserAccess(sModuleName, "edit") >= 0 )
+					bExcludeSystemTables = false;
+
+				// 02/27/2021 Paul.  Check both directions for valid relationship table and update procedure.
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					IDbCommand cmdUpdate = null;
+					try { cmdUpdate = SqlProcs.Factory(con, "sp" + sRELATIONSHIP_TABLE + "_Update"); } catch { }
+					using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables("vw" + sRELATIONSHIP_TABLE, bExcludeSystemTables) )
+					{
+						if ( cmdUpdate == null || (dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count == 0) )
+						{
+							sRELATIONSHIP_TABLE = sRELATED_TABLE + "_" + sTABLE_NAME;
+							try { cmdUpdate = SqlProcs.Factory(con, "sp" + sRELATIONSHIP_TABLE + "_Update"); } catch { }
+							using ( DataTable dtSYNC_TABLES2 = _splendidCache.RestTables("vw" + sRELATIONSHIP_TABLE, bExcludeSystemTables) )
+							{
+								if ( cmdUpdate == null || (dtSYNC_TABLES2 != null && dtSYNC_TABLES2.Rows.Count == 0) )
+									return Forbidden(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + " to relationship between modules " + sModuleName + " and " + sRelatedModule);
+							}
+						}
+					}
+					// Call the private UpdateRelatedItemInternal
+					UpdateRelatedItemInternal(con, sTABLE_NAME, sRELATIONSHIP_TABLE, sMODULE_FIELD_NAME, gID, sRELATED_FIELD_NAME, gRelatedID, bExcludeSystemTables);
+				}
 				return Ok(new { d = (object)null });
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "UpdateRelatedItem");
-				return StatusCode(500, new { status = "error", error = new { message = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." } });
+				SplendidError.SystemError(new StackFrame(1, true), ex);
+				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>Private helper — executes the relationship insert stored procedure with full record-level ACL.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 5714-5878.</summary>
+		private void UpdateRelatedItemInternal(IDbConnection con, string sTABLE_NAME, string sRELATIONSHIP_TABLE, string sMODULE_FIELD_NAME, Guid gID, string sRELATED_FIELD_NAME, Guid gRELATED_ID, bool bExcludeSystemTables)
+		{
+			string sCulture = GetUserCulture();
+			L10N L10n = new L10N(sCulture, _memoryCache);
+			Regex r = new Regex(@"[^A-Za-z0-9_]");
+			sTABLE_NAME = r.Replace(sTABLE_NAME, "").ToUpper();
+
+			// Check that the parent table is registered in RestTables
+			using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables(sTABLE_NAME, bExcludeSystemTables) )
+			{
+				if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
+				{
+					DataRow rowSYNC_TABLE = dtSYNC_TABLES.Rows[0];
+					string sMODULE_NAME = Sql.ToString(rowSYNC_TABLE["MODULE_NAME"]);
+					if ( Sql.IsEmptyString(sMODULE_NAME) )
+						throw new Exception("MODULE_NAME should not be empty for table " + sTABLE_NAME);
+
+					int nACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
+					if ( nACLACCESS >= 0 )
+					{
+						bool bRecordExists   = false;
+						bool bAccessAllowed  = false;
+						Guid gLOCAL_ASSIGNED = Guid.Empty;
+						DataTable dtCurrent  = new DataTable();
+						string sSQL = "select *"              + ControlChars.CrLf
+						            + "  from " + sTABLE_NAME + ControlChars.CrLf
+						            + " where DELETED = 0"    + ControlChars.CrLf;
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.CommandText = sSQL;
+							cmd.CommandTimeout = 60 * 60;
+							StringBuilder sbID = new StringBuilder();
+							Sql.AppendParameter(cmd, sbID, "ID", gID);
+							cmd.CommandText += sbID.ToString();
+							using ( var da = _dbProviderFactories.CreateDataAdapter() )
+							{
+								((IDbDataAdapter)da).SelectCommand = cmd;
+								da.Fill(dtCurrent);
+								if ( dtCurrent.Rows.Count > 0 )
+								{
+									bRecordExists = true;
+									if ( dtCurrent.Columns.Contains("ASSIGNED_USER_ID") )
+										gLOCAL_ASSIGNED = Sql.ToGuid(dtCurrent.Rows[0]["ASSIGNED_USER_ID"]);
+								}
+							}
+						}
+						if ( bRecordExists )
+						{
+							sSQL = "select count(*)"       + ControlChars.CrLf
+							     + "  from " + sTABLE_NAME + ControlChars.CrLf;
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.CommandText = sSQL;
+								_security.Filter(cmd, sMODULE_NAME, "edit");
+								StringBuilder sbID2 = new StringBuilder();
+								Sql.AppendParameter(cmd, sbID2, "ID", gID);
+								cmd.CommandText += sbID2.ToString();
+								if ( Sql.ToInteger(cmd.ExecuteScalar()) > 0 )
+								{
+									if ( (nACLACCESS > ACL_ACCESS.OWNER) || (nACLACCESS == ACL_ACCESS.OWNER && _security.USER_ID == gLOCAL_ASSIGNED) || !dtCurrent.Columns.Contains("ASSIGNED_USER_ID") )
+										bAccessAllowed = true;
+								}
+							}
+						}
+						if ( bAccessAllowed )
+						{
+							IDbCommand cmdUpdate = SqlProcs.Factory(con, "sp" + sRELATIONSHIP_TABLE + "_Update");
+							using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+							{
+								try
+								{
+									cmdUpdate.Transaction = trn;
+									foreach ( IDbDataParameter par in cmdUpdate.Parameters )
+									{
+										string sParameterName = Sql.ExtractDbName(par.ParameterName).ToUpper();
+										if ( sParameterName == sMODULE_FIELD_NAME )
+											par.Value = gID;
+										else if ( sParameterName == sRELATED_FIELD_NAME )
+											par.Value = gRELATED_ID;
+										else if ( sParameterName == "MODIFIED_USER_ID" )
+											par.Value = Sql.ToDBGuid(_security.USER_ID);
+										else
+											par.Value = DBNull.Value;
+									}
+									cmdUpdate.ExecuteScalar();
+									trn.Commit();
+								}
+								catch (Exception ex)
+								{
+									try { trn.Rollback(); } catch { }
+									SplendidError.SystemError(new StackFrame(1, true), ex);
+									throw;
+								}
+							}
+						}
+						else
+						{
+							throw new Exception(L10n.Term("ACL.LBL_NO_ACCESS"));
+						}
+					}
+					else
+					{
+						throw new Exception(L10n.Term("ACL.LBL_NO_ACCESS"));
+					}
+				}
 			}
 		}
 
@@ -3988,46 +5006,100 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Rest.svc/ChangePassword — Changes the user's password.</summary>
+		/// <summary>POST Rest.svc/ChangePassword — Changes the user's password.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 6918-7066. Uses spUSERS_PasswordUpdate stored procedure.</summary>
 		[HttpPost("ChangePassword")]
 		public IActionResult ChangePassword([FromBody] Dictionary<string, object> dict)
 		{
 			try
 			{
-				if (!_security.IsAuthenticated()) return Unauthorized();
+				L10N L10n = new L10N(GetUserCulture(), _memoryCache);
+				if ( !_security.IsAuthenticated() )
+					return Unauthorized();
 				Guid   gUSER_ID      = Sql.ToGuid  (dict.ContainsKey("USER_ID"     ) ? dict["USER_ID"     ] : null);
 				string sOLD_PASSWORD = Sql.ToString (dict.ContainsKey("OLD_PASSWORD") ? dict["OLD_PASSWORD"] : null);
 				string sNEW_PASSWORD = Sql.ToString (dict.ContainsKey("NEW_PASSWORD") ? dict["NEW_PASSWORD"] : null);
-				// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-				string sNEW_HASH = Security.HashPassword(sNEW_PASSWORD);
-				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
-				using (IDbConnection con = dbf.CreateConnection())
+				if ( Sql.IsEmptyGuid(gUSER_ID) )
+					throw new Exception(L10n.Term(".ERR_MISSING_REQUIRED_FIELDS"));
+				if ( Sql.IsEmptyString(sNEW_PASSWORD) )
+					throw new Exception(L10n.Term(".ERR_MISSING_REQUIRED_FIELDS"));
+				// 01/10/2022 Paul.  Only an admin can change the password for another user.
+				if ( !(_security.AdminUserAccess("Users", "edit") >= 0) )
+				{
+					if ( gUSER_ID != _security.USER_ID )
+						throw new Exception(L10n.Term(".LBL_INSUFFICIENT_ACCESS"));
+				}
+
+				bool bValidOldPassword = false;
+				string sUSER_NAME = String.Empty;
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
 				{
 					con.Open();
-					// Verify old password
-					string sSQL = "select USER_HASH from USERS where ID = @ID and DELETED = 0";
-					using (IDbCommand cmd = con.CreateCommand())
+					string sSQL;
+					sSQL = "select *                     " + ControlChars.CrLf
+					     + "  from vwUSERS_Login         " + ControlChars.CrLf
+					     + " where ID        = @ID       " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandText = sSQL;
 						Sql.AddParameter(cmd, "@ID", gUSER_ID);
-						string sOLD_HASH = Sql.ToString(cmd.ExecuteScalar());
-						string sOLD_HASH_CHECK = Security.HashPassword(sOLD_PASSWORD);
-						if (sOLD_HASH != sOLD_HASH_CHECK)
+						using ( IDataReader rdr = cmd.ExecuteReader(System.Data.CommandBehavior.SingleRow) )
 						{
-							L10N L10n = new L10N(Sql.ToString(_httpContextAccessor.HttpContext?.Session?.GetString("USER_SETTINGS/CULTURE")), _memoryCache);
-							throw new Exception(L10n.Term("Users.ERR_PASSWORD_INCORRECT_OLD"));
+							if ( rdr.Read() )
+								sUSER_NAME = Sql.ToString(rdr["USER_NAME"]);
+							else
+								throw new Exception(L10n.Term("Users.ERR_USER_NOT_FOUND"));
+						}
+						if ( !(_security.AdminUserAccess("Users", "view") >= 0) )
+						{
+							if ( !Sql.IsEmptyString(sOLD_PASSWORD) )
+							{
+								// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
+								string sUSER_HASH = Security.HashPassword(sOLD_PASSWORD);
+								cmd.CommandText += "   and USER_HASH = @USER_HASH" + ControlChars.CrLf;
+								Sql.AddParameter(cmd, "@USER_HASH", sUSER_HASH);
+							}
+							else
+							{
+								cmd.CommandText += "   and (USER_HASH = '' or USER_HASH is null)" + ControlChars.CrLf;
+							}
+							using ( IDataReader rdr = cmd.ExecuteReader(System.Data.CommandBehavior.SingleRow) )
+							{
+								if ( rdr.Read() )
+									bValidOldPassword = true;
+							}
+							if ( !bValidOldPassword )
+								throw new Exception(L10n.Term("Users.ERR_PASSWORD_INCORRECT_OLD"));
 						}
 					}
-					// Update password
-					using (IDbCommand cmd = con.CreateCommand())
+				}
+				if ( bValidOldPassword || (_security.AdminUserAccess("Users", "edit") >= 0) )
+				{
+					// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
+					string sNEW_HASH = Security.HashPassword(sNEW_PASSWORD);
+					using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
 					{
-						cmd.CommandText = "update USERS set USER_HASH = @USER_HASH, DATE_MODIFIED = @DATE_MODIFIED, DATE_MODIFIED_UTC = @DATE_MODIFIED_UTC, MODIFIED_USER_ID = @MODIFIED_USER_ID where ID = @ID";
-						Sql.AddParameter(cmd, "@USER_HASH"        , sNEW_HASH        );
-						Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now      );
-						Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow   );
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID );
-						Sql.AddParameter(cmd, "@ID"               , gUSER_ID          );
-						cmd.ExecuteNonQuery();
+						con.Open();
+						string sSQL;
+						sSQL = "select count(*)                " + ControlChars.CrLf
+						     + "  from vwUSERS_PASSWORD_HISTORY" + ControlChars.CrLf
+						     + " where USER_ID   = @USER_ID    " + ControlChars.CrLf
+						     + "   and USER_HASH = @USER_HASH  " + ControlChars.CrLf;
+						using ( IDbCommand cmd = con.CreateCommand() )
+						{
+							cmd.CommandText = sSQL;
+							Sql.AddParameter(cmd, "@USER_ID"  , gUSER_ID );
+							Sql.AddParameter(cmd, "@USER_HASH", sNEW_HASH);
+							int nLastPassword = Sql.ToInteger(cmd.ExecuteScalar());
+							if ( nLastPassword == 0 )
+							{
+								SqlProcs.spUSERS_PasswordUpdate(gUSER_ID, sNEW_HASH);
+							}
+							else
+							{
+								throw new Exception(L10n.Term("Users.ERR_CANNOT_REUSE_PASSWORD"));
+							}
+						}
 					}
 				}
 				return Ok(new { d = (object)null });
@@ -4108,7 +5180,8 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Rest.svc/DeleteRelatedItem — Removes a relationship between two records.</summary>
+		/// <summary>POST Rest.svc/DeleteRelatedItem — Removes a relationship between two records.
+		/// Ported from SplendidCRM/Rest.svc.cs lines 7582-7900. Uses sp{TABLE}_Delete stored procedure.</summary>
 		[HttpPost("DeleteRelatedItem")]
 		public IActionResult DeleteRelatedItem([FromBody] Dictionary<string, object> dict)
 		{
@@ -4122,18 +5195,40 @@ namespace SplendidCRM.Web.Controllers
 				string sRELATIONSHIP_TABLE = LookupRelationshipTable(sModuleName, sRelatedModule);
 				if (!Sql.IsEmptyString(sRELATIONSHIP_TABLE))
 				{
-					DbProviderFactory dbf = _dbProviderFactories.GetFactory();
-					using (IDbConnection con = dbf.CreateConnection())
+					string sTABLE_NAME        = _splendidCache.ModuleTableName(sModuleName);
+					string sMODULE_FIELD_NAME  = _splendidCache.ModuleTableName(sModuleName) + "_ID";
+					string sRELATED_FIELD_NAME = _splendidCache.ModuleTableName(sRelatedModule) + "_ID";
+
+					using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
 					{
 						con.Open();
-						using (IDbCommand cmd = con.CreateCommand())
+						IDbCommand cmdDelete = SqlProcs.Factory(con, "sp" + sRELATIONSHIP_TABLE + "_Delete");
+						using ( IDbTransaction trn = Sql.BeginTransaction(con) )
 						{
-							cmd.CommandText = "update " + sRELATIONSHIP_TABLE + " set DELETED = 1, DATE_MODIFIED = @DATE_MODIFIED, DATE_MODIFIED_UTC = @DATE_MODIFIED_UTC, MODIFIED_USER_ID = @MODIFIED_USER_ID where ID = @ID";
-							Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now      );
-							Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow   );
-							Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID );
-							Sql.AddParameter(cmd, "@ID"               , gRelatedID        );
-							cmd.ExecuteNonQuery();
+							try
+							{
+								cmdDelete.Transaction = trn;
+								foreach ( IDbDataParameter par in cmdDelete.Parameters )
+								{
+									string sParameterName = Sql.ExtractDbName(par.ParameterName).ToUpper();
+									if ( sParameterName == sMODULE_FIELD_NAME.ToUpper() )
+										par.Value = gID;
+									else if ( sParameterName == sRELATED_FIELD_NAME.ToUpper() )
+										par.Value = gRelatedID;
+									else if ( sParameterName == "MODIFIED_USER_ID" )
+										par.Value = Sql.ToDBGuid(_security.USER_ID);
+									else
+										par.Value = DBNull.Value;
+								}
+								cmdDelete.ExecuteScalar();
+								trn.Commit();
+							}
+							catch (Exception ex)
+							{
+								try { trn.Rollback(); } catch { }
+								SplendidError.SystemError(new StackFrame(1, true), ex);
+								throw;
+							}
 						}
 					}
 				}
@@ -4203,6 +5298,114 @@ namespace SplendidCRM.Web.Controllers
 			}
 			// Fallback: try standard naming convention (MODULE1_MODULE2)
 			return String.Empty;
+		}
+
+		// =====================================================================================
+		// GetStream — Private helper ported from SplendidCRM/Rest.svc.cs lines 4471-4595.
+		// Used by GetModuleStream to query the per-module _STREAM view.
+		// =====================================================================================
+		private DataTable GetStream(string sTABLE_NAME, int nSKIP, int nTOP, string sFILTER, string sORDER_BY, UniqueStringCollection arrSELECT, Guid gITEM_ID, ref long lTotalCount, bool bRecentActivity, StringBuilder sbDumpSQL)
+		{
+			DataTable dt = null;
+			if ( _security.IsAuthenticated() )
+			{
+				Regex r = new Regex(@"[^A-Za-z0-9_]");
+				sTABLE_NAME = r.Replace(sTABLE_NAME, "");
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
+				{
+					con.Open();
+					using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables(sTABLE_NAME, false) )
+					{
+						string sSQL = String.Empty;
+						if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
+						{
+							DataRow rowSYNC_TABLE = dtSYNC_TABLES.Rows[0];
+							string sMODULE_NAME = Sql.ToString(rowSYNC_TABLE["MODULE_NAME"]);
+							string sVIEW_NAME   = Sql.ToString(rowSYNC_TABLE["VIEW_NAME"  ]);
+							if ( sMODULE_NAME != "ActivityStream" )
+								sVIEW_NAME += "_STREAM";
+
+							if ( sMODULE_NAME == "ActivityStream" )
+								arrSELECT.Add("MODULE_NAME");
+							else
+								arrSELECT.Add("\'" + sMODULE_NAME + "\' as MODULE_NAME");
+							foreach ( string sColumnName in arrSELECT )
+							{
+								if ( Sql.IsEmptyString(sSQL) )
+									sSQL += "select " + sVIEW_NAME + "." + sColumnName + ControlChars.CrLf;
+								else if ( sColumnName.ToLower().Contains(" as ") )
+									sSQL += "     , " + sColumnName + ControlChars.CrLf;
+								else
+									sSQL += "     , " + sVIEW_NAME + "." + sColumnName + ControlChars.CrLf;
+							}
+							string sSelectSQL = sSQL;
+							sSQL += "  from " + sVIEW_NAME + ControlChars.CrLf;
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.CommandText = sSQL;
+								cmd.CommandTimeout = 0;
+								if ( gITEM_ID != Guid.Empty )
+								{
+									_security.Filter(cmd, sMODULE_NAME, "list");
+									cmd.CommandText += "   and ID = @ID" + ControlChars.CrLf;
+									Sql.AddParameter(cmd, "@ID", gITEM_ID);
+								}
+								else
+								{
+									_security.Filter(cmd, sMODULE_NAME, "list");
+									if ( bRecentActivity )
+									{
+										int nRecentActivityDays = Sql.ToInteger(_memoryCache.Get("CONFIG.ActivityStream.RecentActivityDays"));
+										if ( nRecentActivityDays == 0 )
+											nRecentActivityDays = 7;
+										cmd.CommandText += "   and STREAM_DATE > @STREAM_DATE" + ControlChars.CrLf;
+										Sql.AddParameter(cmd, "@STREAM_DATE", DateTime.Now.AddDays(-nRecentActivityDays));
+									}
+								}
+								if ( !Sql.IsEmptyString(sFILTER) )
+								{
+									RestUtil.ConvertODataFilter(sFILTER, cmd);
+								}
+								cmd.CommandText += sORDER_BY + ControlChars.CrLf;
+								sbDumpSQL.Append(Sql.ExpandParameters(cmd));
+
+								using ( var da = _dbProviderFactories.CreateDataAdapter() )
+								{
+									((IDbDataAdapter)da).SelectCommand = cmd;
+									dt = new DataTable(sTABLE_NAME);
+									if ( nTOP > 0 )
+									{
+										lTotalCount = -1;
+										if ( cmd.CommandText.StartsWith(sSelectSQL) )
+										{
+											string sOriginalSQL = cmd.CommandText;
+											string sCountSQL = "select count(*) " + ControlChars.CrLf + sOriginalSQL.Substring(sSelectSQL.Length);
+											cmd.CommandText = sCountSQL;
+											lTotalCount = Sql.ToLong(cmd.ExecuteScalar());
+											cmd.CommandText = sOriginalSQL;
+										}
+										if ( nSKIP > 0 )
+										{
+											int nCurrentPageIndex = nSKIP / nTOP;
+											Sql.PageResults(cmd, sTABLE_NAME, sORDER_BY, nCurrentPageIndex, nTOP);
+										}
+										else
+										{
+											Sql.LimitResults(cmd, nTOP);
+										}
+									}
+									da.Fill(dt);
+									if ( nTOP <= 0 )
+										lTotalCount = dt.Rows.Count;
+								}
+							}
+						}
+					}
+				}
+			}
+			if ( dt == null )
+				dt = new DataTable();
+			return dt;
 		}
 
 	}  // class RestController

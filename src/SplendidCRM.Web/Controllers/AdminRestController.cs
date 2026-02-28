@@ -135,10 +135,11 @@ namespace SplendidCRM.Web.Controllers
 			public string FIELD_TYPE          ;
 			public string DATA_LABEL          ;
 			public string DATA_FIELD          ;
+			public string DISPLAY_FIELD       ;
 			public string MODULE_TYPE         ;
 			public string LIST_NAME           ;
 			public string DATA_FORMAT         ;
-			public string FORMAT_MAX_LENGTH   ;
+			public int    FORMAT_MAX_LENGTH   ;
 			public string URL_FIELD           ;
 			public string URL_FORMAT          ;
 			public string COLUMN_TYPE         ;
@@ -326,151 +327,217 @@ namespace SplendidCRM.Web.Controllers
 				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
-				List<ModuleNode> modules = new List<ModuleNode>();
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 108-332.
+				// Uses a single UNION ALL query, Global node, L10N localization, and vwTERMINOLOGY_PickList.
+				List<ModuleNode> lstModules = new List<ModuleNode>();
+				Dictionary<string, ModuleNode> dict = new Dictionary<string, ModuleNode>();
 
-				// Languages for terminology lists
-				List<string> lstLanguages = new List<string>();
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
 				{
 					con.Open();
-					using IDbCommand cmdLang = con.CreateCommand();
-					cmdLang.CommandText =
-						"select NAME              " + ControlChars.CrLf
-					  + "  from vwLANGUAGES       " + ControlChars.CrLf
-					  + " where ACTIVE = 1        " + ControlChars.CrLf
-					  + " order by NAME           " + ControlChars.CrLf;
-					using var daLang = _dbProviderFactories.CreateDataAdapter();
-					((IDbDataAdapter)daLang).SelectCommand = cmdLang;
-					using var dtLang = new DataTable();
-					daLang.Fill(dtLang);
-					foreach (DataRow row in dtLang.Rows)
-						lstLanguages.Add(Sql.ToString(row["NAME"]));
-				}
+					string sSQL;
 
-				using (IDbConnection con = _dbProviderFactories.CreateConnection())
-				{
-					con.Open();
-					// EditViews and Search views
-					using (IDbCommand cmd = con.CreateCommand())
+					// 9g: Languages with DISPLAY_NAME and exclusion filter
+					DataTable dtLANGUAGES = new DataTable();
+					sSQL = "select NAME, DISPLAY_NAME               " + ControlChars.CrLf
+					     + "  from vwLANGUAGES                      " + ControlChars.CrLf
+					     + " where ACTIVE = 1                       " + ControlChars.CrLf
+					     + "   and NAME not in ('en-AU','en-GB','en-CA')" + ControlChars.CrLf
+					     + " order by NAME                          " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
-						cmd.CommandText =
-							"select MODULE_NAME, NAME, EDIT_TYPE " + ControlChars.CrLf
-						  + "  from vwMODULES_Edit               " + ControlChars.CrLf
-						  + " order by MODULE_NAME, NAME         " + ControlChars.CrLf;
-						using var da = _dbProviderFactories.CreateDataAdapter();
-						((IDbDataAdapter)da).SelectCommand = cmd;
-						using var dt = new DataTable();
-						da.Fill(dt);
-						foreach (DataRow row in dt.Rows)
+						cmd.CommandText = sSQL;
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
 						{
-							string sModuleName = Sql.ToString(row["MODULE_NAME"]);
-							string sViewName   = Sql.ToString(row["NAME"]);
-							string sEditType   = Sql.ToString(row["EDIT_TYPE"]);
-							ModuleNode mn = modules.Find(m => m.ModuleName == sModuleName);
-							if (mn == null)
-							{
-								mn = new ModuleNode { ModuleName = sModuleName, DisplayName = sModuleName, IsAdmin = Sql.ToBoolean(_memoryCache.Get("Modules." + sModuleName + ".IsAdmin")) };
-								modules.Add(mn);
-							}
-							ViewNode vn = new ViewNode { ViewName = sViewName, DisplayName = sViewName, LayoutType = sEditType };
-							if (sEditType == "SearchView" || sEditType == "SearchBasic" || sEditType == "SearchAdvanced" || sEditType == "SearchPopup" || sViewName.Contains(".SearchView") || sViewName.Contains(".SearchBasic") || sViewName.Contains(".SearchAdvanced"))
-								mn.Search.Add(vn);
-							else
-								mn.EditViews.Add(vn);
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							da.Fill(dtLANGUAGES);
 						}
 					}
-					// DetailViews
-					using (IDbCommand cmd = con.CreateCommand())
+
+					// 9d: Modules dictionary from vwMODULES_Edit (MODULE_NAME, MODULE_ENABLED only)
+					Dictionary<string, bool> dictAllModules = new Dictionary<string, bool>();
+					sSQL = "select MODULE_NAME                      " + ControlChars.CrLf
+					     + "     , MODULE_ENABLED                   " + ControlChars.CrLf
+					     + "  from vwMODULES_Edit                   " + ControlChars.CrLf
+					     + " order by MODULE_NAME                   " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
-						cmd.CommandText =
-							"select MODULE_NAME, NAME " + ControlChars.CrLf
-						  + "  from vwDETAILVIEWS     " + ControlChars.CrLf
-						  + " order by MODULE_NAME, NAME " + ControlChars.CrLf;
-						using var da = _dbProviderFactories.CreateDataAdapter();
-						((IDbDataAdapter)da).SelectCommand = cmd;
-						using var dt = new DataTable();
-						da.Fill(dt);
-						foreach (DataRow row in dt.Rows)
+						cmd.CommandText = sSQL;
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
 						{
-							string sModuleName = Sql.ToString(row["MODULE_NAME"]);
-							string sViewName   = Sql.ToString(row["NAME"]);
-							ModuleNode mn = modules.Find(m => m.ModuleName == sModuleName);
-							if (mn == null)
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								mn = new ModuleNode { ModuleName = sModuleName, DisplayName = sModuleName, IsAdmin = Sql.ToBoolean(_memoryCache.Get("Modules." + sModuleName + ".IsAdmin")) };
-								modules.Add(mn);
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									string sMODULE_NAME    = Sql.ToString (row["MODULE_NAME"   ]);
+									bool   bMODULE_ENABLED = Sql.ToBoolean(row["MODULE_ENABLED"]);
+									if ( !dictAllModules.ContainsKey(sMODULE_NAME) )
+										dictAllModules[sMODULE_NAME] = bMODULE_ENABLED;
+								}
 							}
-							mn.DetailViews.Add(new ViewNode { ViewName = sViewName, DisplayName = sViewName, LayoutType = "DetailView" });
 						}
 					}
-					// GridViews (ListViews/SubPanels)
-					using (IDbCommand cmd = con.CreateCommand())
+
+					// 9h: Global node — first entry (ModuleName = String.Empty)
+					ViewNode view = null;
+					ModuleNode dictMODULE = new ModuleNode();
+					lstModules.Add(dictMODULE);
+					dictMODULE.ModuleName  = String.Empty;
+					dictMODULE.IsAdmin     = false;
+					dictMODULE.DisplayName = "Global";
+					foreach ( DataRow rowLang in dtLANGUAGES.Rows )
 					{
-						cmd.CommandText =
-							"select NAME, VIEW_NAME " + ControlChars.CrLf
-						  + "  from vwGRIDVIEWS     " + ControlChars.CrLf
-						  + " order by NAME         " + ControlChars.CrLf;
-						using var da = _dbProviderFactories.CreateDataAdapter();
-						((IDbDataAdapter)da).SelectCommand = cmd;
-						using var dt = new DataTable();
-						da.Fill(dt);
-						foreach (DataRow row in dt.Rows)
+						view = new ViewNode();
+						view.ViewName    = Sql.ToString(rowLang["NAME"]);
+						view.LayoutType  = "Terminology";
+						view.DisplayName = Sql.ToString(rowLang["DISPLAY_NAME"]);
+						dictMODULE.Terminology.Add(view);
+					}
+					// 9h: vwTERMINOLOGY_PickList for Global node TerminologyLists
+					sSQL = "select LIST_NAME             " + ControlChars.CrLf
+					     + "  from vwTERMINOLOGY_PickList" + ControlChars.CrLf
+					     + " order by LIST_NAME          " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
 						{
-							string sName     = Sql.ToString(row["NAME"]);
-							string sViewName = Sql.ToString(row["VIEW_NAME"]);
-							string[] parts   = sName.Split('.');
-							string sModuleName = parts.Length > 1 ? parts[1] : parts[0];
-							string sLayoutType = parts[0];
-							ModuleNode mn = modules.Find(m => m.ModuleName == sModuleName);
-							if (mn == null)
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								mn = new ModuleNode { ModuleName = sModuleName, DisplayName = sModuleName, IsAdmin = Sql.ToBoolean(_memoryCache.Get("Modules." + sModuleName + ".IsAdmin")) };
-								modules.Add(mn);
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									view = new ViewNode();
+									view.ViewName    = Sql.ToString(row["LIST_NAME"]);
+									view.LayoutType  = "TerminologyList";
+									view.DisplayName = Sql.ToString(row["LIST_NAME"]);
+									dictMODULE.TerminologyLists.Add(view);
+								}
 							}
-							ViewNode vn = new ViewNode { ViewName = sName, DisplayName = sName, LayoutType = sLayoutType };
-							if (sLayoutType == "SubpanelView" || sLayoutType.StartsWith("Subpanel"))
-								mn.SubPanels.Add(vn);
-							else
-								mn.ListViews.Add(vn);
 						}
 					}
-					// EditViews Relationships
-					using (IDbCommand cmd = con.CreateCommand())
+
+					// Main UNION ALL query: 9d/9e/9f combined
+					sSQL = "select NAME                                   " + ControlChars.CrLf
+					     + "     , MODULE_NAME                            " + ControlChars.CrLf
+					     + "     , 'EditView'               as LAYOUT_TYPE" + ControlChars.CrLf
+					     + "  from vwEDITVIEWS                            " + ControlChars.CrLf
+					     + "union all                                     " + ControlChars.CrLf
+					     + "select NAME                                   " + ControlChars.CrLf
+					     + "     , MODULE_NAME                            " + ControlChars.CrLf
+					     + "     , 'DetailView'             as LAYOUT_TYPE" + ControlChars.CrLf
+					     + "  from vwDETAILVIEWS                          " + ControlChars.CrLf
+					     + "union all                                     " + ControlChars.CrLf
+					     + "select NAME                                   " + ControlChars.CrLf
+					     + "     , MODULE_NAME                            " + ControlChars.CrLf
+					     + "     , 'ListView'               as LAYOUT_TYPE" + ControlChars.CrLf
+					     + "  from vwGRIDVIEWS                            " + ControlChars.CrLf
+					     + "union all                                     " + ControlChars.CrLf
+					     + "select distinct DETAIL_NAME            as NAME" + ControlChars.CrLf
+					     + "     , DETAIL_NAME              as MODULE_NAME" + ControlChars.CrLf
+					     + "     , 'DetailViewRelationship'               " + ControlChars.CrLf
+					     + "  from vwDETAILVIEWS_RELATIONSHIPS_La         " + ControlChars.CrLf
+					     + "union all                                     " + ControlChars.CrLf
+					     + "select distinct EDIT_NAME              as NAME" + ControlChars.CrLf
+					     + "     , EDIT_NAME                as MODULE_NAME" + ControlChars.CrLf
+					     + "     , 'EditViewRelationship'                 " + ControlChars.CrLf
+					     + "  from " + Sql.MetadataName(con, "vwEDITVIEWS_RELATIONSHIPS_Layout") + ControlChars.CrLf
+					     + " order by MODULE_NAME, NAME                   " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
 					{
-						cmd.CommandText =
-							"select MODULE_NAME, EDIT_NAME " + ControlChars.CrLf
-						  + "  from vwEDITVIEWS            " + ControlChars.CrLf
-						  + " where VIEW_TYPE = 'Relationship' " + ControlChars.CrLf
-						  + " order by MODULE_NAME, EDIT_NAME " + ControlChars.CrLf;
-						using var da = _dbProviderFactories.CreateDataAdapter();
-						((IDbDataAdapter)da).SelectCommand = cmd;
-						using var dt = new DataTable();
-						da.Fill(dt);
-						foreach (DataRow row in dt.Rows)
+						cmd.CommandText = sSQL;
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
 						{
-							string sModuleName = Sql.ToString(row["MODULE_NAME"]);
-							string sViewName   = Sql.ToString(row["EDIT_NAME"]);
-							ModuleNode mn = modules.Find(m => m.ModuleName == sModuleName);
-							if (mn == null)
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using ( DataTable dt = new DataTable() )
 							{
-								mn = new ModuleNode { ModuleName = sModuleName, DisplayName = sModuleName, IsAdmin = Sql.ToBoolean(_memoryCache.Get("Modules." + sModuleName + ".IsAdmin")) };
-								modules.Add(mn);
+								da.Fill(dt);
+								foreach ( DataRow row in dt.Rows )
+								{
+									string sNAME        = Sql.ToString(row["NAME"       ]);
+									string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
+									string sLAYOUT_TYPE = Sql.ToString(row["LAYOUT_TYPE"]);
+									// For relationship views, extract module from dotted name
+									if ( sLAYOUT_TYPE == "DetailViewRelationship" || sLAYOUT_TYPE == "EditViewRelationship" )
+									{
+										string[] arrMODULE_NAME = sMODULE_NAME.Split('.');
+										sMODULE_NAME = arrMODULE_NAME[0];
+									}
+									// 9d: Exclude disabled modules
+									if ( dictAllModules.ContainsKey(sMODULE_NAME) && !dictAllModules[sMODULE_NAME] )
+										continue;
+									try
+									{
+										if ( !dict.ContainsKey(sMODULE_NAME) )
+										{
+											dictMODULE = new ModuleNode();
+											dict.Add(sMODULE_NAME, dictMODULE);
+											lstModules.Add(dictMODULE);
+											dictMODULE.ModuleName = sMODULE_NAME;
+											dictMODULE.IsAdmin    = Sql.ToBoolean(_memoryCache.Get("Modules." + sMODULE_NAME + ".IsAdmin"));
+											// 9i: L10N localization for DisplayName
+											string sDisplayName = L10n.Term(".moduleList." + sMODULE_NAME);
+											if ( sDisplayName.StartsWith(".moduleList.") )
+												sDisplayName = sMODULE_NAME;
+											dictMODULE.DisplayName = sDisplayName;
+											// Add terminology nodes per language (using DISPLAY_NAME)
+											foreach ( DataRow rowLang in dtLANGUAGES.Rows )
+											{
+												view = new ViewNode();
+												view.ViewName    = Sql.ToString(rowLang["NAME"]);
+												view.LayoutType  = "Terminology";
+												view.DisplayName = Sql.ToString(rowLang["DISPLAY_NAME"]);
+												dictMODULE.Terminology.Add(view);
+											}
+										}
+										else
+										{
+											dictMODULE = dict[sMODULE_NAME];
+										}
+										view = new ViewNode();
+										view.ViewName    = sNAME;
+										view.LayoutType  = sLAYOUT_TYPE;
+										view.DisplayName = sNAME;
+										if ( sNAME.StartsWith(sMODULE_NAME + ".") )
+											view.DisplayName = sNAME.Substring(sMODULE_NAME.Length + 1);
+										switch ( sLAYOUT_TYPE )
+										{
+											case "EditView":
+												if ( sNAME.Contains(".Search") )
+													dictMODULE.Search.Add(view);
+												else
+													dictMODULE.EditViews.Add(view);
+												break;
+											case "DetailView":
+												dictMODULE.DetailViews.Add(view);
+												break;
+											case "ListView":
+												if ( sNAME.StartsWith(sMODULE_NAME + ".ArchiveView") || sNAME.StartsWith(sMODULE_NAME + ".ListView") || sNAME.StartsWith(sMODULE_NAME + ".PopupView") || sNAME.StartsWith(sMODULE_NAME + ".Export") || sNAME.Contains("." + sMODULE_NAME) )
+													dictMODULE.ListViews.Add(view);
+												else
+													dictMODULE.SubPanels.Add(view);
+												break;
+											case "DetailViewRelationship":
+												dictMODULE.Relationships.Add(view);
+												break;
+											case "EditViewRelationship":
+												dictMODULE.Relationships.Add(view);
+												break;
+										}
+									}
+									catch (Exception ex)
+									{
+										SplendidError.SystemError(new StackFrame(1, true), ex);
+									}
+								}
 							}
-							mn.Relationships.Add(new ViewNode { ViewName = sViewName, DisplayName = sViewName, LayoutType = "Relationship" });
-						}
-					}
-					// Terminology entries per language
-					foreach (string sLang in lstLanguages)
-					{
-						foreach (ModuleNode mn in modules)
-						{
-							mn.Terminology.Add(new ViewNode { ViewName = mn.ModuleName + "." + sLang, DisplayName = sLang, LayoutType = "Terminology" });
-							mn.TerminologyLists.Add(new ViewNode { ViewName = mn.ModuleName + "." + sLang + ".Lists", DisplayName = sLang + " (Lists)", LayoutType = "TerminologyLists" });
 						}
 					}
 				}
-				modules.Sort((a, b) => String.Compare(a.ModuleName, b.ModuleName, StringComparison.OrdinalIgnoreCase));
-				return JsonContent(new { d = new { results = modules } });
+				return JsonContent(new { d = lstModules });
 			}
 			catch (Exception ex)
 			{
@@ -492,141 +559,343 @@ namespace SplendidCRM.Web.Controllers
 				SetNoCacheHeaders();
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+				if ( !_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE) )
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 
-				List<LayoutField> fields    = new List<LayoutField>();
-				List<LayoutField> available = new List<LayoutField>();
-				bool bLayoutAvailable = false;
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 336-700.
+				if ( Sql.IsEmptyString(ModuleName) )
+					throw new Exception("The module name must be specified.");
+				string sTABLE_NAME = Sql.ToString(_memoryCache.Get<object>("Modules." + ModuleName + ".TableName"));
+				string sVIEW_NAME  = "vw" + sTABLE_NAME;
+				bool   bValid      = Sql.ToBoolean(_memoryCache.Get<object>("Modules." + ModuleName + ".Valid"));
+				if ( Sql.IsEmptyString(sTABLE_NAME) && !bValid )
+					throw new Exception("Unknown module: " + ModuleName);
+
+				List<LayoutField> lstFields = new List<LayoutField>();
+				if ( LayoutType != "EditView" && LayoutType != "DetailView" && LayoutType != "ListView" )
+				{
+					LayoutType = "EditView";
+				}
+				if ( Sql.IsEmptyString(LayoutName) )
+				{
+					LayoutName = ModuleName + "." + LayoutType;
+				}
 
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
+				string sSQL;
+				DataTable dtDefaultView = new DataTable();
 
-				// Determine which view/table to query based on LayoutType
-				string sViewName  = String.Empty;
-				string sTableName = String.Empty;
-				string sOrderBy   = String.Empty;
-
-				switch (LayoutType)
+				if ( LayoutType == "EditView" )
 				{
-					case "EditView":
-					case "SearchView":
-					case "SearchBasic":
-					case "SearchAdvanced":
-					case "SearchPopup":
-						sViewName  = "vwEDITVIEWS_FIELDS";
-						sTableName = "EDITVIEWS_FIELDS";
-						sOrderBy   = "FIELD_INDEX";
-						bLayoutAvailable = true;
-						break;
-					case "DetailView":
-						sViewName  = "vwDETAILVIEWS_FIELDS";
-						sTableName = "DETAILVIEWS_FIELDS";
-						sOrderBy   = "FIELD_INDEX";
-						bLayoutAvailable = true;
-						break;
-					case "ListView":
-					case "SubpanelView":
-						sViewName  = "vwGRIDVIEWS_COLUMNS";
-						sTableName = "GRIDVIEWS_COLUMNS";
-						sOrderBy   = "COLUMN_INDEX";
-						bLayoutAvailable = true;
-						break;
-					case "Relationship":
-						sViewName  = "vwEDITVIEWS_RELATIONSHIPS";
-						sTableName = "EDITVIEWS_RELATIONSHIPS";
-						sOrderBy   = "RELATIONSHIP_ORDER";
-						bLayoutAvailable = true;
-						break;
-					case "Terminology":
-						// Terminology is handled specially — return module terminology rows
-						return GetAdminLayoutTerminologyInternal(con, ModuleName, LayoutName);
-					case "TerminologyLists":
-						return GetAdminLayoutTerminologyListsInternal(con, ModuleName, LayoutName);
+					sSQL = "select *                        " + ControlChars.CrLf
+					     + "  from vwEDITVIEWS_FIELDS       " + ControlChars.CrLf
+					     + " where EDIT_NAME = @LAYOUT_NAME " + ControlChars.CrLf
+					     + "   and DEFAULT_VIEW = 1         " + ControlChars.CrLf
+					     + " order by FIELD_INDEX           " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							da.Fill(dtDefaultView);
+							if ( dtDefaultView.Rows.Count == 0 )
+							{
+								sSQL = "select *                        " + ControlChars.CrLf
+								     + "  from vwEDITVIEWS_FIELDS       " + ControlChars.CrLf
+								     + " where EDIT_NAME = @LAYOUT_NAME " + ControlChars.CrLf
+								     + "   and DEFAULT_VIEW = 0         " + ControlChars.CrLf
+								     + " order by FIELD_INDEX           " + ControlChars.CrLf;
+								cmd.CommandText = sSQL;
+								da.Fill(dtDefaultView);
+							}
+						}
+					}
+					sSQL = "select VIEW_NAME          " + ControlChars.CrLf
+					     + "  from vwEDITVIEWS        " + ControlChars.CrLf
+					     + " where NAME = @LAYOUT_NAME" + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						sVIEW_NAME = Sql.ToString(cmd.ExecuteScalar());
+						if ( Sql.IsEmptyString(sVIEW_NAME) )
+							sVIEW_NAME = "vw" + sTABLE_NAME + "_Edit";
+					}
+				}
+				else if ( LayoutType == "DetailView" )
+				{
+					sSQL = "select *                         " + ControlChars.CrLf
+					     + "  from vwDETAILVIEWS_FIELDS      " + ControlChars.CrLf
+					     + " where DETAIL_NAME = @LAYOUT_NAME" + ControlChars.CrLf
+					     + "   and DEFAULT_VIEW = 1          " + ControlChars.CrLf
+					     + " order by FIELD_INDEX            " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							da.Fill(dtDefaultView);
+							if ( dtDefaultView.Rows.Count == 0 )
+							{
+								sSQL = "select *                         " + ControlChars.CrLf
+								     + "  from vwDETAILVIEWS_FIELDS      " + ControlChars.CrLf
+								     + " where DETAIL_NAME = @LAYOUT_NAME" + ControlChars.CrLf
+								     + "   and DEFAULT_VIEW = 0          " + ControlChars.CrLf
+								     + " order by FIELD_INDEX            " + ControlChars.CrLf;
+								cmd.CommandText = sSQL;
+								da.Fill(dtDefaultView);
+							}
+						}
+					}
+					sSQL = "select VIEW_NAME          " + ControlChars.CrLf
+					     + "  from vwDETAILVIEWS      " + ControlChars.CrLf
+					     + " where NAME = @LAYOUT_NAME" + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						sVIEW_NAME = Sql.ToString(cmd.ExecuteScalar());
+						if ( Sql.IsEmptyString(sVIEW_NAME) )
+							sVIEW_NAME = "vw" + sTABLE_NAME + "_Edit";
+					}
+				}
+				else if ( LayoutType == "ListView" )
+				{
+					sSQL = "select *                        " + ControlChars.CrLf
+					     + "  from vwGRIDVIEWS_COLUMNS      " + ControlChars.CrLf
+					     + " where GRID_NAME = @LAYOUT_NAME " + ControlChars.CrLf
+					     + "   and DEFAULT_VIEW = 1         " + ControlChars.CrLf
+					     + " order by COLUMN_INDEX          " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						using ( var da = _dbProviderFactories.CreateDataAdapter() )
+						{
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							da.Fill(dtDefaultView);
+							if ( dtDefaultView.Rows.Count == 0 )
+							{
+								sSQL = "select *                        " + ControlChars.CrLf
+								     + "  from vwGRIDVIEWS_COLUMNS      " + ControlChars.CrLf
+								     + " where GRID_NAME = @LAYOUT_NAME " + ControlChars.CrLf
+								     + "   and DEFAULT_VIEW = 0         " + ControlChars.CrLf
+								     + " order by COLUMN_INDEX          " + ControlChars.CrLf;
+								cmd.CommandText = sSQL;
+								da.Fill(dtDefaultView);
+							}
+						}
+					}
+					sSQL = "select VIEW_NAME          " + ControlChars.CrLf
+					     + "  from vwGRIDVIEWS        " + ControlChars.CrLf
+					     + " where NAME = @LAYOUT_NAME" + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						Sql.AddParameter(cmd, "@LAYOUT_NAME", LayoutName);
+						sVIEW_NAME = Sql.ToString(cmd.ExecuteScalar());
+						if ( Sql.IsEmptyString(sVIEW_NAME) )
+							sVIEW_NAME = "vw" + sTABLE_NAME + "_List";
+					}
 				}
 
-				if (bLayoutAvailable)
+				DataView vwDefaultView = new DataView(dtDefaultView);
+
+				using ( IDbCommand cmd = con.CreateCommand() )
 				{
-					using IDbCommand cmd = con.CreateCommand();
-					cmd.CommandText =
-						"select *                    " + ControlChars.CrLf
-					  + "  from " + sViewName        + ControlChars.CrLf
-					  + " where EDIT_NAME = @EDIT_NAME " + ControlChars.CrLf
-					  + " order by " + sOrderBy      + ControlChars.CrLf;
-					if (sViewName == "vwGRIDVIEWS_COLUMNS")
+					if ( LayoutType == "EditView" && !LayoutName.Contains(".Search") )
 					{
-						// GridViews use GRID_NAME
-						cmd.CommandText = cmd.CommandText.Replace("EDIT_NAME", "GRID_NAME");
-						cmd.CommandText = cmd.CommandText.Replace("FIELD_INDEX", "COLUMN_INDEX");
+						if ( Sql.ToBoolean(_memoryCache.Get<object>("CONFIG.LayoutEditor.EditView.AllFields")) )
+						{
+							sSQL = "select *                        " + ControlChars.CrLf
+							     + "  from vwSqlColumns             " + ControlChars.CrLf
+							     + " where ObjectName = @OBJECTNAME " + ControlChars.CrLf
+							     + " order by ColumnName            " + ControlChars.CrLf;
+							cmd.CommandText = sSQL;
+							if ( !Sql.IsEmptyString(sVIEW_NAME) )
+								Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, sVIEW_NAME));
+							else
+								Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, "vw" + sTABLE_NAME));
+						}
+						else
+						{
+							sSQL = "select *                        " + ControlChars.CrLf
+							     + "  from vwSqlColumns             " + ControlChars.CrLf
+							     + " where ObjectName = @OBJECTNAME " + ControlChars.CrLf
+							     + "   and ObjectType = 'P'         " + ControlChars.CrLf
+							     + " union all                      " + ControlChars.CrLf
+							     + "select *                        " + ControlChars.CrLf
+							     + "  from vwSqlColumns             " + ControlChars.CrLf
+							     + " where ObjectName = @CUSTOMNAME " + ControlChars.CrLf
+							     + "   and ObjectType = 'U'         " + ControlChars.CrLf;
+							if ( Sql.IsOracle(con) )
+							{
+								sSQL = "select *" + ControlChars.CrLf
+								     + " from (" + sSQL + ControlChars.CrLf
+								     + "      ) vwSqlColumns" + ControlChars.CrLf
+								     + " order by ColumnName" + ControlChars.CrLf;
+							}
+							else
+							{
+								sSQL += " order by ColumnName" + ControlChars.CrLf;
+							}
+							cmd.CommandText = sSQL;
+							Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, "sp" + sTABLE_NAME + "_Update"));
+							Sql.AddParameter(cmd, "@CUSTOMNAME", Sql.MetadataName(cmd, sTABLE_NAME + "_CSTM"));
+						}
 					}
-					Sql.AddParameter(cmd, "@EDIT_NAME" , LayoutName);
-					if (sViewName == "vwGRIDVIEWS_COLUMNS")
+					else
 					{
-						Sql.SetParameter(cmd, "@EDIT_NAME", LayoutName);
-					}
-					using var da = _dbProviderFactories.CreateDataAdapter();
-					((IDbDataAdapter)da).SelectCommand = cmd;
-					using var dt = new DataTable();
-					da.Fill(dt);
-					foreach (DataRow row in dt.Rows)
-					{
-						LayoutField lf = DataRowToLayoutField(row);
-						fields.Add(lf);
+						sSQL = "select *                        " + ControlChars.CrLf
+						     + "  from vwSqlColumns             " + ControlChars.CrLf
+						     + " where ObjectName = @OBJECTNAME " + ControlChars.CrLf
+						     + " order by ColumnName            " + ControlChars.CrLf;
+						cmd.CommandText = sSQL;
+						if ( !Sql.IsEmptyString(sVIEW_NAME) )
+							Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, sVIEW_NAME));
+						else if ( LayoutType == "ListView" )
+							Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, "vw" + sTABLE_NAME + "_List"));
+						else
+							Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, "vw" + sTABLE_NAME));
 					}
 
-					// Available fields from SqlColumns (not yet in layout)
-					DataTable dtSqlColumns = _splendidCache.SqlColumns(sTableName);
-					if (dtSqlColumns != null)
+					using ( var da = _dbProviderFactories.CreateDataAdapter() )
 					{
-						foreach (DataRow row in dtSqlColumns.Rows)
+						((IDbDataAdapter)da).SelectCommand = cmd;
+						using ( DataTable dt = new DataTable() )
 						{
-							string sColName = Sql.ToString(row["ColumnName"]);
-							bool bAlreadyUsed = fields.Exists(f => f.ColumnName == sColName);
-							if (!bAlreadyUsed)
+							da.Fill(dt);
+							// Add missing columns as in legacy lines 569-586
+							if ( !dt.Columns.Contains("FIELD_TYPE"        ) ) dt.Columns.Add("FIELD_TYPE"        , typeof(System.String));
+							if ( !dt.Columns.Contains("DATA_LABEL"        ) ) dt.Columns.Add("DATA_LABEL"        , typeof(System.String));
+							if ( !dt.Columns.Contains("DATA_FIELD"        ) ) dt.Columns.Add("DATA_FIELD"        , typeof(System.String));
+							if ( !dt.Columns.Contains("DISPLAY_FIELD"     ) ) dt.Columns.Add("DISPLAY_FIELD"     , typeof(System.String));
+							if ( !dt.Columns.Contains("MODULE_TYPE"       ) ) dt.Columns.Add("MODULE_TYPE"       , typeof(System.String));
+							if ( !dt.Columns.Contains("LIST_NAME"         ) ) dt.Columns.Add("LIST_NAME"         , typeof(System.String));
+							if ( !dt.Columns.Contains("DATA_FORMAT"       ) ) dt.Columns.Add("DATA_FORMAT"       , typeof(System.String));
+							if ( !dt.Columns.Contains("FORMAT_MAX_LENGTH" ) ) dt.Columns.Add("FORMAT_MAX_LENGTH" , typeof(System.Int32 ));
+							if ( !dt.Columns.Contains("URL_FIELD"         ) ) dt.Columns.Add("URL_FIELD"         , typeof(System.String));
+							if ( !dt.Columns.Contains("URL_FORMAT"        ) ) dt.Columns.Add("URL_FORMAT"        , typeof(System.String));
+							if ( !dt.Columns.Contains("COLUMN_TYPE"       ) ) dt.Columns.Add("COLUMN_TYPE"       , typeof(System.String));
+							if ( !dt.Columns.Contains("HEADER_TEXT"       ) ) dt.Columns.Add("HEADER_TEXT"       , typeof(System.String));
+							if ( !dt.Columns.Contains("SORT_EXPRESSION"   ) ) dt.Columns.Add("SORT_EXPRESSION"   , typeof(System.String));
+							if ( !dt.Columns.Contains("URL_ASSIGNED_FIELD") ) dt.Columns.Add("URL_ASSIGNED_FIELD", typeof(System.String));
+
+							foreach ( DataRow row in dt.Rows )
 							{
-								LayoutField lf = new LayoutField
+								string sColumnName = Sql.ToString(row["ColumnName"]);
+								if ( sColumnName.StartsWith("@") )
+									sColumnName = sColumnName.Replace("@", String.Empty);
+								else if ( sColumnName.StartsWith("ID_") && Sql.IsOracle(cmd) )
+									sColumnName = sColumnName.Substring(3);
+								// Filter system columns per legacy lines 602-606
+								if ( (sColumnName == "ID" && !LayoutName.Contains(".Export")) || sColumnName == "ID_C" || sColumnName == "MODIFIED_USER_ID" || sColumnName == "TEAM_SET_LIST" || sColumnName == "ASSIGNED_SET_LIST" )
 								{
-									ColumnName = sColName,
-									ColumnType = Sql.ToString(row["ColumnType"]),
-									CsType     = Sql.ToString(row["CsType"]),
-									length     = Sql.ToInteger(row["length"])
-								};
-								available.Add(lf);
+									row.Delete();
+									continue;
+								}
+								row["ColumnName"] = sColumnName;
+								row["DATA_LABEL"] = Utils.BuildTermName(ModuleName, sColumnName);
+								row["DATA_FIELD"] = sColumnName;
+								if ( LayoutType == "EditView" )
+								{
+									row["FIELD_TYPE"] = "TextBox";
+									vwDefaultView.RowFilter = "DATA_FIELD = '" + sColumnName + "'";
+									if ( vwDefaultView.Count > 0 )
+									{
+										row["FIELD_TYPE"       ] = Sql.ToString (vwDefaultView[0]["FIELD_TYPE"       ]);
+										row["DISPLAY_FIELD"    ] = Sql.ToString (vwDefaultView[0]["DISPLAY_FIELD"    ]);
+										row["LIST_NAME"        ] = Sql.ToString (vwDefaultView[0]["LIST_NAME"        ]);
+										row["DATA_FORMAT"      ] = Sql.ToString (vwDefaultView[0]["DATA_FORMAT"      ]);
+										row["FORMAT_MAX_LENGTH"] = Sql.ToInteger(vwDefaultView[0]["FORMAT_MAX_LENGTH"]);
+										row["MODULE_TYPE"      ] = Sql.ToString (vwDefaultView[0]["MODULE_TYPE"      ]);
+									}
+								}
+								else if ( LayoutType == "DetailView" )
+								{
+									row["FIELD_TYPE" ] = "String";
+									row["DATA_FORMAT"] = "{0}";
+									vwDefaultView.RowFilter = "DATA_FIELD = '" + sColumnName + "'";
+									if ( vwDefaultView.Count > 0 )
+									{
+										row["FIELD_TYPE" ] = Sql.ToString(vwDefaultView[0]["FIELD_TYPE" ]);
+										row["LIST_NAME"  ] = Sql.ToString(vwDefaultView[0]["LIST_NAME"  ]);
+										row["DATA_FORMAT"] = Sql.ToString(vwDefaultView[0]["DATA_FORMAT"]);
+										row["URL_FIELD"  ] = Sql.ToString(vwDefaultView[0]["URL_FIELD"  ]);
+										row["URL_FORMAT" ] = Sql.ToString(vwDefaultView[0]["URL_FORMAT" ]);
+										row["MODULE_TYPE"] = Sql.ToString(vwDefaultView[0]["MODULE_TYPE"]);
+									}
+								}
+								else if ( LayoutType == "ListView" )
+								{
+									row["COLUMN_TYPE"    ] = "BoundColumn";
+									row["DATA_FORMAT"    ] = String.Empty;
+									row["SORT_EXPRESSION"] = sColumnName;
+									string sMODULE_NAME = ModuleName;
+									string[] arrNAME = LayoutName.Split('.');
+									if ( arrNAME.Length > 1 && Sql.ToBoolean(_memoryCache.Get<object>("Modules." + arrNAME[1] + ".Valid")) )
+									{
+										sMODULE_NAME = arrNAME[1];
+									}
+									row["HEADER_TEXT"] = Utils.BuildTermName(sMODULE_NAME, sColumnName).Replace(".LBL_", ".LBL_LIST_");
+									vwDefaultView.RowFilter = "DATA_FIELD = '" + sColumnName + "'";
+									if ( vwDefaultView.Count > 0 )
+									{
+										row["COLUMN_TYPE"       ] = Sql.ToString(vwDefaultView[0]["COLUMN_TYPE"       ]);
+										row["DATA_FORMAT"       ] = Sql.ToString(vwDefaultView[0]["DATA_FORMAT"       ]);
+										row["HEADER_TEXT"       ] = Sql.ToString(vwDefaultView[0]["HEADER_TEXT"       ]);
+										row["SORT_EXPRESSION"   ] = Sql.ToString(vwDefaultView[0]["SORT_EXPRESSION"   ]);
+										row["LIST_NAME"         ] = Sql.ToString(vwDefaultView[0]["LIST_NAME"         ]);
+										row["URL_FIELD"         ] = Sql.ToString(vwDefaultView[0]["URL_FIELD"         ]);
+										row["URL_FORMAT"        ] = Sql.ToString(vwDefaultView[0]["URL_FORMAT"        ]);
+										row["MODULE_TYPE"       ] = Sql.ToString(vwDefaultView[0]["MODULE_TYPE"       ]);
+										row["URL_ASSIGNED_FIELD"] = Sql.ToString(vwDefaultView[0]["URL_ASSIGNED_FIELD"]);
+									}
+								}
+							}
+							dt.AcceptChanges();
+							DataView vw = new DataView(dt);
+							vw.Sort = "DATA_FIELD asc";
+							foreach ( DataRow row in dt.Rows )
+							{
+								LayoutField lay = new LayoutField();
+								lay.ColumnName         = Sql.ToString (row["ColumnName"        ]);
+								lay.ColumnType         = Sql.ToString (row["ColumnType"        ]);
+								lay.CsType             = Sql.ToString (row["CsType"            ]);
+								lay.length             = Sql.ToInteger(row["length"            ]);
+								lay.FIELD_TYPE         = Sql.ToString (row["FIELD_TYPE"        ]);
+								lay.DATA_LABEL         = Sql.ToString (row["DATA_LABEL"        ]);
+								lay.DATA_FIELD         = Sql.ToString (row["DATA_FIELD"        ]);
+								lay.MODULE_TYPE        = Sql.ToString (row["MODULE_TYPE"       ]);
+								lay.LIST_NAME          = Sql.ToString (row["LIST_NAME"         ]);
+								lay.DATA_FORMAT        = Sql.ToString (row["DATA_FORMAT"       ]);
+								if ( lay.CsType == "string" )
+									lay.FORMAT_MAX_LENGTH = Sql.ToInteger(row["FORMAT_MAX_LENGTH"]);
+								lay.URL_FIELD          = Sql.ToString (row["URL_FIELD"         ]);
+								lay.URL_FORMAT         = Sql.ToString (row["URL_FORMAT"        ]);
+								lay.COLUMN_TYPE        = Sql.ToString (row["COLUMN_TYPE"       ]);
+								lay.HEADER_TEXT        = Sql.ToString (row["HEADER_TEXT"       ]);
+								lay.SORT_EXPRESSION    = Sql.ToString (row["SORT_EXPRESSION"   ]);
+								lay.URL_ASSIGNED_FIELD = Sql.ToString (row["URL_ASSIGNED_FIELD"]);
+								lstFields.Add(lay);
 							}
 						}
 					}
 				}
-
-				return JsonContent(new { d = new { results = fields, available } });
+				Dictionary<string, object> d = new Dictionary<string, object>();
+				d.Add("d", lstFields);
+				return JsonContent(d);
 			}
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
 				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
 			}
-		}
-
-		private LayoutField DataRowToLayoutField(DataRow row)
-		{
-			var lf = new LayoutField();
-			if (row.Table.Columns.Contains("ColumnName"          )) lf.ColumnName         = Sql.ToString(row["ColumnName"          ]);
-			if (row.Table.Columns.Contains("ColumnType"          )) lf.ColumnType         = Sql.ToString(row["ColumnType"          ]);
-			if (row.Table.Columns.Contains("CsType"              )) lf.CsType             = Sql.ToString(row["CsType"              ]);
-			if (row.Table.Columns.Contains("length"              )) lf.length             = Sql.ToInteger(row["length"             ]);
-			if (row.Table.Columns.Contains("FIELD_TYPE"          )) lf.FIELD_TYPE         = Sql.ToString(row["FIELD_TYPE"          ]);
-			if (row.Table.Columns.Contains("DATA_LABEL"          )) lf.DATA_LABEL         = Sql.ToString(row["DATA_LABEL"          ]);
-			if (row.Table.Columns.Contains("DATA_FIELD"          )) lf.DATA_FIELD         = Sql.ToString(row["DATA_FIELD"          ]);
-			if (row.Table.Columns.Contains("MODULE_TYPE"         )) lf.MODULE_TYPE        = Sql.ToString(row["MODULE_TYPE"         ]);
-			if (row.Table.Columns.Contains("LIST_NAME"           )) lf.LIST_NAME          = Sql.ToString(row["LIST_NAME"           ]);
-			if (row.Table.Columns.Contains("DATA_FORMAT"         )) lf.DATA_FORMAT        = Sql.ToString(row["DATA_FORMAT"         ]);
-			if (row.Table.Columns.Contains("FORMAT_MAX_LENGTH"   )) lf.FORMAT_MAX_LENGTH  = Sql.ToString(row["FORMAT_MAX_LENGTH"   ]);
-			if (row.Table.Columns.Contains("URL_FIELD"           )) lf.URL_FIELD          = Sql.ToString(row["URL_FIELD"           ]);
-			if (row.Table.Columns.Contains("URL_FORMAT"          )) lf.URL_FORMAT         = Sql.ToString(row["URL_FORMAT"          ]);
-			if (row.Table.Columns.Contains("COLUMN_TYPE"         )) lf.COLUMN_TYPE        = Sql.ToString(row["COLUMN_TYPE"         ]);
-			if (row.Table.Columns.Contains("HEADER_TEXT"         )) lf.HEADER_TEXT        = Sql.ToString(row["HEADER_TEXT"         ]);
-			if (row.Table.Columns.Contains("SORT_EXPRESSION"     )) lf.SORT_EXPRESSION    = Sql.ToString(row["SORT_EXPRESSION"     ]);
-			if (row.Table.Columns.Contains("URL_ASSIGNED_FIELD"  )) lf.URL_ASSIGNED_FIELD = Sql.ToString(row["URL_ASSIGNED_FIELD"  ]);
-			return lf;
 		}
 
 		private IActionResult GetAdminLayoutTerminologyInternal(IDbConnection con, string sModuleName, string sLayoutName)
@@ -683,10 +952,6 @@ namespace SplendidCRM.Web.Controllers
 			}
 			return JsonContent(new { d = new { results } });
 		}
-
-		// Fix SqlColumns call in GetAdminLayoutModuleFields — the method above uses
-		// _splendidCache.SqlColumns(sTableName, ModuleName) but it only accepts one arg.
-		// The actual call is corrected here to only pass the table name.
 		private DataTable GetSqlColumnsForTable(string sTableName)
 		{
 			return _splendidCache.SqlColumns(sTableName);
@@ -1177,19 +1442,41 @@ namespace SplendidCRM.Web.Controllers
 				SplendidCRM.TimeZone T10n = GetUserTimezone();
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
-				using IDbCommand cmd = con.CreateCommand();
-				cmd.CommandText =
-					"select *                           " + ControlChars.CrLf
-				  + "  from vwACL_ACCESS_ByUser         " + ControlChars.CrLf
-				  + " where USER_ID = @USER_ID          " + ControlChars.CrLf
-				  + " order by MODULE_NAME              " + ControlChars.CrLf;
-				Sql.AddParameter(cmd, "@USER_ID", USER_ID);
-				using var da = _dbProviderFactories.CreateDataAdapter();
-				((IDbDataAdapter)da).SelectCommand = cmd;
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 5706-5730.
 				using var dt = new DataTable();
-				da.Fill(dt);
-				string json = JsonConvert.SerializeObject(_restUtil.ToJson(null, "ACL", dt, T10n), Newtonsoft.Json.Formatting.None);
-				return Content(json, "application/json", Encoding.UTF8);
+				string sSQL = "select MODULE_NAME          " + ControlChars.CrLf
+				            + "     , DISPLAY_NAME         " + ControlChars.CrLf
+				            + "     , ACLACCESS_ADMIN      " + ControlChars.CrLf
+				            + "     , ACLACCESS_ACCESS     " + ControlChars.CrLf
+				            + "     , ACLACCESS_VIEW       " + ControlChars.CrLf
+				            + "     , ACLACCESS_LIST       " + ControlChars.CrLf
+				            + "     , ACLACCESS_EDIT       " + ControlChars.CrLf
+				            + "     , ACLACCESS_DELETE     " + ControlChars.CrLf
+				            + "     , ACLACCESS_IMPORT     " + ControlChars.CrLf
+				            + "     , ACLACCESS_EXPORT     " + ControlChars.CrLf
+				            + "     , ACLACCESS_ARCHIVE    " + ControlChars.CrLf
+				            + "     , IS_ADMIN             " + ControlChars.CrLf
+				            + "  from vwACL_ACCESS_ByUser  " + ControlChars.CrLf
+				            + " where USER_ID = @USER_ID   " + ControlChars.CrLf;
+				using ( IDbCommand cmd = con.CreateCommand() )
+				{
+					cmd.CommandText = sSQL;
+					Sql.AddParameter(cmd, "@USER_ID", USER_ID);
+					if ( _security.AdminUserAccess("Users", "edit") < 0 )
+					{
+						StringBuilder sbSelf = new StringBuilder();
+						Sql.AppendParameter(cmd, sbSelf, "USER_ID", _security.USER_ID);
+						cmd.CommandText += sbSelf.ToString();
+					}
+					cmd.CommandText += " order by MODULE_NAME" + ControlChars.CrLf;
+					using var da = _dbProviderFactories.CreateDataAdapter();
+					((IDbDataAdapter)da).SelectCommand = cmd;
+					da.Fill(dt);
+				}
+				var reqObj = HttpContext.Request;
+				string sBaseURI = reqObj.Scheme + "://" + reqObj.Host.Value + reqObj.PathBase.Value + "/Administration/Rest.svc/GetAclAccessByUser";
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, "ACL", dt, T10n);
+				return JsonContent(new { d = dictResponse });
 			}
 			catch (Exception ex)
 			{
@@ -1331,55 +1618,96 @@ namespace SplendidCRM.Web.Controllers
 		{
 			try
 			{
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 3275-3315.
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
+				if ( !_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE) )
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
+				// Legacy reads TableName and ViewName from query string.
+				string sTableName = HttpContext.Request.Query.ContainsKey("TableName")
+					? Sql.ToString(HttpContext.Request.Query["TableName"]) : String.Empty;
+				string sViewName  = HttpContext.Request.Query.ContainsKey("ViewName")
+					? Sql.ToString(HttpContext.Request.Query["ViewName"]) : String.Empty;
 
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
 
-				string sTableName = Sql.ToString(dict.ContainsKey("TableName") ? dict["TableName"] : null);
-				if (Sql.IsEmptyString(sTableName))
-					return BadRequest(new { error = "TableName is required" });
+				// Fallback: if not in query string, try body.
+				if ( Sql.IsEmptyString(sTableName) )
+					sTableName = Sql.ToString(dict.ContainsKey("TableName") ? dict["TableName"] : null);
+				if ( Sql.IsEmptyString(sViewName) )
+					sViewName = Sql.ToString(dict.ContainsKey("ViewName") ? dict["ViewName"] : null);
 
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbTransaction trn = Sql.BeginTransaction(con);
-				try
+				if ( Sql.IsEmptyString(sTableName) )
+					return BadRequest(new { error = "The table name must be specified." });
+				if ( Sql.IsEmptyString(sViewName) && sTableName != "TERMINOLOGY" )
+					return BadRequest(new { error = "The layout view name must be specified." });
+
+				// Dispatch to the appropriate handler and clear caches.
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 3297-3313.
+				using ( IDbConnection con = _dbProviderFactories.CreateConnection() )
 				{
-					// Dispatch to appropriate layout table update
-					switch (sTableName.ToUpper())
+					con.Open();
+					switch ( sTableName )
 					{
 						case "EDITVIEWS_FIELDS":
+						{
+							using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+							{
+								try
+								{
+									UpdateLayoutTable(con, trn, sTableName, dict);
+									trn.Commit();
+								}
+								catch(Exception ex) { trn.Rollback(); throw new Exception("Layout update failed; transaction aborted: " + ex.Message, ex); }
+							}
+							_splendidCache.ClearEditView(sViewName);
+							break;
+						}
 						case "DETAILVIEWS_FIELDS":
+						{
+							using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+							{
+								try
+								{
+									UpdateLayoutTable(con, trn, sTableName, dict);
+									trn.Commit();
+								}
+								catch(Exception ex) { trn.Rollback(); throw new Exception("Layout update failed; transaction aborted: " + ex.Message, ex); }
+							}
+							_splendidCache.ClearDetailView(sViewName);
+							break;
+						}
 						case "GRIDVIEWS_COLUMNS":
-							UpdateLayoutTable(con, trn, sTableName, dict);
+						{
+							using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+							{
+								try
+								{
+									UpdateLayoutTable(con, trn, sTableName, dict);
+									trn.Commit();
+								}
+								catch(Exception ex) { trn.Rollback(); throw new Exception("Layout update failed; transaction aborted: " + ex.Message, ex); }
+							}
+							_splendidCache.ClearGridView(sViewName);
+							break;
+						}
+						case "DETAILVIEWS_RELATIONSHIPS":
+							UpdateAdminTableLayoutNameInternal(con, "DETAILVIEWS_RELATIONSHIPS", "DETAIL_NAME", sViewName, dict);
+							_splendidCache.ClearDetailViewRelationships();
 							break;
 						case "EDITVIEWS_RELATIONSHIPS":
-						case "DETAILVIEWS_RELATIONSHIPS":
-						case "DYNAMIC_BUTTONS":
-							UpdateLayoutEvents(con, trn, sTableName, dict);
+							UpdateAdminTableLayoutNameInternal(con, "EDITVIEWS_RELATIONSHIPS", "EDIT_NAME", sViewName, dict);
+							_splendidCache.ClearEditViewRelationships();
+							break;
+						case "TERMINOLOGY":
+							UpdateAdminTableLayoutNameInternal(con, "TERMINOLOGY", "MODULE_NAME", sViewName, dict);
+							ReloadTerminologyInternal(sViewName);
 							break;
 						default:
-							UpdateAdminTableInternal(con, trn, sTableName, dict);
-							break;
+							throw new Exception("Unsupported layout table: " + sTableName);
 					}
-					trn.Commit();
-					// Clear relevant layout caches
-					switch (sTableName.ToUpper())
-					{
-						case "GRIDVIEWS_COLUMNS"       : _splendidCache.ClearGridView(Sql.ToString(dict.ContainsKey("GRID_NAME") ? dict["GRID_NAME"] : null)); break;
-						case "DETAILVIEWS_FIELDS"      : _splendidCache.ClearDetailView(Sql.ToString(dict.ContainsKey("DETAIL_NAME") ? dict["DETAIL_NAME"] : null)); break;
-						case "EDITVIEWS_FIELDS"        : _splendidCache.ClearEditView(Sql.ToString(dict.ContainsKey("EDIT_NAME") ? dict["EDIT_NAME"] : null)); break;
-						case "DETAILVIEWS_RELATIONSHIPS": _splendidCache.ClearDetailViewRelationships(); break;
-						case "EDITVIEWS_RELATIONSHIPS" : _splendidCache.ClearEditViewRelationships(); break;
-					}
-				}
-				catch (Exception ex)
-				{
-					trn.Rollback();
-					throw new Exception("Layout update failed; transaction aborted: " + ex.Message, ex);
 				}
 				return Ok(new { status = "updated" });
 			}
@@ -1387,6 +1715,141 @@ namespace SplendidCRM.Web.Controllers
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
 				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+			}
+		}
+
+		/// <summary>Ported from SplendidCRM/Administration/Rest.svc.cs UpdateAdminTableLayoutName (lines 3635-3706).
+		/// Iterates rows in dict[sTABLE_NAME], calling sp{TABLE}_Update for each with type-aware parameter binding.</summary>
+		private void UpdateAdminTableLayoutNameInternal(IDbConnection con, string sTABLE_NAME, string sLAYOUT_NAME_FIELD, string sVIEW_NAME, Dictionary<string, object> dict)
+		{
+			using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+			{
+				try
+				{
+					if ( dict.ContainsKey(sTABLE_NAME) )
+					{
+						IDbCommand cmdUpdate = SqlProcs.Factory(con, "sp" + sTABLE_NAME + "_Update");
+						cmdUpdate.Transaction = trn;
+						IDbDataParameter parMODIFIED_USER_ID = Sql.FindParameter(cmdUpdate, "@MODIFIED_USER_ID");
+
+						// The body may be a JArray or ArrayList depending on deserialization.
+						System.Collections.ArrayList lst = null;
+						object raw = dict[sTABLE_NAME];
+						if ( raw is System.Collections.ArrayList al )
+							lst = al;
+						else if ( raw is Newtonsoft.Json.Linq.JArray jArr )
+						{
+							lst = new System.Collections.ArrayList();
+							foreach ( Newtonsoft.Json.Linq.JObject jObj in jArr )
+								lst.Add(jObj.ToObject<Dictionary<string, object>>());
+						}
+						else if ( raw is List<object> oList )
+						{
+							lst = new System.Collections.ArrayList();
+							foreach ( var o in oList )
+							{
+								if ( o is Newtonsoft.Json.Linq.JObject jObj2 )
+									lst.Add(jObj2.ToObject<Dictionary<string, object>>());
+								else if ( o is Dictionary<string, object> d )
+									lst.Add(d);
+							}
+						}
+						if ( lst != null )
+						{
+							for ( int i = 0; i < lst.Count; i++ )
+							{
+								foreach ( IDbDataParameter par in cmdUpdate.Parameters )
+								{
+									par.Value = DBNull.Value;
+								}
+								if ( parMODIFIED_USER_ID != null )
+									parMODIFIED_USER_ID.Value = _security.USER_ID;
+
+								Dictionary<string, object> dictRow = lst[i] as Dictionary<string, object>;
+								if ( dictRow == null ) continue;
+								Sql.SetParameter(cmdUpdate, sLAYOUT_NAME_FIELD, sVIEW_NAME);
+								foreach ( string sFieldName in dictRow.Keys )
+								{
+									if ( sFieldName != sLAYOUT_NAME_FIELD && sFieldName != "MODIFIED_USER_ID" )
+									{
+										IDbDataParameter par = Sql.FindParameter(cmdUpdate, sFieldName);
+										if ( par != null )
+										{
+											switch ( par.DbType )
+											{
+												case DbType.Guid    :  par.Value = Sql.ToDBGuid    (dictRow[sFieldName]);  break;
+												case DbType.Int16   :  par.Value = Sql.ToDBInteger (dictRow[sFieldName]);  break;
+												case DbType.Int32   :  par.Value = Sql.ToDBInteger (dictRow[sFieldName]);  break;
+												case DbType.Int64   :  par.Value = Sql.ToDBInteger (dictRow[sFieldName]);  break;
+												case DbType.Double  :  par.Value = Sql.ToDBFloat   (dictRow[sFieldName]);  break;
+												case DbType.Decimal :  par.Value = Sql.ToDBDecimal (dictRow[sFieldName]);  break;
+												case DbType.Byte    :  par.Value = Sql.ToDBBoolean (dictRow[sFieldName]);  break;
+												case DbType.DateTime:  par.Value = Sql.ToDBDateTime(dictRow[sFieldName]);  break;
+												default             :  par.Value = Sql.ToDBString  (dictRow[sFieldName]);  break;
+											}
+										}
+									}
+								}
+								cmdUpdate.ExecuteNonQuery();
+							}
+						}
+					}
+					trn.Commit();
+				}
+				catch ( Exception ex )
+				{
+					trn.Rollback();
+					throw new Exception("Failed to update, transaction aborted; " + ex.Message, ex);
+				}
+			}
+		}
+
+		/// <summary>Reloads terminology from the database for a specific module after layout save.
+		/// Ported from SplendidCRM/Administration/Rest.svc.cs ReloadTerminology (lines 3317-3356).</summary>
+		private void ReloadTerminologyInternal(string sMODULE_NAME)
+		{
+			try
+			{
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					string sSQL;
+					sSQL = "select NAME                " + ControlChars.CrLf
+					     + "     , LANG                " + ControlChars.CrLf
+					     + "     , MODULE_NAME         " + ControlChars.CrLf
+					     + "     , DISPLAY_NAME        " + ControlChars.CrLf
+					     + "  from vwTERMINOLOGY       " + ControlChars.CrLf
+					     + " where LIST_NAME is null   " + ControlChars.CrLf;
+					using ( IDbCommand cmd = con.CreateCommand() )
+					{
+						cmd.CommandText = sSQL;
+						if ( Sql.IsEmptyString(sMODULE_NAME) )
+						{
+							cmd.CommandText += "   and MODULE_NAME is null " + ControlChars.CrLf;
+						}
+						else
+						{
+							StringBuilder sbModule = new StringBuilder();
+							Sql.AppendParameter(cmd, sbModule, "MODULE_NAME", sMODULE_NAME, Sql.SqlFilterMode.Exact);
+							cmd.CommandText += sbModule.ToString();
+						}
+						using ( IDataReader rdr = cmd.ExecuteReader() )
+						{
+							while ( rdr.Read() )
+							{
+								string sLANG         = Sql.ToString(rdr["LANG"        ]);
+								string sNAME         = Sql.ToString(rdr["NAME"        ]);
+								string sDISPLAY_NAME = Sql.ToString(rdr["DISPLAY_NAME"]);
+								L10N.SetTerm(_memoryCache, sLANG, sMODULE_NAME, sNAME, sDISPLAY_NAME);
+							}
+						}
+					}
+				}
+			}
+			catch ( Exception ex )
+			{
+				SplendidError.SystemError(new StackFrame(1, true), ex);
 			}
 		}
 
@@ -2182,24 +2645,43 @@ namespace SplendidCRM.Web.Controllers
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				string sModuleName = Sql.ToString(dict.ContainsKey("MODULE_NAME") ? dict["MODULE_NAME"] : null);
-				if (Sql.IsEmptyString(sModuleName))
-					return BadRequest(new { error = "MODULE_NAME is required" });
+				Guid gID = Sql.ToGuid(dict.ContainsKey("ID") ? dict["ID"] : null);
+				if ( Sql.IsEmptyGuid(gID) )
+					return BadRequest(new { error = "ID is required" });
+				// Ported from SplendidCRM/Administration/Rest.svc.cs line 1246.
+				// SP is spMODULES_ArchiveBuild (NOT spMODULE_ARCHIVE_Build).
+				// Parameter is @ID (Guid), not @MODULE_NAME (string).
+				Guid gUSER_ID = _security.USER_ID;
 				Thread t = new Thread(() =>
 				{
 					try
 					{
 						using IDbConnection con = _dbProviderFactories.CreateConnection();
 						con.Open();
-						using IDbCommand cmd = SqlProcs.Factory(con, "spMODULE_ARCHIVE_Build");
-						Sql.AddParameter(cmd, "@MODULE_NAME", sModuleName);
-						cmd.ExecuteNonQuery();
+						using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+						{
+							try
+							{
+								using ( IDbCommand cmd = con.CreateCommand() )
+								{
+									cmd.Transaction    = trn;
+									cmd.CommandType    = CommandType.StoredProcedure;
+									cmd.CommandText    = "spMODULES_ArchiveBuild";
+									cmd.CommandTimeout = 0;
+									Sql.AddParameter(cmd, "@ID"              , gID      );
+									Sql.AddParameter(cmd, "@MODIFIED_USER_ID", gUSER_ID );
+									cmd.ExecuteNonQuery();
+								}
+								trn.Commit();
+							}
+							catch { trn.Rollback(); throw; }
+						}
 					}
 					catch (Exception ex) { SplendidError.SystemError(new StackFrame(1, true), ex); }
 				});
 				t.IsBackground = true;
 				t.Start();
-				return Ok(new { status = "started", module = sModuleName });
+				return Ok(new { status = "started" });
 			}
 			catch (Exception ex)
 			{
@@ -2210,8 +2692,9 @@ namespace SplendidCRM.Web.Controllers
 
 		/// <summary>
 		/// POST Administration/Rest.svc/PostAdminTable
-		/// Generic admin table insert/update operation. Source: lines 1264-1500.
-		/// Supports Modules, ACLRoles, DynamicButtons, Shortcuts, etc.
+		/// Generic admin table READ/query operation with POST body search values.
+		/// Ported from SplendidCRM/Administration/Rest.svc.cs lines 1265-1500.
+		/// This is a READ operation, NOT a write. Uses RestUtil.GetAdminTable().
 		/// </summary>
 		[HttpPost("PostAdminTable")]
 		public async System.Threading.Tasks.Task<IActionResult> PostAdminTable()
@@ -2222,37 +2705,118 @@ namespace SplendidCRM.Web.Controllers
 				L10N L10n = new L10N(sCulture, _memoryCache);
 				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				string sTableName = Sql.ToString(dict.ContainsKey("TableName") ? dict["TableName"] : null);
-				if (Sql.IsEmptyString(sTableName) || !Regex.IsMatch(sTableName, @"^[A-Za-z0-9_]+$"))
-					return BadRequest(new { error = "Valid TableName is required" });
-				// Enforce admin access by module when IS_ADMIN_DELEGATE
-				if (!_security.IS_ADMIN && _security.IS_ADMIN_DELEGATE)
+
+				string TableName = Sql.ToString(Request.Query["TableName"].FirstOrDefault());
+				int    nSKIP     = Sql.ToInteger(Request.Query["$skip"   ].FirstOrDefault());
+				int    nTOP      = Sql.ToInteger(Request.Query["$top"    ].FirstOrDefault());
+				string sFILTER   = Sql.ToString (Request.Query["$filter" ].FirstOrDefault());
+				string sORDER_BY = Sql.ToString (Request.Query["$orderby"].FirstOrDefault());
+				string sGROUP_BY = Sql.ToString (Request.Query["$groupby"].FirstOrDefault());
+				string sSELECT   = Sql.ToString (Request.Query["$select" ].FirstOrDefault());
+				long lTotalCount = 0;
+
+				SplendidCRM.TimeZone T10n = GetUserTimezone();
+				Dictionary<string, object> dictSearchValues = null;
+				foreach ( string sName in dict.Keys )
 				{
-					string sModule = Sql.ToString(dict.ContainsKey("MODULE_NAME") ? dict["MODULE_NAME"] : null);
-					if (!Sql.IsEmptyString(sModule) && _security.AdminUserAccess(sModule, "edit") == 0)
-						return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
-				}
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbTransaction trn = Sql.BeginTransaction(con);
-				try
-				{
-					using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_Update");
-					foreach (string sKey in dict.Keys)
+					switch ( sName )
 					{
-						if (sKey == "TableName") continue;
-						IDbDataParameter par = Sql.FindParameter(cmd, "@" + sKey);
-						if (par != null)
-							Sql.SetParameter(par, Sql.ToString(dict[sKey]));
+						case "TableName"     : TableName        = Sql.ToString (dict[sName]); break;
+						case "$skip"         : nSKIP            = Sql.ToInteger(dict[sName]); break;
+						case "$top"          : nTOP             = Sql.ToInteger(dict[sName]); break;
+						case "$filter"       : sFILTER          = Sql.ToString (dict[sName]); break;
+						case "$orderby"      : sORDER_BY        = Sql.ToString (dict[sName]); break;
+						case "$groupby"      : sGROUP_BY        = Sql.ToString (dict[sName]); break;
+						case "$select"       : sSELECT          = Sql.ToString (dict[sName]); break;
+						case "$searchvalues" : dictSearchValues  = dict[sName] as Dictionary<string, object>; break;
 					}
-					cmd.Transaction = trn;
-					cmd.ExecuteNonQuery();
-					trn.Commit();
 				}
-				catch { trn.Rollback(); throw; }
-				return Ok(new { status = "updated", table = sTableName });
+				// Search values are handled by RestUtil.GetAdminTable internally via filter.
+				// The legacy code also passes search values as part of the filter string.
+				if ( dictSearchValues != null )
+				{
+					// Build search clause using IDbCommand context — handled in GetAdminTable.
+					// Pass search values as a serialized filter string.
+					StringBuilder sbSearch = new StringBuilder();
+					foreach ( string sKey in dictSearchValues.Keys )
+					{
+						string sValue = Sql.ToString(dictSearchValues[sKey]);
+						if ( !Sql.IsEmptyString(sValue) )
+						{
+							string sFieldName = new Regex(@"[^A-Za-z0-9_]").Replace(sKey, "");
+							if ( !Sql.IsEmptyString(sFieldName) )
+								sbSearch.Append(" and " + sFieldName + " like '%" + Sql.EscapeSQL(sValue) + "%'");
+						}
+					}
+					if ( sbSearch.Length > 0 )
+					{
+						if ( !Sql.IsEmptyString(sFILTER) )
+							sFILTER = sFILTER + sbSearch.ToString();
+						else
+							sFILTER = "1 = 1" + sbSearch.ToString();
+					}
+				}
+
+				Regex r = new Regex(@"[^A-Za-z0-9_]");
+				string sFILTER_KEYWORDS = Sql.SqlFilterLiterals(sFILTER);
+				sFILTER_KEYWORDS = (" " + r.Replace(sFILTER_KEYWORDS, " ") + " ").ToLower();
+				if ( sFILTER_KEYWORDS.IndexOf(" select ") >= 0 && sFILTER_KEYWORDS.IndexOf(" from ") > sFILTER_KEYWORDS.IndexOf(" select ") )
+					return BadRequest(new { error = "Subqueries are not allowed." });
+
+				UniqueStringCollection arrSELECT = new UniqueStringCollection();
+				sSELECT = sSELECT.Replace(" ", "");
+				if ( !Sql.IsEmptyString(sSELECT) )
+				{
+					foreach ( string s in sSELECT.Split(',') )
+					{
+						string sColumnName = r.Replace(s, "");
+						if ( !Sql.IsEmptyString(sColumnName) )
+							arrSELECT.Add(sColumnName);
+					}
+				}
+
+				StringBuilder sbDumpSQL = new StringBuilder();
+				DataTable dt = new DataTable();
+				string sMODULE_NAME = Sql.ToString(_memoryCache.Get("Modules." + TableName + ".ModuleName"));
+				if ( !Sql.IsEmptyString(sMODULE_NAME) && !TableName.StartsWith("OAUTH") && !TableName.StartsWith("USERS_PASSWORD") && !TableName.EndsWith("_AUDIT") && !TableName.EndsWith("_STREAM") )
+				{
+					bool bIsAdmin = Sql.ToBoolean(_memoryCache.Get("Modules." + sMODULE_NAME + ".IsAdmin"));
+					if ( bIsAdmin && _security.AdminUserAccess(sMODULE_NAME, "access") >= 0 )
+					{
+						using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables(TableName, false) )
+						{
+							if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
+							{
+								dt = _restUtil.GetAdminTable(HttpContext, TableName, nSKIP, nTOP, sFILTER, sORDER_BY, sGROUP_BY, arrSELECT, null, ref lTotalCount, null, AccessMode.list, sbDumpSQL);
+							}
+							else
+							{
+								throw new Exception("Unsupported table: " + TableName);
+							}
+						}
+					}
+					else
+					{
+						throw new Exception(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+					}
+				}
+				else
+				{
+					throw new Exception("Unsupported table: " + TableName);
+				}
+
+				var req = HttpContext.Request;
+				string sBaseURI = req.Scheme + "://" + req.Host.Value + req.PathBase.Value + "/Administration/Rest.svc/PostAdminTable";
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, TableName, dt, T10n);
+				dictResponse.Add("__total", lTotalCount);
+				if ( Sql.ToBoolean(_memoryCache.Get("CONFIG.show_sql")) )
+				{
+					dictResponse.Add("__sql", sbDumpSQL.ToString());
+				}
+				return JsonContent(new { d = dictResponse });
 			}
 			catch (Exception ex)
 			{
@@ -2306,46 +2870,266 @@ namespace SplendidCRM.Web.Controllers
 		{
 			try
 			{
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 4122-4510.
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE))
-					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+				// Legacy reads ModuleName from query string.
+				string sModuleName = HttpContext.Request.Query.ContainsKey("ModuleName")
+					? Sql.ToString(HttpContext.Request.Query["ModuleName"])
+					: String.Empty;
+				if ( Sql.IsEmptyString(sModuleName) )
+					return BadRequest(new { error = "The module name must be specified." });
+				int nACLACCESS = _security.AdminUserAccess(sModuleName, "edit");
+				if ( !_security.IsAuthenticated() || !Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sModuleName + ".RestEnabled")) || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName });
+
+				string sTABLE_NAME = Sql.ToString(_memoryCache.Get<object>("Modules." + sModuleName + ".TableName"));
+				if ( Sql.IsEmptyString(sTABLE_NAME) )
+					throw new Exception("Unknown module: " + sModuleName);
+
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				string sModuleName = Sql.ToString(dict.ContainsKey("MODULE_NAME") ? dict["MODULE_NAME"] : null);
-				if (Sql.IsEmptyString(sModuleName))
-					return BadRequest(new { error = "MODULE_NAME is required" });
-				string sTableName = Crm.Modules.TableName(_memoryCache, sModuleName);
-				if (Sql.IsEmptyString(sTableName)) sTableName = sModuleName;
-				List<Guid> arrIDs = new List<Guid>();
-				if (dict.ContainsKey("IDs") && dict["IDs"] is JArray jIDs)
-					foreach (var jID in jIDs)
-						arrIDs.Add(Sql.ToGuid(jID.ToString()));
-				if (arrIDs.Count == 0)
-					return BadRequest(new { error = "IDs array is required" });
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbTransaction trn = Sql.BeginTransaction(con);
-				try
+				Guid     gTIMEZONE = Sql.ToGuid(_httpContextAccessor.HttpContext?.Session.GetString("USER_SETTINGS/TIMEZONE"));
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(gTIMEZONE);
+
+				// Build column set, filtering empty values.
+				DataTable dtUPDATE = new DataTable(sTABLE_NAME);
+				foreach ( string sColumnName in dict.Keys )
 				{
-					foreach (Guid gID in arrIDs)
+					if ( sColumnName != "ID" && sColumnName != "ID_LIST" )
 					{
-						using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_Update");
-						IDbDataParameter parID = Sql.FindParameter(cmd, "@ID");
-						if (parID != null) Sql.SetParameter(parID, gID);
-						foreach (string sKey in dict.Keys)
+						if ( dict[sColumnName] is System.Collections.ArrayList lst )
 						{
-							if (sKey == "MODULE_NAME" || sKey == "IDs") continue;
-							IDbDataParameter par = Sql.FindParameter(cmd, "@" + sKey);
-							if (par != null) Sql.SetParameter(par, Sql.ToString(dict[sKey]));
+							if ( lst.Count > 0 ) dtUPDATE.Columns.Add(sColumnName.ToUpper());
 						}
-						cmd.Transaction = trn;
-						cmd.ExecuteNonQuery();
+						else if ( dict[sColumnName] is Newtonsoft.Json.Linq.JArray jArr )
+						{
+							if ( jArr.Count > 0 ) dtUPDATE.Columns.Add(sColumnName.ToUpper());
+						}
+						else
+						{
+							if ( !Sql.IsEmptyString(dict[sColumnName]) ) dtUPDATE.Columns.Add(sColumnName.ToUpper());
+						}
 					}
-					trn.Commit();
 				}
-				catch { trn.Rollback(); throw; }
-				return Ok(new { status = "updated", count = arrIDs.Count });
+				List<Guid> arrID_LIST = new List<Guid>();
+				DataRow row = dtUPDATE.NewRow();
+				dtUPDATE.Rows.Add(row);
+				foreach ( string sColumnName in dict.Keys )
+				{
+					if ( dict[sColumnName] is System.Collections.ArrayList lst2 )
+					{
+						if ( sColumnName == "ID_LIST" )
+						{
+							foreach ( object item in lst2 ) arrID_LIST.Add(Sql.ToGuid(item));
+						}
+						else if ( dtUPDATE.Columns.Contains(sColumnName) )
+						{
+							System.Xml.XmlDocument xml = new System.Xml.XmlDocument();
+							xml.AppendChild(xml.CreateXmlDeclaration("1.0", "UTF-8", null));
+							xml.AppendChild(xml.CreateElement("Values"));
+							foreach ( object item in lst2 )
+							{
+								System.Xml.XmlNode xValue = xml.CreateElement("Value");
+								xml.DocumentElement.AppendChild(xValue);
+								xValue.InnerText = Sql.ToString(item);
+							}
+							row[sColumnName] = xml.OuterXml;
+						}
+					}
+					else if ( dict[sColumnName] is Newtonsoft.Json.Linq.JArray jArr2 )
+					{
+						if ( sColumnName == "ID_LIST" )
+						{
+							foreach ( var jt in jArr2 ) arrID_LIST.Add(Sql.ToGuid(jt.ToString()));
+						}
+						else if ( dtUPDATE.Columns.Contains(sColumnName) )
+						{
+							System.Xml.XmlDocument xml = new System.Xml.XmlDocument();
+							xml.AppendChild(xml.CreateXmlDeclaration("1.0", "UTF-8", null));
+							xml.AppendChild(xml.CreateElement("Values"));
+							foreach ( var jt in jArr2 )
+							{
+								System.Xml.XmlNode xValue = xml.CreateElement("Value");
+								xml.DocumentElement.AppendChild(xValue);
+								xValue.InnerText = jt.ToString();
+							}
+							row[sColumnName] = xml.OuterXml;
+						}
+					}
+					else if ( sColumnName != "ID" && sColumnName != "ID_LIST" )
+					{
+						if ( dtUPDATE.Columns.Contains(sColumnName) )
+							row[sColumnName] = dict[sColumnName];
+					}
+				}
+				if ( arrID_LIST.Count == 0 )
+					throw new Exception(L10n.Term(".LBL_LISTVIEW_NO_SELECTED"));
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables(sTABLE_NAME, false) )
+					{
+						if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
+						{
+							DataRow rowSYNC_TABLE = dtSYNC_TABLES.Rows[0];
+							string sMODULE_NAME = Sql.ToString (rowSYNC_TABLE["MODULE_NAME"]);
+							string sVIEW_NAME   = Sql.ToString (rowSYNC_TABLE["VIEW_NAME"  ]);
+							bool   bHAS_CUSTOM  = Sql.ToBoolean(rowSYNC_TABLE["HAS_CUSTOM" ]);
+							if ( Sql.IsEmptyString(sMODULE_NAME) )
+								throw new Exception("sMODULE_NAME should not be empty for table " + sTABLE_NAME);
+
+							DataTable dtCustomFields = _splendidCache.FieldsMetaData_Validated(sTABLE_NAME);
+							using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+							{
+								try
+								{
+									IDbCommand cmdUpdate = SqlProcs.Factory(con, "sp" + sTABLE_NAME + "_Update");
+									cmdUpdate.Transaction = trn;
+									cmdUpdate.CommandTimeout = 60 * 60;
+									foreach ( Guid gID in arrID_LIST )
+									{
+										bool   bRecordExists   = false;
+										bool   bAccessAllowed  = false;
+										Guid   gLOCAL_ASSIGNED = Guid.Empty;
+										DataRow rowCurrent      = null;
+										DataTable dtCurrent     = new DataTable();
+										string sSQL = "select *"             + ControlChars.CrLf
+										            + "  from " + sVIEW_NAME + ControlChars.CrLf
+										            + " where 1 = 1"         + ControlChars.CrLf;
+										using ( IDbCommand cmd = con.CreateCommand() )
+										{
+											cmd.CommandText = sSQL;
+											cmd.Transaction = trn;
+											StringBuilder sbWhere1 = new StringBuilder();
+											Sql.AppendParameter(cmd, sbWhere1, "ID", gID);
+											cmd.CommandText += sbWhere1.ToString();
+											using ( var da = dbf.CreateDataAdapter() )
+											{
+												((IDbDataAdapter)da).SelectCommand = cmd;
+												da.Fill(dtCurrent);
+												if ( dtCurrent.Rows.Count > 0 )
+												{
+													rowCurrent = dtCurrent.Rows[0];
+													bRecordExists = true;
+													if ( dtCurrent.Columns.Contains("ASSIGNED_USER_ID") )
+														gLOCAL_ASSIGNED = Sql.ToGuid(rowCurrent["ASSIGNED_USER_ID"]);
+												}
+											}
+										}
+										if ( bRecordExists )
+										{
+											sSQL = "select count(*)"       + ControlChars.CrLf
+											     + "  from " + sVIEW_NAME  + ControlChars.CrLf;
+											using ( IDbCommand cmd = con.CreateCommand() )
+											{
+												cmd.CommandText = sSQL;
+												cmd.Transaction = trn;
+												_security.Filter(cmd, sMODULE_NAME, "edit");
+												StringBuilder sbWhere2 = new StringBuilder();
+												Sql.AppendParameter(cmd, sbWhere2, "ID", gID);
+												cmd.CommandText += sbWhere2.ToString();
+												if ( Sql.ToInteger(cmd.ExecuteScalar()) > 0 )
+												{
+													if ( (nACLACCESS > ACL_ACCESS.OWNER) || (nACLACCESS == ACL_ACCESS.OWNER && _security.USER_ID == gLOCAL_ASSIGNED) || !dtCurrent.Columns.Contains("ASSIGNED_USER_ID") )
+														bAccessAllowed = true;
+												}
+											}
+										}
+										if ( bRecordExists && bAccessAllowed )
+										{
+											// Handle TEAM_SET_ADD/TAG_SET_ADD/ASSIGNED_SET_ADD/NAICS_SET_ADD.
+											string sASSIGNED_SET_LIST = rowCurrent.Table.Columns.Contains("ASSIGNED_SET_LIST") ? Sql.ToString(rowCurrent["ASSIGNED_SET_LIST"]) : String.Empty;
+											string sTEAM_SET_LIST     = rowCurrent.Table.Columns.Contains("TEAM_SET_LIST"    ) ? Sql.ToString(rowCurrent["TEAM_SET_LIST"    ]) : String.Empty;
+											string sTAG_SET_NAME      = rowCurrent.Table.Columns.Contains("TAG_SET_NAME"     ) ? Sql.ToString(rowCurrent["TAG_SET_NAME"     ]) : String.Empty;
+											string sNAICS_SET_NAME    = rowCurrent.Table.Columns.Contains("NAICS_SET_NAME"   ) ? Sql.ToString(rowCurrent["NAICS_SET_NAME"   ]) : String.Empty;
+											if ( row.Table.Columns.Contains("ASSIGNED_SET_LIST") && !Sql.IsEmptyString(row["ASSIGNED_SET_LIST"]) )
+											{
+												if ( row.Table.Columns.Contains("ASSIGNED_SET_ADD") && Sql.ToBoolean(row["ASSIGNED_SET_ADD"]) )
+												{ if ( !Sql.IsEmptyString(sASSIGNED_SET_LIST) ) sASSIGNED_SET_LIST += ","; sASSIGNED_SET_LIST += Sql.ToString(row["ASSIGNED_SET_LIST"]); }
+												else sASSIGNED_SET_LIST = Sql.ToString(row["ASSIGNED_SET_LIST"]);
+											}
+											if ( row.Table.Columns.Contains("TEAM_SET_LIST") && !Sql.IsEmptyString(row["TEAM_SET_LIST"]) )
+											{
+												if ( row.Table.Columns.Contains("TEAM_SET_ADD") && Sql.ToBoolean(row["TEAM_SET_ADD"]) )
+												{ if ( !Sql.IsEmptyString(sTEAM_SET_LIST) ) sTEAM_SET_LIST += ","; sTEAM_SET_LIST += Sql.ToString(row["TEAM_SET_LIST"]); }
+												else sTEAM_SET_LIST = Sql.ToString(row["TEAM_SET_LIST"]);
+											}
+											if ( row.Table.Columns.Contains("TAG_SET_NAME") && !Sql.IsEmptyString(row["TAG_SET_NAME"]) )
+											{
+												if ( row.Table.Columns.Contains("TAG_SET_ADD") && Sql.ToBoolean(row["TAG_SET_ADD"]) )
+												{ if ( !Sql.IsEmptyString(sTAG_SET_NAME) ) sTAG_SET_NAME += ","; sTAG_SET_NAME += Sql.ToString(row["TAG_SET_NAME"]); }
+												else sTAG_SET_NAME = Sql.ToString(row["TAG_SET_NAME"]);
+											}
+											if ( row.Table.Columns.Contains("NAICS_SET_NAME") && !Sql.IsEmptyString(row["NAICS_SET_NAME"]) )
+											{
+												if ( row.Table.Columns.Contains("ADD_NAICS_CODE_SET") && Sql.ToBoolean(row["ADD_NAICS_CODE_SET"]) )
+												{ if ( !Sql.IsEmptyString(sNAICS_SET_NAME) ) sNAICS_SET_NAME += ","; sNAICS_SET_NAME += Sql.ToString(row["NAICS_SET_NAME"]); }
+												else sNAICS_SET_NAME = Sql.ToString(row["NAICS_SET_NAME"]);
+											}
+											// Initialize parameters: first null all, set ID and MODIFIED_USER_ID.
+											foreach ( IDbDataParameter par in cmdUpdate.Parameters )
+											{
+												string sParameterName = par.ParameterName.TrimStart('@').ToUpper();
+												if ( sParameterName == "ID" )
+													par.Value = gID;
+												else if ( sParameterName == "MODIFIED_USER_ID" )
+													par.Value = Sql.ToDBGuid(_security.USER_ID);
+												else
+													par.Value = DBNull.Value;
+											}
+											// Load current record values into parameters.
+											foreach ( DataColumn col in rowCurrent.Table.Columns )
+											{
+												IDbDataParameter par = Sql.FindParameter(cmdUpdate, col.ColumnName);
+												if ( par != null && String.Compare(col.ColumnName, "MODIFIED_USER_ID", true) != 0 && String.Compare(col.ColumnName, "DATE_MODIFIED_UTC", true) != 0 )
+													par.Value = rowCurrent[col.ColumnName];
+											}
+											// Overlay mass update values with ACL field security.
+											foreach ( DataColumn col in row.Table.Columns )
+											{
+												bool bIsWriteable = true;
+												if ( SplendidInit.bEnableACLFieldSecurity && !Sql.IsEmptyString(sMODULE_NAME) )
+												{
+													Security.ACL_FIELD_ACCESS acl = _security.GetUserFieldSecurity(sMODULE_NAME, col.ColumnName, Guid.Empty);
+													bIsWriteable = acl.IsWriteable();
+												}
+												if ( bIsWriteable )
+												{
+													IDbDataParameter par = Sql.FindParameter(cmdUpdate, col.ColumnName);
+													if ( par != null && row[col.ColumnName] != null && row[col.ColumnName] != DBNull.Value && !Sql.IsEmptyString(row[col.ColumnName]) )
+													{
+														if      ( col.ColumnName == "ASSIGNED_SET_LIST" && !Sql.IsEmptyString(sASSIGNED_SET_LIST) ) par.Value = sASSIGNED_SET_LIST;
+														else if ( col.ColumnName == "TEAM_SET_LIST"     && !Sql.IsEmptyString(sTEAM_SET_LIST)     ) par.Value = sTEAM_SET_LIST;
+														else if ( col.ColumnName == "TAG_SET_NAME"      && !Sql.IsEmptyString(sTAG_SET_NAME)      ) par.Value = sTAG_SET_NAME;
+														else if ( col.ColumnName == "NAICS_SET_NAME"    && !Sql.IsEmptyString(sNAICS_SET_NAME)    ) par.Value = sNAICS_SET_NAME;
+														else par.Value = RestUtil.DBValueFromJsonValue(par.DbType, row[col.ColumnName], T10n);
+													}
+												}
+											}
+											cmdUpdate.ExecuteNonQuery();
+											if ( bHAS_CUSTOM )
+												_splendidDynamic.UpdateCustomFields(row, trn, gID, sTABLE_NAME, dtCustomFields);
+										}
+										else
+										{
+											throw new Exception(L10n.Term("ACL.LBL_NO_ACCESS"));
+										}
+									}
+									trn.Commit();
+								}
+								catch
+								{
+									try { trn.Rollback(); } catch { }
+									throw;
+								}
+							}
+						}
+					}
+				}
+				return Ok(new { status = "updated", count = arrID_LIST.Count });
 			}
 			catch (Exception ex)
 			{
@@ -2447,36 +3231,209 @@ namespace SplendidCRM.Web.Controllers
 		{
 			try
 			{
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 4708-4960.
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+				if ( !_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE) )
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				string sProcedureName = Sql.ToString(dict.ContainsKey("ProcedureName") ? dict["ProcedureName"] : null);
-				if (Sql.IsEmptyString(sProcedureName) || !Regex.IsMatch(sProcedureName, @"^[A-Za-z0-9_]+$"))
-					return BadRequest(new { error = "Valid ProcedureName is required" });
-				// Whitelist of allowed admin procedures (security boundary)
-				HashSet<string> allowedProcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+				// Legacy reads ProcedureName from query string.
+				string sProcedureName = HttpContext.Request.Query.ContainsKey("ProcedureName")
+					? Sql.ToString(HttpContext.Request.Query["ProcedureName"])
+					: Sql.ToString(dict.ContainsKey("ProcedureName") ? dict["ProcedureName"] : null);
+				if ( Sql.IsEmptyString(sProcedureName) )
+					return BadRequest(new { error = "ProcedureName is required" });
+
+				Guid gTIMEZONE = Sql.ToGuid(_httpContextAccessor.HttpContext?.Session.GetString("USER_SETTINGS/TIMEZONE"));
+				SplendidCRM.TimeZone T10n = SplendidCRM.TimeZone.CreateTimeZone(gTIMEZONE);
+				// Build DataTable of input parameters.
+				DataTable dtUPDATE = new DataTable(sProcedureName);
+				foreach ( string sColumnName in dict.Keys )
 				{
-					"spMESSAGES_PruneDatabase", "spSYSTEM_LOG_Prune", "spACL_ROLES_Rebuild",
-					"spFULL_TEXT_Search_Rebuild", "spMODULE_ARCHIVE_Build", "spAudit_Rebuild",
-					"spUSERS_LOGINS_Prune", "spSUGAR_FIELDS_Rebuild", "spTERMINOLOGY_Import",
-					"spBACKUP_DATABASE", "spCHECK_VERSION"
-				};
-				if (!allowedProcs.Contains(sProcedureName))
-					return StatusCode(403, new { error = "Procedure not permitted: " + sProcedureName });
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbCommand cmd = SqlProcs.Factory(con, sProcedureName);
-				foreach (string sKey in dict.Keys)
-				{
-					if (sKey == "ProcedureName") continue;
-					IDbDataParameter par = Sql.FindParameter(cmd, "@" + sKey);
-					if (par != null) Sql.SetParameter(par, Sql.ToString(dict[sKey]));
+					dtUPDATE.Columns.Add(sColumnName);
 				}
-				cmd.ExecuteNonQuery();
-				return Ok(new { status = "executed", procedure = sProcedureName });
+				DataRow row = dtUPDATE.NewRow();
+				dtUPDATE.Rows.Add(row);
+				foreach ( string sColumnName in dict.Keys )
+				{
+					if ( dict[sColumnName] is System.Collections.ArrayList )
+					{
+						System.Collections.ArrayList lst = dict[sColumnName] as System.Collections.ArrayList;
+						System.Xml.XmlDocument xml = new System.Xml.XmlDocument();
+						xml.AppendChild(xml.CreateXmlDeclaration("1.0", "UTF-8", null));
+						xml.AppendChild(xml.CreateElement("Values"));
+						if ( lst.Count > 0 )
+						{
+							foreach ( object item in lst )
+							{
+								System.Xml.XmlNode xValue = xml.CreateElement("Value");
+								xml.DocumentElement.AppendChild(xValue);
+								xValue.InnerText = Sql.ToString(item);
+							}
+						}
+						row[sColumnName] = xml.OuterXml;
+					}
+					else
+					{
+						row[sColumnName] = dict[sColumnName];
+					}
+				}
+				Dictionary<string, object> d = new Dictionary<string, object>();
+				StringBuilder sbDumpSQL = new StringBuilder();
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				// Validate procedure via RestTables (dynamic whitelist from SYSTEM_REST_TABLES).
+				using ( DataTable dtSYNC_TABLES = _splendidCache.RestTables(sProcedureName, false) )
+				{
+					if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
+					{
+						DataRow rowSYNC_TABLE = dtSYNC_TABLES.Rows[0];
+						string sPROCEDURE_NAME  = Sql.ToString (rowSYNC_TABLE["TABLE_NAME"     ]);
+						string sMODULE_NAME     = Sql.ToString (rowSYNC_TABLE["MODULE_NAME"    ]);
+						string sREQUIRED_FIELDS = Sql.ToString (rowSYNC_TABLE["REQUIRED_FIELDS"]);
+						bool   bIS_SYSTEM       = Sql.ToBoolean(rowSYNC_TABLE["IS_SYSTEM"      ]);
+						bool   bEnableTeamManagement = Crm.Config.enable_team_management();
+
+						int nACLACCESS = _security.AdminUserAccess(sMODULE_NAME, "edit");
+						if ( nACLACCESS >= 0 && bIS_SYSTEM )
+						{
+							if ( !Sql.IsEmptyString(sREQUIRED_FIELDS) )
+							{
+								string[] arrREQUIRED_FIELDS = sREQUIRED_FIELDS.ToUpper().Replace(",", " ").Split(' ');
+								string sMISSING_FIELDS = String.Empty;
+								foreach ( string sREQUIRED_FIELD in arrREQUIRED_FIELDS )
+								{
+									if ( !Sql.IsEmptyString(sREQUIRED_FIELD) && !dtUPDATE.Columns.Contains(sREQUIRED_FIELD) )
+									{
+										if ( !Sql.IsEmptyString(sMISSING_FIELDS) )
+											sMISSING_FIELDS += " ";
+										sMISSING_FIELDS += sREQUIRED_FIELD;
+									}
+								}
+								if ( !Sql.IsEmptyString(sMISSING_FIELDS) )
+									throw new Exception("Missing required fields: " + sMISSING_FIELDS);
+							}
+
+							using ( IDbConnection con = dbf.CreateConnection() )
+							{
+								con.Open();
+								bool bEnableTransaction = true;
+								if ( sPROCEDURE_NAME == "spSqlBackupDatabase" )
+									bEnableTransaction = false;
+								if ( bEnableTransaction )
+								{
+									using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+									{
+										try
+										{
+											IDbCommand cmd = SqlProcs.Factory(con, sPROCEDURE_NAME);
+											cmd.Transaction = trn;
+											foreach ( IDbDataParameter par in cmd.Parameters )
+											{
+												string sParameterName = par.ParameterName.TrimStart('@').ToUpper();
+												if ( sParameterName == "TEAM_ID" && bEnableTeamManagement )
+													par.Value = Sql.ToDBGuid(_security.TEAM_ID);
+												else if ( sParameterName == "ASSIGNED_USER_ID" )
+													par.Value = Sql.ToDBGuid(_security.USER_ID);
+												else if ( sParameterName == "MODIFIED_USER_ID" )
+													par.Value = Sql.ToDBGuid(_security.USER_ID);
+												else
+													par.Value = DBNull.Value;
+											}
+											foreach ( DataColumn col in row.Table.Columns )
+											{
+												IDbDataParameter par = Sql.FindParameter(cmd, col.ColumnName);
+												if ( par != null )
+													par.Value = RestUtil.DBValueFromJsonValue(par.DbType, row[col.ColumnName], T10n);
+											}
+											sbDumpSQL.Append(Sql.ExpandParameters(cmd));
+											if ( sPROCEDURE_NAME == "spSqlBackupDatabase" )
+												cmd.CommandTimeout = 0;
+											cmd.ExecuteNonQuery();
+											trn.Commit();
+											foreach ( IDbDataParameter par in cmd.Parameters )
+											{
+												if ( par.Direction == ParameterDirection.InputOutput || par.Direction == ParameterDirection.Output )
+												{
+													string sParameterName = par.ParameterName.TrimStart('@').ToUpper();
+													d.Add(sParameterName, par.Value);
+												}
+											}
+											// Post-execution hooks: terminology/module reload.
+											if ( sProcedureName == "spLANGUAGES_Enable" )
+											{
+												_splendidInit.InitTerminology();
+												_splendidCache.ClearLanguages();
+											}
+											else if ( sProcedureName == "spLANGUAGES_Disable" || sProcedureName == "spLANGUAGES_Delete" )
+											{
+												_splendidCache.ClearLanguages();
+											}
+											else if ( sProcedureName == "spMODULES_UpdateRelativePath" )
+											{
+												_splendidInit.InitModules();
+											}
+										}
+										catch
+										{
+											try { trn.Rollback(); } catch { }
+											throw;
+										}
+									}
+								}
+								else
+								{
+									// Non-transactional execution (e.g., spSqlBackupDatabase).
+									IDbCommand cmd = SqlProcs.Factory(con, sPROCEDURE_NAME);
+									foreach ( IDbDataParameter par in cmd.Parameters )
+									{
+										string sParameterName = par.ParameterName.TrimStart('@').ToUpper();
+										if ( sParameterName == "TEAM_ID" && bEnableTeamManagement )
+											par.Value = Sql.ToDBGuid(_security.TEAM_ID);
+										else if ( sParameterName == "ASSIGNED_USER_ID" )
+											par.Value = Sql.ToDBGuid(_security.USER_ID);
+										else if ( sParameterName == "MODIFIED_USER_ID" )
+											par.Value = Sql.ToDBGuid(_security.USER_ID);
+										else
+											par.Value = DBNull.Value;
+									}
+									foreach ( DataColumn col in row.Table.Columns )
+									{
+										IDbDataParameter par = Sql.FindParameter(cmd, col.ColumnName);
+										if ( par != null )
+											par.Value = RestUtil.DBValueFromJsonValue(par.DbType, row[col.ColumnName], T10n);
+									}
+									sbDumpSQL.Append(Sql.ExpandParameters(cmd));
+									if ( sPROCEDURE_NAME == "spSqlBackupDatabase" )
+										cmd.CommandTimeout = 0;
+									cmd.ExecuteNonQuery();
+									foreach ( IDbDataParameter par in cmd.Parameters )
+									{
+										if ( par.Direction == ParameterDirection.InputOutput || par.Direction == ParameterDirection.Output )
+										{
+											string sParameterName = par.ParameterName.TrimStart('@').ToUpper();
+											d.Add(sParameterName, par.Value);
+										}
+									}
+								}
+							}
+						}
+						else
+						{
+							throw new Exception(L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS"));
+						}
+					}
+					else
+					{
+						throw new Exception("Procedure not found in SYSTEM_REST_TABLES: " + sProcedureName);
+					}
+				}
+				Dictionary<string, object> dictResponse = new Dictionary<string, object>();
+				dictResponse.Add("d", d);
+				if ( Sql.ToBoolean(_memoryCache.Get<object>("CONFIG.show_sql")) )
+					dictResponse.Add("__sql", sbDumpSQL.ToString());
+				return JsonContent(dictResponse);
 			}
 			catch (Exception ex)
 			{
@@ -2490,24 +3447,41 @@ namespace SplendidCRM.Web.Controllers
 		/// Checks for available SplendidCRM software updates. Source: lines 2452-2499.
 		/// </summary>
 		[HttpGet("CheckVersion")]
-		public IActionResult CheckVersion()
+		public IActionResult CheckVersion(string CHECK_UPDATES = null)
 		{
 			try
 			{
 				SetNoCacheHeaders();
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+				if ( !_security.IsAuthenticated() || !(_security.IS_ADMIN || _security.IS_ADMIN_DELEGATE) )
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
-				string sCurrentVersion = Sql.ToString(_memoryCache.Get<object>("CONFIG.version"));
-				var result = new Dictionary<string, object>
+
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 2471-2498.
+				// Resolve Utils from DI to call CheckVersion().
+				var utils = HttpContext.RequestServices.GetRequiredService<Utils>();
+				DataTable dt = utils.CheckVersion();
+				DataView vwMain = dt.DefaultView;
+				vwMain.Sort = "Build desc";
+				if ( Sql.ToBoolean(CHECK_UPDATES) && vwMain.Count > 0 )
 				{
-					{ "CURRENT_VERSION"  , sCurrentVersion },
-					{ "LATEST_VERSION"   , sCurrentVersion },
-					{ "UPDATE_AVAILABLE" , false           },
-					{ "DOWNLOAD_URL"     , String.Empty    }
-				};
-				return JsonContent(new { d = result });
+					_memoryCache.Set("available_version"            , Sql.ToString(vwMain[0]["Build"      ]));
+					_memoryCache.Set("available_version_description", Sql.ToString(vwMain[0]["Description"]));
+				}
+				else
+				{
+					_memoryCache.Remove("available_version"            );
+					_memoryCache.Remove("available_version_description");
+				}
+				vwMain.RowFilter = "New = '1'";
+				long lTotalCount = vwMain.Count;
+
+				SplendidCRM.TimeZone T10n = GetUserTimezone();
+				var reqObj = HttpContext.Request;
+				string sBaseURI = reqObj.Scheme + "://" + reqObj.Host.Value + reqObj.PathBase.Value + "/Administration/Rest.svc/CheckVersion";
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, String.Empty, vwMain, T10n);
+				dictResponse.Add("__total", lTotalCount);
+				return JsonContent(dictResponse);
 			}
 			catch (Exception ex)
 			{
@@ -2582,39 +3556,123 @@ namespace SplendidCRM.Web.Controllers
 		{
 			try
 			{
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 5423-5561.
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
-					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+				string sModuleName = "EditCustomFields";
+				int nACLACCESS = _security.AdminUserAccess(sModuleName, "edit");
+				if ( !_security.IsAuthenticated() || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName });
+
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				string sModuleName = Sql.ToString(dict.ContainsKey("MODULE_NAME") ? dict["MODULE_NAME"] : null);
-				if (Sql.IsEmptyString(sModuleName))
-					return BadRequest(new { error = "MODULE_NAME is required" });
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbTransaction trn = Sql.BeginTransaction(con);
-				try
+
+				// Extract each expected field individually (legacy lines 5460-5479).
+				string sNAME           = String.Empty;
+				string sLABEL          = String.Empty;
+				string sLABEL_TERM     = String.Empty;
+				string sCUSTOM_MODULE  = String.Empty;
+				string sDATA_TYPE      = String.Empty;
+				Int32  nMAX_SIZE       = 0           ;
+				bool   bREQUIRED       = false       ;
+				bool   bAUDITED        = false       ;
+				string sDEFAULT_VALUE  = String.Empty;
+				string sDROPDOWN_LIST  = String.Empty;
+				bool   bMASS_UPDATE    = false       ;
+				foreach ( string sName in dict.Keys )
 				{
-					using IDbCommand cmd = SqlProcs.Factory(con, "spFIELDS_META_DATA_Insert");
-					foreach (string sKey in dict.Keys)
+					switch ( sName )
 					{
-						IDbDataParameter par = Sql.FindParameter(cmd, "@" + sKey);
-						if (par != null) Sql.SetParameter(par, Sql.ToString(dict[sKey]));
+						case "NAME"          :  sNAME           = Sql.ToString (dict[sName]);  break;
+						case "LABEL"         :  sLABEL          = Sql.ToString (dict[sName]);  break;
+						case "CUSTOM_MODULE" :  sCUSTOM_MODULE  = Sql.ToString (dict[sName]);  break;
+						case "DATA_TYPE"     :  sDATA_TYPE      = Sql.ToString (dict[sName]);  break;
+						case "MAX_SIZE"      :  nMAX_SIZE       = Sql.ToInteger(dict[sName]);  break;
+						case "REQUIRED"      :  bREQUIRED       = Sql.ToBoolean(dict[sName]);  break;
+						case "AUDITED"       :  bAUDITED        = Sql.ToBoolean(dict[sName]);  break;
+						case "DEFAULT_VALUE" :  sDEFAULT_VALUE  = Sql.ToString (dict[sName]);  break;
+						case "DROPDOWN_LIST" :  sDROPDOWN_LIST  = Sql.ToString (dict[sName]);  break;
+						case "MASS_UPDATE"   :  bMASS_UPDATE    = Sql.ToBoolean(dict[sName]);  break;
 					}
-					cmd.Transaction = trn;
-					cmd.ExecuteNonQuery();
-					trn.Commit();
 				}
-				catch { trn.Rollback(); throw; }
-				string sServiceLevel = Sql.ToString(_memoryCache.Get<object>("CONFIG.service_level"));
-				if (Sql.IsEmptyString(sServiceLevel)) sServiceLevel = "Community";
-				Thread t = new Thread(() => ModuleUtils.EditCustomFields.RecompileViews(_memoryCache, sServiceLevel));
-				t.IsBackground = true;
-				t.Start();
-				return Ok(new { status = "inserted", module = sModuleName });
+				sNAME  = sNAME .Trim();
+				sLABEL = sLABEL.Trim();
+
+				// Validate module existence (legacy lines 5490-5497).
+				if ( Sql.IsEmptyString(sCUSTOM_MODULE) )
+					throw new Exception("The module name must be specified.");
+				string sTABLE_NAME = Sql.ToString (_memoryCache.Get<object>("Modules." + sCUSTOM_MODULE + ".TableName"));
+				bool   bValid      = Sql.ToBoolean(_memoryCache.Get<object>("Modules." + sCUSTOM_MODULE + ".Valid"    ));
+				if ( Sql.IsEmptyString(sTABLE_NAME) && !bValid )
+					throw new Exception("Unknown module: " + sCUSTOM_MODULE);
+
+				// Validate and sanitize field name (legacy lines 5499-5510).
+				if ( Sql.IsEmptyString(sNAME) )
+					throw new Exception("The field name must be specified.");
+				if ( Sql.IsEmptyString(sLABEL) )
+					sLABEL = sNAME;
+				Regex r = new Regex(@"[^\w]+");
+				sNAME = r.Replace(sNAME, "_");
+				r = new Regex(@"^[A-Za-z_]\w*");
+				if ( !r.IsMatch(sNAME) )
+					throw new Exception("invalid field name");
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+					{
+						try
+						{
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.Transaction    = trn;
+								cmd.CommandType    = CommandType.StoredProcedure;
+								cmd.CommandText    = "spFIELDS_META_DATA_Insert";
+								cmd.CommandTimeout = 0;
+								IDbDataParameter parID                = Sql.AddParameter(cmd, "@ID"               , Guid.Empty          );
+								IDbDataParameter parMODIFIED_USER_ID  = Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID   );
+								IDbDataParameter parNAME              = Sql.AddParameter(cmd, "@NAME"             , sNAME               , 255);
+								IDbDataParameter parLABEL             = Sql.AddParameter(cmd, "@LABEL"            , sLABEL              , 255);
+								IDbDataParameter parLABEL_TERM        = Sql.AddParameter(cmd, "@LABEL_TERM"       , sLABEL_TERM         , 255);
+								IDbDataParameter parCUSTOM_MODULE     = Sql.AddParameter(cmd, "@CUSTOM_MODULE"    , sCUSTOM_MODULE      , 255);
+								IDbDataParameter parDATA_TYPE         = Sql.AddParameter(cmd, "@DATA_TYPE"        , sDATA_TYPE          , 255);
+								IDbDataParameter parMAX_SIZE          = Sql.AddParameter(cmd, "@MAX_SIZE"         , nMAX_SIZE           );
+								IDbDataParameter parREQUIRED          = Sql.AddParameter(cmd, "@REQUIRED"         , bREQUIRED           );
+								IDbDataParameter parAUDITED           = Sql.AddParameter(cmd, "@AUDITED"          , bAUDITED            );
+								IDbDataParameter parDEFAULT_VALUE     = Sql.AddParameter(cmd, "@DEFAULT_VALUE"    , sDEFAULT_VALUE      , 255);
+								IDbDataParameter parDROPDOWN_LIST     = Sql.AddParameter(cmd, "@DROPDOWN_LIST"    , sDROPDOWN_LIST      ,  50);
+								IDbDataParameter parMASS_UPDATE       = Sql.AddParameter(cmd, "@MASS_UPDATE"      , bMASS_UPDATE        );
+								IDbDataParameter parDISABLE_RECOMPILE = Sql.AddParameter(cmd, "@DISABLE_RECOMPILE", true                );
+								parID.Direction = ParameterDirection.InputOutput;
+								cmd.ExecuteNonQuery();
+							}
+							trn.Commit();
+						}
+						catch ( Exception ex )
+						{
+							trn.Rollback();
+							throw new Exception(ex.Message, ex.InnerException);
+						}
+					}
+				}
+				// Trigger background recompile (legacy lines 5549-5560).
+				if ( _memoryCache.Get<object>("System.Recompile.Start") == null )
+				{
+					string sServiceLevel = Sql.ToString(_memoryCache.Get<object>("CONFIG.service_level"));
+					if ( Sql.IsEmptyString(sServiceLevel) ) sServiceLevel = "Community";
+					Thread t = new Thread(() => ModuleUtils.EditCustomFields.RecompileViews(_memoryCache, sServiceLevel));
+					t.IsBackground = true;
+					t.Start();
+				}
+				else
+				{
+					_memoryCache.Set("System.Recompile.Restart", true);
+				}
+				return Ok(new { status = "inserted", module = sCUSTOM_MODULE });
 			}
-			catch (Exception ex)
+			catch ( Exception ex )
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
 				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
@@ -2632,24 +3690,55 @@ namespace SplendidCRM.Web.Controllers
 			{
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
-					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 5361-5420.
+				string sModuleName = "EditCustomFields";
+				int nACLACCESS = _security.AdminUserAccess(sModuleName, "delete");
+				if ( !_security.IsAuthenticated() || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName });
+
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
 				Guid gID = Sql.ToGuid(dict.ContainsKey("ID") ? dict["ID"] : null);
-				if (Sql.IsEmptyGuid(gID))
+				if ( Sql.IsEmptyGuid(gID) )
 					return BadRequest(new { error = "ID is required" });
-				using IDbConnection con = _dbProviderFactories.CreateConnection();
-				con.Open();
-				using IDbCommand cmd = SqlProcs.Factory(con, "spFIELDS_META_DATA_Delete");
-				Sql.AddParameter(cmd, "@ID"              , gID            );
-				Sql.AddParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID);
-				cmd.ExecuteNonQuery();
-				string sServiceLevel = Sql.ToString(_memoryCache.Get<object>("CONFIG.service_level"));
-				if (Sql.IsEmptyString(sServiceLevel)) sServiceLevel = "Community";
-				Thread t = new Thread(() => ModuleUtils.EditCustomFields.RecompileViews(_memoryCache, sServiceLevel));
-				t.IsBackground = true;
-				t.Start();
+
+				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
+				using ( IDbConnection con = dbf.CreateConnection() )
+				{
+					con.Open();
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
+					{
+						try
+						{
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.Transaction    = trn;
+								cmd.CommandType    = CommandType.StoredProcedure;
+								cmd.CommandText    = "spFIELDS_META_DATA_Delete";
+								cmd.CommandTimeout = 0;
+								Sql.AddParameter(cmd, "@ID"               , gID               );
+								Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID );
+								Sql.AddParameter(cmd, "@DISABLE_RECOMPILE", true              );
+								cmd.ExecuteNonQuery();
+							}
+							trn.Commit();
+						}
+						catch ( Exception ex )
+						{
+							trn.Rollback();
+							throw new Exception(ex.Message, ex.InnerException);
+						}
+					}
+				}
+				// Trigger background recompile of views after schema change.
+				if ( _memoryCache.Get<object>("System.Recompile.Start") == null )
+				{
+					_memoryCache.Set("System.Recompile.Restart", true);
+				}
+				else
+				{
+					_memoryCache.Set("System.Recompile.Restart", true);
+				}
 				return Ok(new { status = "deleted", id = gID });
 			}
 			catch (Exception ex)
@@ -2664,33 +3753,45 @@ namespace SplendidCRM.Web.Controllers
 		/// Returns ACL access rights for all roles for a given module. Source: lines 5848-5918.
 		/// </summary>
 		[HttpGet("GetAclAccessByModule")]
-		public IActionResult GetAclAccessByModule(string MODULE_NAME)
+		public IActionResult GetAclAccessByModule()
 		{
 			try
 			{
 				SetNoCacheHeaders();
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
+				// Ported from SplendidCRM/Administration/Rest.svc.cs lines 5848-5918.
+				// Legacy returns ALL modules (no WHERE clause). No MODULE_NAME parameter.
+				if ( !_security.IsAuthenticated() || !(_security.AdminUserAccess("ACLRoles", "view") >= 0 || _security.AdminUserAccess("ACLRoles", "edit") >= 0) )
 					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
-				if (Sql.IsEmptyString(MODULE_NAME))
-					return BadRequest(new { error = "MODULE_NAME is required" });
 				SplendidCRM.TimeZone T10n = GetUserTimezone();
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
+				string sSQL = "select MODULE_NAME          " + ControlChars.CrLf
+				            + "     , DISPLAY_NAME         " + ControlChars.CrLf
+				            + "     , ACLACCESS_ADMIN      " + ControlChars.CrLf
+				            + "     , ACLACCESS_ACCESS     " + ControlChars.CrLf
+				            + "     , ACLACCESS_VIEW       " + ControlChars.CrLf
+				            + "     , ACLACCESS_LIST       " + ControlChars.CrLf
+				            + "     , ACLACCESS_EDIT       " + ControlChars.CrLf
+				            + "     , ACLACCESS_DELETE     " + ControlChars.CrLf
+				            + "     , ACLACCESS_IMPORT     " + ControlChars.CrLf
+				            + "     , ACLACCESS_EXPORT     " + ControlChars.CrLf
+				            + "     , ACLACCESS_ARCHIVE    " + ControlChars.CrLf
+				            + "     , IS_ADMIN             " + ControlChars.CrLf
+				            + "  from vwACL_ACCESS_ByModule" + ControlChars.CrLf
+				            + " order by MODULE_NAME       " + ControlChars.CrLf;
 				using IDbCommand cmd = con.CreateCommand();
-				cmd.CommandText =
-					"select *                       " + ControlChars.CrLf
-				  + "  from vwACL_ACCESS_ByModule   " + ControlChars.CrLf
-				  + " where MODULE_NAME = @MODULE_NAME" + ControlChars.CrLf
-				  + " order by ROLE_NAME, DISPLAY_NAME" + ControlChars.CrLf;
-				Sql.AddParameter(cmd, "@MODULE_NAME", MODULE_NAME);
+				cmd.CommandText = sSQL;
 				using var da = _dbProviderFactories.CreateDataAdapter();
 				((IDbDataAdapter)da).SelectCommand = cmd;
 				using var dt = new DataTable();
 				da.Fill(dt);
-				string json = JsonConvert.SerializeObject(_restUtil.ToJson(null, "ACL_ACCESS_ByModule", dt, T10n), Newtonsoft.Json.Formatting.None);
-				return Content(json, "application/json", Encoding.UTF8);
+				var reqObj = HttpContext.Request;
+				string sBaseURI = reqObj.Scheme + "://" + reqObj.Host.Value + reqObj.PathBase.Value + "/Administration/Rest.svc/GetAclAccessByModule";
+				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, String.Empty, dt, T10n);
+				dictResponse.Add("__total", (long)dt.Rows.Count);
+				return JsonContent(dictResponse);
 			}
 			catch (Exception ex)
 			{
@@ -4286,7 +5387,8 @@ namespace SplendidCRM.Web.Controllers
 			}
 		}
 
-		/// <summary>POST Administration/Rest.svc/UpdateAdminEditCustomField — Updates (modifies) a custom field definition.</summary>
+		/// <summary>POST Administration/Rest.svc/UpdateAdminEditCustomField — Updates (modifies) a custom field definition.
+		/// Ported from SplendidCRM/Administration/Rest.svc.cs lines 5564-5667.</summary>
 		[HttpPost("UpdateAdminEditCustomField")]
 		public async System.Threading.Tasks.Task<IActionResult> UpdateAdminEditCustomField()
 		{
@@ -4294,44 +5396,80 @@ namespace SplendidCRM.Web.Controllers
 			{
 				string sCulture = GetUserCulture();
 				L10N L10n = new L10N(sCulture, _memoryCache);
-				if (!_security.IsAuthenticated() || !_security.IS_ADMIN)
-					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") });
+				string sModuleName = "EditCustomFields";
+				int nACLACCESS = _security.AdminUserAccess(sModuleName, "edit");
+				if ( !_security.IsAuthenticated() || nACLACCESS < 0 )
+					return StatusCode(401, new { error = L10n.Term("ACL.LBL_INSUFFICIENT_ACCESS") + ": " + sModuleName });
 
 				string body = await ReadRequestBodyAsync();
 				Dictionary<string, object> dict = DeserializeBody(body);
-				Guid   gID            = Sql.ToGuid  (dict.ContainsKey("ID"           ) ? dict["ID"           ] : null);
-				string sMODULE_NAME   = Sql.ToString (dict.ContainsKey("MODULE_NAME"  ) ? dict["MODULE_NAME"  ] : null);
-				string sDATA_TYPE     = Sql.ToString (dict.ContainsKey("DATA_TYPE"    ) ? dict["DATA_TYPE"    ] : null);
-				string sCOLUMN_NAME   = Sql.ToString (dict.ContainsKey("COLUMN_NAME"  ) ? dict["COLUMN_NAME"  ] : null);
-				string sDISPLAY_LABEL = Sql.ToString (dict.ContainsKey("DISPLAY_LABEL") ? dict["DISPLAY_LABEL"] : null);
-				int    nMAX_SIZE      = Sql.ToInteger(dict.ContainsKey("MAX_SIZE"     ) ? dict["MAX_SIZE"     ] : null);
-				bool   bREQUIRED      = Sql.ToBoolean(dict.ContainsKey("REQUIRED"     ) ? dict["REQUIRED"     ] : null);
-				string sDEFAULT_VALUE = Sql.ToString (dict.ContainsKey("DEFAULT_VALUE") ? dict["DEFAULT_VALUE"] : null);
-				string sDROPDOWN_LIST = Sql.ToString (dict.ContainsKey("DROPDOWN_LIST") ? dict["DROPDOWN_LIST"] : null);
+				Guid   gID             = Guid.Empty    ;
+				Int32  nMAX_SIZE       = 0             ;
+				bool   bREQUIRED       = false         ;
+				bool   bAUDITED        = false         ;
+				string sDEFAULT_VALUE  = String.Empty  ;
+				string sDROPDOWN_LIST  = String.Empty  ;
+				bool   bMASS_UPDATE    = false         ;
+				foreach ( string sName in dict.Keys )
+				{
+					switch ( sName )
+					{
+						case "ID"           :  gID            = Sql.ToGuid   (dict[sName]);  break;
+						case "MAX_SIZE"     :  nMAX_SIZE      = Sql.ToInteger(dict[sName]);  break;
+						case "REQUIRED"     :  bREQUIRED      = Sql.ToBoolean(dict[sName]);  break;
+						case "AUDITED"      :  bAUDITED       = Sql.ToBoolean(dict[sName]);  break;
+						case "DEFAULT_VALUE":  sDEFAULT_VALUE = Sql.ToString (dict[sName]);  break;
+						case "DROPDOWN_LIST":  sDROPDOWN_LIST = Sql.ToString (dict[sName]);  break;
+						case "MASS_UPDATE"  :  bMASS_UPDATE   = Sql.ToBoolean(dict[sName]);  break;
+					}
+				}
+				if ( Sql.IsEmptyGuid(gID) )
+					throw new Exception("The ID must be specified.");
 
-				if (Sql.IsEmptyString(sMODULE_NAME) || Sql.IsEmptyString(sCOLUMN_NAME))
-					return BadRequest(new { error = "MODULE_NAME and COLUMN_NAME are required" });
-
-				string sTABLE_NAME = Crm.Modules.TableName(_memoryCache, sMODULE_NAME);
 				DbProviderFactory dbf = _dbProviderFactories.GetFactory();
-				using (IDbConnection con = dbf.CreateConnection())
+				using ( IDbConnection con = dbf.CreateConnection() )
 				{
 					con.Open();
-					using (IDbCommand cmd = con.CreateCommand())
+					using ( IDbTransaction trn = Sql.BeginTransaction(con) )
 					{
-						cmd.CommandText = "update FIELDS_META_DATA set DATA_TYPE = @DATA_TYPE, DISPLAY_LABEL = @DISPLAY_LABEL, MAX_SIZE = @MAX_SIZE, REQUIRED_OPTION = @REQUIRED, DEFAULT_VALUE = @DEFAULT_VALUE, EXT1 = @EXT1, DATE_MODIFIED = @DATE_MODIFIED, DATE_MODIFIED_UTC = @DATE_MODIFIED_UTC, MODIFIED_USER_ID = @MODIFIED_USER_ID where ID = @ID";
-						Sql.AddParameter(cmd, "@DATA_TYPE"        , sDATA_TYPE                  );
-						Sql.AddParameter(cmd, "@DISPLAY_LABEL"    , sDISPLAY_LABEL              );
-						Sql.AddParameter(cmd, "@MAX_SIZE"         , nMAX_SIZE                   );
-						Sql.AddParameter(cmd, "@REQUIRED"         , bREQUIRED ? "required" : "" );
-						Sql.AddParameter(cmd, "@DEFAULT_VALUE"    , sDEFAULT_VALUE              );
-						Sql.AddParameter(cmd, "@EXT1"             , sDROPDOWN_LIST              );
-						Sql.AddParameter(cmd, "@DATE_MODIFIED"    , DateTime.Now                );
-						Sql.AddParameter(cmd, "@DATE_MODIFIED_UTC", DateTime.UtcNow             );
-						Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID           );
-						Sql.AddParameter(cmd, "@ID"               , gID                         );
-						cmd.ExecuteNonQuery();
+						try
+						{
+							using ( IDbCommand cmd = con.CreateCommand() )
+							{
+								cmd.Transaction    = trn;
+								cmd.CommandType    = CommandType.StoredProcedure;
+								cmd.CommandText    = "spFIELDS_META_DATA_Update";
+								cmd.CommandTimeout = 0;
+								Sql.AddParameter(cmd, "@ID"               , gID                );
+								Sql.AddParameter(cmd, "@MODIFIED_USER_ID" , _security.USER_ID  );
+								Sql.AddParameter(cmd, "@MAX_SIZE"         , nMAX_SIZE          );
+								Sql.AddParameter(cmd, "@REQUIRED"         , bREQUIRED          );
+								Sql.AddParameter(cmd, "@AUDITED"          , bAUDITED           );
+								Sql.AddParameter(cmd, "@DEFAULT_VALUE"    , sDEFAULT_VALUE, 255);
+								Sql.AddParameter(cmd, "@DROPDOWN_LIST"    , sDROPDOWN_LIST,  50);
+								Sql.AddParameter(cmd, "@MASS_UPDATE"      , bMASS_UPDATE       );
+								Sql.AddParameter(cmd, "@DISABLE_RECOMPILE", true               );
+								cmd.ExecuteNonQuery();
+							}
+							trn.Commit();
+						}
+						catch ( Exception ex )
+						{
+							trn.Rollback();
+							throw new Exception(ex.Message, ex.InnerException);
+						}
 					}
+				}
+				// Trigger background recompile of views after schema change.
+				if ( _memoryCache.Get<object>("System.Recompile.Start") == null )
+				{
+					// In the legacy code, ModuleUtils.EditCustomFields.RecompileViews was invoked on a separate thread.
+					// For ASP.NET Core, we flag the recompile need in the cache for the scheduler to pick up.
+					_memoryCache.Set("System.Recompile.Restart", true);
+				}
+				else
+				{
+					_memoryCache.Set("System.Recompile.Restart", true);
 				}
 				return Ok(new { d = gID });
 			}

@@ -1261,13 +1261,13 @@ namespace SplendidCRM
 			if ( dbf != null )
 			{
 				IDbDataParameter par = dbf.CreateParameter();
-				par.ParameterName = "@" + sField;
+				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 				return par;
 			}
 			else
 			{
 				IDbDataParameter par = cmd.CreateParameter();
-				par.ParameterName = "@" + sField;
+				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 				return par;
 			}
 		}
@@ -1359,7 +1359,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, Int16 nValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Int16;
 			par.Value         = nValue;
 			cmd.Parameters.Add(par);
@@ -1369,7 +1369,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, Int32 nValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Int32;
 			par.Value         = nValue;
 			cmd.Parameters.Add(par);
@@ -1379,7 +1379,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, Int64 nValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Int64;
 			par.Value         = nValue;
 			cmd.Parameters.Add(par);
@@ -1389,7 +1389,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, float fValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Single;
 			par.Value         = fValue;
 			cmd.Parameters.Add(par);
@@ -1399,7 +1399,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, double dValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Double;
 			par.Value         = dValue;
 			cmd.Parameters.Add(par);
@@ -1409,7 +1409,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, Decimal dValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Decimal;
 			par.Value         = dValue;
 			cmd.Parameters.Add(par);
@@ -1419,7 +1419,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, bool bValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			// 02/04/2006 Paul.  Oracle doesn't support a boolean type, so store as int. 
 			if ( IsOracle(cmd) )
 			{
@@ -1443,7 +1443,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, Guid gValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			if ( IsOracle(cmd) )
 			{
 				par.DbType = DbType.AnsiString;
@@ -1461,7 +1461,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, DateTime dtValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.DateTime;
 			par.Value         = dtValue == DateTime.MinValue ? DBNull.Value : (object)dtValue;
 			cmd.Parameters.Add(par);
@@ -1472,7 +1472,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, string sValue, int nMaxLength)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.String;
 			par.Size          = nMaxLength;
 			if ( Sql.IsEmptyString(sValue) )
@@ -1487,7 +1487,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, string sValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.String;
 			if ( Sql.IsEmptyString(sValue) )
 				par.Value = DBNull.Value;
@@ -1501,7 +1501,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddAnsiParam(IDbCommand cmd, string sField, string sValue, int nMaxLength)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.AnsiString;
 			par.Size          = nMaxLength;
 			if ( Sql.IsEmptyString(sValue) )
@@ -1516,7 +1516,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddAnsiParam(IDbCommand cmd, string sField, string sValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.AnsiString;
 			if ( Sql.IsEmptyString(sValue) )
 				par.Value = DBNull.Value;
@@ -1530,7 +1530,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, int nValue, ParameterDirection direction)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Int32;
 			par.Value         = nValue;
 			par.Direction     = direction;
@@ -1542,7 +1542,7 @@ namespace SplendidCRM
 		public static IDbDataParameter AddParameter(IDbCommand cmd, string sField, byte[] abyValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Binary;
 			if ( abyValue == null || abyValue.Length == 0 )
 				par.Value = DBNull.Value;
@@ -1571,7 +1571,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, int nValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Int32;
 			par.Value         = nValue;
 			cmd.Parameters.Add(par);
@@ -1581,7 +1581,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, float fValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Single;
 			par.Value         = fValue;
 			cmd.Parameters.Add(par);
@@ -1591,7 +1591,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, Decimal dValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.Decimal;
 			par.Value         = dValue;
 			cmd.Parameters.Add(par);
@@ -1601,7 +1601,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, bool bValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			if ( IsOracle(cmd) )
 			{
 				par.DbType = DbType.Int32;
@@ -1619,7 +1619,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, Guid gValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			if ( IsOracle(cmd) )
 			{
 				par.DbType = DbType.AnsiString;
@@ -1643,7 +1643,7 @@ namespace SplendidCRM
 			{
 				IDbDataParameter par = cmd.CreateParameter();
 				string sField = arrField[i].Replace(".", "_") + "_" + i.ToString();
-				par.ParameterName = "@" + sField;
+				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 				if ( IsOracle(cmd) )
 				{
 					par.DbType = DbType.AnsiString;
@@ -1665,7 +1665,7 @@ namespace SplendidCRM
 		public static void AppendParameter(IDbCommand cmd, StringBuilder sb, string sField, DateTime dtValue)
 		{
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.DateTime;
 			par.Value         = dtValue == DateTime.MinValue ? DBNull.Value : (object)dtValue;
 			cmd.Parameters.Add(par);
@@ -1733,7 +1733,7 @@ namespace SplendidCRM
 			if ( Sql.IsEmptyString(sValue) )
 				return;
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.String;
 			switch ( nFilterMode )
 			{
@@ -1785,7 +1785,7 @@ namespace SplendidCRM
 			{
 				IDbDataParameter par = cmd.CreateParameter();
 				string sField = arrField[i].Replace(".", "_") + "_" + i.ToString();
-				par.ParameterName = "@" + sField;
+				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 				par.DbType        = DbType.String;
 				switch ( nFilterMode )
 				{
@@ -1982,7 +1982,7 @@ namespace SplendidCRM
 			{
 				IDbDataParameter par = cmd.CreateParameter();
 				string sField = arrField[i].Replace(".", "_") + "_" + i.ToString();
-				par.ParameterName = "@" + sField;
+				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 				par.DbType        = DbType.String;
 				par.Value         = "%" + EscapeSQLLike(sValue) + "%";
 				cmd.Parameters.Add(par);
@@ -2002,7 +2002,7 @@ namespace SplendidCRM
 			if ( Sql.IsEmptyString(sValue) )
 				return;
 			IDbDataParameter par = cmd.CreateParameter();
-			par.ParameterName = "@" + sField;
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 			par.DbType        = DbType.String;
 			par.Value         = "%" + EscapeSQLLike(sValue) + "%";
 			cmd.Parameters.Add(par);
@@ -2296,7 +2296,7 @@ namespace SplendidCRM
 												try
 												{
 													IDbDataParameter par = cmdInsert.CreateParameter();
-													par.ParameterName = "@" + sField;
+													par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 													if ( sField == "ID" )
 													{
 														par.DbType = DbType.Guid;
@@ -2784,7 +2784,7 @@ namespace SplendidCRM
 							if ( !Sql.IsEmptyString(sValue) )
 							{
 								IDbDataParameter par = cmd.CreateParameter();
-								par.ParameterName = "@" + sField;
+								par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 								par.DbType        = DbType.String;
 								par.Value         = sValue;
 								cmd.Parameters.Add(par);
@@ -2896,7 +2896,7 @@ namespace SplendidCRM
 								if ( IsSQLServer(cmd) )
 								{
 									IDbDataParameter par = cmd.CreateParameter();
-									par.ParameterName = "@" + sField;
+									par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
 									par.DbType        = DbType.String;
 									par.Value         = "\"" + EscapeSQL(sValue) + "\"";
 									cmd.Parameters.Add(par);

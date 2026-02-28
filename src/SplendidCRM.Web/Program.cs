@@ -436,6 +436,31 @@ var app = builder.Build();
 StartupValidator.Validate(app.Configuration, app.Services.GetService<ILogger<Program>>());
 
 // =====================================================================================
+// STATIC AMBIENT WIRING — Bridge DI services into legacy static classes.
+// These classes use static ambient fields because their methods are static and cannot
+// accept constructor-injected parameters directly.
+// Must run AFTER builder.Build() (DI container ready) and BEFORE any middleware that
+// invokes these static methods.
+// =====================================================================================
+{
+	var ambientHttpAccessor  = app.Services.GetRequiredService<IHttpContextAccessor>();
+	var ambientMemoryCache   = app.Services.GetRequiredService<IMemoryCache>();
+	var ambientConfiguration = app.Services.GetRequiredService<IConfiguration>();
+	var ambientSecurity      = app.Services.GetRequiredService<Security>();
+	var ambientDbf           = app.Services.GetRequiredService<DbProviderFactories>();
+	var ambientSplendidCache = app.Services.GetRequiredService<SplendidCache>();
+
+	Sql.SetAmbient(ambientDbf, ambientMemoryCache, ambientHttpAccessor, ambientSecurity);
+	SqlProcs.SetAmbient(ambientSecurity, ambientDbf);
+	Utils.SetAmbient(ambientHttpAccessor, ambientMemoryCache, ambientConfiguration, ambientSecurity, ambientDbf, ambientSplendidCache);
+	SplendidDefaults.SetAmbient(ambientHttpAccessor, ambientMemoryCache);
+	SplendidCRM.TimeZone.SetAmbient(ambientMemoryCache);
+	PopUtils.SetAmbient(ambientMemoryCache);
+	MimeUtils.SetAmbient(ambientMemoryCache, ambientSecurity, ambientDbf);
+	SqlProcs.SetDynamicFactoryAmbient(ambientMemoryCache, ambientDbf);
+}
+
+// =====================================================================================
 // 5. MIDDLEWARE PIPELINE — Order matters
 // =====================================================================================
 
@@ -493,6 +518,44 @@ app.UseAuthorization();
 
 // Session middleware (distributed session from Redis or SQL Server).
 app.UseSession();
+
+// =====================================================================================
+// APPLICATION INITIALIZATION MIDDLEWARE — Replaces Global.asax.cs Application_BeginRequest.
+// Original: if (Application.Count == 0) { SplendidInit.InitApp(this.Context); }
+// Loads CONFIG, modules, terminology, ACL, timezones, currencies from the database
+// into IMemoryCache on the first HTTP request.
+// Guard key "imageURL" is written by SplendidInit.InitAppURLs() — same sentinel as legacy.
+// MUST be AFTER UseSession() and BEFORE MapControllers().
+// =====================================================================================
+app.Use(async (context, next) =>
+{
+	var splendidInit = context.RequestServices.GetRequiredService<SplendidInit>();
+	var memoryCache  = context.RequestServices.GetRequiredService<IMemoryCache>();
+	if (!memoryCache.TryGetValue("imageURL", out object _))
+	{
+		splendidInit.InitApp();
+	}
+	await next();
+});
+
+// =====================================================================================
+// SESSION RENEWAL MIDDLEWARE — Replaces per-method SplendidSession.CreateSession calls.
+// Legacy called SplendidSession.CreateSession(HttpContext.Current.Session) in 20+ REST
+// methods to keep the SignalR session dictionary in sync with ASP.NET session expiry.
+// This middleware applies the same call cross-cuttingly for every authenticated request.
+// =====================================================================================
+app.Use(async (context, next) =>
+{
+	if ( context.Session != null && context.User?.Identity?.IsAuthenticated == true )
+	{
+		try
+		{
+			SplendidSession.CreateSession(context.Session, context.Session.Id);
+		}
+		catch { /* session renewal is non-critical */ }
+	}
+	await next();
+});
 
 // SoapCore endpoint for SugarCRM SOAP API (preserves /soap.asmx path).
 ((IApplicationBuilder)app).UseSoapEndpoint<SplendidCRM.ISugarSoapService>(
