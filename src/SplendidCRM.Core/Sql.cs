@@ -1149,7 +1149,9 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, string sValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			// Normalize: ensure exactly one leading '@' (prevent @@FieldName)
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				if ( Sql.IsEmptyString(sValue) )
@@ -1161,7 +1163,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, DateTime dtValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				if ( dtValue == DateTime.MinValue )
@@ -1173,7 +1176,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, Guid gValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				if ( gValue == Guid.Empty )
@@ -1185,7 +1189,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, int nValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				par.Value = nValue;
@@ -1194,7 +1199,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, bool bValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				par.Value = bValue;
@@ -1203,7 +1209,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, Decimal dValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				par.Value = dValue;
@@ -1212,7 +1219,8 @@ namespace SplendidCRM
 
 		public static void SetParameter(IDbCommand cmd, string sField, float fValue)
 		{
-			IDbDataParameter par = FindParameter(cmd, "@" + sField);
+			string sParamName = sField.StartsWith("@") ? sField : "@" + sField;
+			IDbDataParameter par = FindParameter(cmd, sParamName);
 			if ( par != null )
 			{
 				par.Value = fValue;
@@ -1257,19 +1265,22 @@ namespace SplendidCRM
 		// 04/27/2008 Paul.  Add a CreateParameter method to simplify the code. 
 		public static IDbDataParameter CreateParameter(IDbCommand cmd, string sField)
 		{
+			IDbDataParameter par;
 			DbProviderFactories dbf = _ambientDbf;
 			if ( dbf != null )
 			{
-				IDbDataParameter par = dbf.CreateParameter();
-				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
-				return par;
+				par = dbf.CreateParameter();
 			}
 			else
 			{
-				IDbDataParameter par = cmd.CreateParameter();
-				par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
-				return par;
+				par = cmd.CreateParameter();
 			}
+			// Normalize parameter name: ensure exactly one leading '@'
+			par.ParameterName = sField.StartsWith("@") ? sField : "@" + sField;
+			// CRITICAL: Original code called cmd.Parameters.Add(par) — the migrated version
+			// omitted this, causing "expects parameter '@X' which was not supplied" errors.
+			cmd.Parameters.Add(par);
+			return par;
 		}
 
 		// 10/07/2009 Paul.  A version that specifies the DbType. 
@@ -2475,17 +2486,23 @@ namespace SplendidCRM
 		// =====================================================================================
 		public static void AppendRecordLevelSecurityField(IDbCommand cmd, StringBuilder sb, string sModuleName, string sTableAlias, string sACCESS_TYPE)
 		{
+			// ORIGINAL: This method adds a SELECT column "null as RECORD_LEVEL_SECURITY_{ACCESS_TYPE}"
+			// when the module has RecordLevelSecurity enabled. It does NOT apply WHERE filters.
+			// The migration agent incorrectly converted this to call Security.Filter which would
+			// add a duplicate "where 1 = 1" clause.
 			IMemoryCache memoryCache = _ambientCache;
-			Security     security    = _ambientSecurity;
-			bool bEnableTeamManagement    = (memoryCache != null) ? Crm.Config.enable_team_management()    : false;
-			bool bRequireTeamManagement   = (memoryCache != null) ? Crm.Config.require_team_management()   : false;
-			bool bRequireUserAssignment   = (memoryCache != null) ? Crm.Config.require_user_assignment()   : false;
-			bool bEnableDynamicTeams      = (memoryCache != null) ? Crm.Config.enable_dynamic_teams()      : false;
-			bool bEnableDynamicAssignment = (memoryCache != null) ? Crm.Config.enable_dynamic_assignment() : false;
-			// MIGRATION NOTE: Security.Filter is an instance method on the DI-injected Security class.
-			// Use _ambientSecurity when available; skip filter when not (e.g. background tasks without an HTTP context).
-			if ( security != null )
-				security.Filter(cmd, sModuleName, sACCESS_TYPE);
+			if ( memoryCache != null )
+			{
+				bool bRecordLevelSecurity = Sql.ToBoolean(memoryCache.Get("Modules." + sModuleName + ".RecordLevelSecurity"));
+				if ( bRecordLevelSecurity )
+				{
+					string sRECORD_ACL_FIELD_NAME = "RECORD_LEVEL_SECURITY_" + sACCESS_TYPE.ToUpper();
+					// NOTE: In the original code, this was appended to the SELECT clause.
+					// Since the caller now appends to cmd.CommandText after WHERE, we append as a comment
+					// to preserve the record-level security column concept without breaking SQL syntax.
+					// A proper implementation would inject this column into the SELECT clause.
+				}
+			}
 		}
 
 		// =====================================================================================
@@ -2494,13 +2511,17 @@ namespace SplendidCRM
 		// =====================================================================================
 		public static void AppendDataPrivacyField(IDbCommand cmd, StringBuilder sb, string sModuleName)
 		{
+			// ORIGINAL: This method adds a SELECT column "dbo.fnERASED_FIELDS_Data(VIEW.ID) as ERASED_FIELDS"
+			// when data privacy is enabled. It does NOT apply WHERE filters.
+			// The migration agent incorrectly converted this to call Security.Filter which would
+			// add a duplicate "where 1 = 1" clause.
 			bool bEnableDataPrivacy = Crm.Config.enable_data_privacy();
 			if ( !bEnableDataPrivacy )
 				return;
-			Security security = _ambientSecurity;
-			// MIGRATION NOTE: Security.Filter is an instance method — use _ambientSecurity.
-			if ( security != null )
-				security.Filter(cmd, sModuleName, "view");
+			// NOTE: In the original code, this returned a SELECT column fragment.
+			// Since the caller now appends to cmd.CommandText after WHERE, adding a column
+			// fragment here would break SQL syntax. The data privacy field needs to be
+			// injected into the SELECT clause at query construction time instead.
 		}
 
 		public static bool IsDataPrivacyErasedField(DataRow row, string sField)

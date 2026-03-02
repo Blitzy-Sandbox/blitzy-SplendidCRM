@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SplendidCRM.Web.Tests", "tests\SplendidCRM.Web.Tests\SplendidCRM.Web.Tests.csproj", "{AC5A1BED-C79F-48BD-9F72-38B9137F9F90}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SplendidCRM.Integration.Tests", "tests\SplendidCRM.Integration.Tests\SplendidCRM.Integration.Tests.csproj", "{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,18 @@ Global
 		{AC5A1BED-C79F-48BD-9F72-38B9137F9F90}.Release|x64.Build.0 = Release|Any CPU
 		{AC5A1BED-C79F-48BD-9F72-38B9137F9F90}.Release|x86.ActiveCfg = Release|Any CPU
 		{AC5A1BED-C79F-48BD-9F72-38B9137F9F90}.Release|x86.Build.0 = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|x64.Build.0 = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Debug|x86.Build.0 = Debug|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|x64.ActiveCfg = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|x64.Build.0 = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|x86.ActiveCfg = Release|Any CPU
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,5 +94,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{75B94294-6E7F-493C-A33C-90499905487B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{AC5A1BED-C79F-48BD-9F72-38B9137F9F90} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{EDBB7ABA-391E-44CD-BF08-0E30CF756E00} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

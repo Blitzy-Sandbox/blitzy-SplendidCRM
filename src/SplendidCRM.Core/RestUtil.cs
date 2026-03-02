@@ -733,8 +733,10 @@ namespace SplendidCRM
 					using ( IDbCommand cmd = con.CreateCommand() )
 					{
 						cmd.CommandType = CommandType.Text;
-						cmd.CommandText = sSQL + " where 1 = 1\r\n";
-						// Apply module-level security filter
+						// Security.Filter appends JOINs then " where 1 = 1" itself.
+						// We must NOT add "where 1 = 1" before calling Filter, otherwise
+						// JOINs get placed after WHERE (invalid SQL).
+						cmd.CommandText = sSQL;
 						if ( !Sql.IsEmptyString(sMODULE_NAME) )
 						{
 							string sAccessType = "list";
@@ -744,8 +746,15 @@ namespace SplendidCRM
 								case AccessMode.view:    sAccessType = "view";    break;
 								case AccessMode.related: sAccessType = "related"; break;
 							}
+							// Filter appends JOINs + " where 1 = 1" + WHERE conditions
 							_security.Filter(cmd, sMODULE_NAME, sAccessType);
 						}
+						else
+						{
+							// No module — no security filter. Add WHERE manually.
+							cmd.CommandText += " where 1 = 1\r\n";
+						}
+						if ( sbDumpSQL != null ) sbDumpSQL.AppendLine("/* After Security.Filter: " + cmd.CommandText + " */");
 						// Apply record-level security
 						if ( !Sql.IsEmptyString(sMODULE_NAME) )
 						{
@@ -814,10 +823,14 @@ namespace SplendidCRM
 							try { lTotalCount = Sql.ToLong(cmdCount.ExecuteScalar()); }
 							catch { lTotalCount = -1; }
 						}
-						// ORDER BY
-						string sORDER = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
-						// Paginate
-						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDER, nTOP, nSKIP);
+						// ORDER BY — must include "order by" prefix for SQL Server OFFSET/FETCH
+						string sORDERRaw = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
+						string sORDER = sORDERRaw.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
+							? " " + sORDERRaw
+							: " order by " + sORDERRaw;
+						// Paginate — convert nSKIP (row offset) to 1-based page number for Sql.PageResults
+						int nPageNumber = (nTOP > 0 && nSKIP > 0) ? (nSKIP / nTOP) + 1 : 1;
+						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDER, nTOP, nPageNumber);
 						if ( sbDumpSQL != null ) sbDumpSQL.Append(sSQLPaged);
 						using ( IDbCommand cmdPage = con.CreateCommand() )
 						{
@@ -959,8 +972,14 @@ namespace SplendidCRM
 							try { lTotalCount = Sql.ToLong(cmdCount.ExecuteScalar()); }
 							catch { lTotalCount = -1; }
 						}
-						string sORDER = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
-						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDER, nTOP, nSKIP);
+						// ORDER BY — must include "order by" prefix for SQL Server OFFSET/FETCH
+						string sORDERRawAdmin = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
+						string sORDERAdmin = sORDERRawAdmin.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
+							? " " + sORDERRawAdmin
+							: " order by " + sORDERRawAdmin;
+						// Paginate — convert nSKIP (row offset) to 1-based page number for Sql.PageResults
+						int nPageNumberAdmin = (nTOP > 0 && nSKIP > 0) ? (nSKIP / nTOP) + 1 : 1;
+						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDERAdmin, nTOP, nPageNumberAdmin);
 						if ( sbDumpSQL != null ) sbDumpSQL.Append(sSQLPaged);
 						using ( IDbCommand cmdPage = con.CreateCommand() )
 						{
@@ -1126,7 +1145,8 @@ namespace SplendidCRM
 					DataRow rowTable = dtRestTables.Rows[0];
 					sMODULE_NAME  = Sql.ToString(rowTable["MODULE_NAME"]);
 					string sV     = Sql.ToString(rowTable["VIEW_NAME"  ]);
-					bIsAdminTable = Sql.ToBoolean(rowTable["IS_ADMIN"  ]);
+					// IS_ADMIN column may not exist in Community Edition vwSYSTEM_REST_TABLES
+					bIsAdminTable = dtRestTables.Columns.Contains("IS_ADMIN") ? Sql.ToBoolean(rowTable["IS_ADMIN"]) : false;
 					if ( !Sql.IsEmptyString(sV) ) sVIEW_NAME = sV;
 				}
 				// ACL check
@@ -1199,6 +1219,14 @@ namespace SplendidCRM
 						using ( IDbCommand cmd = SqlProcs.Factory(con, sSP_UPDATE) )
 						{
 							cmd.Transaction = trn;
+							// Initialize all parameters to DBNull.Value to prevent
+							// "expects parameter '@X' which was not supplied" errors.
+							// Parameters not explicitly set below will default to NULL in the SP.
+							foreach ( IDbDataParameter parInit in cmd.Parameters )
+							{
+								if ( parInit.Value == null )
+									parInit.Value = DBNull.Value;
+							}
 							// Standard fields
 							Sql.SetParameter(cmd, "@ID",               gID);
 							Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID);

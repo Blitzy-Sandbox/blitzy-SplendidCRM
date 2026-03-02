@@ -168,7 +168,8 @@ namespace SplendidCRM.Web.Controllers
 		private IActionResult InternalError(Exception ex)
 		{
 			string correlationId = HttpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty;
-			string errorMessage  = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred.";
+			// Show detailed errors in Development and Testing environments
+			string errorMessage  = (_webHostEnvironment.IsDevelopment() || _webHostEnvironment.EnvironmentName == "Testing") ? ex.Message : "An internal error occurred.";
 			return StatusCode(500, new { error = errorMessage, correlationId });
 		}
 
@@ -725,18 +726,19 @@ namespace SplendidCRM.Web.Controllers
 					da.Fill(dt);
 					if (!dt.Columns.Contains("MODULE_ACLACCESS" )) dt.Columns.Add("MODULE_ACLACCESS" , typeof(string));
 					if (!dt.Columns.Contains("TARGET_ACLACCESS" )) dt.Columns.Add("TARGET_ACLACCESS" , typeof(string));
+					bool bHasTargetModule = dt.Columns.Contains("TARGET_MODULE");
 					string sLAST_VIEW_NAME = String.Empty;
 					List<Dictionary<string, object>> layout = null;
 					foreach (DataRow row in dt.Rows)
 					{
 						string sVIEW_NAME   = Sql.ToString(row["VIEW_NAME"  ]);
 						string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
-						bool   bADMIN_ONLY  = Sql.ToBoolean(row["ADMIN_ONLY"]);
+						bool   bADMIN_ONLY  = dt.Columns.Contains("ADMIN_ONLY") ? Sql.ToBoolean(row["ADMIN_ONLY"]) : false;
 						if (bADMIN_ONLY && !_security.IS_ADMIN) continue;
 						if (!lstWithAdmin.Contains(sMODULE_NAME)) continue;
 						int nMODULE_ACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
 						row["MODULE_ACLACCESS"] = nMODULE_ACLACCESS.ToString();
-						string sTARGET_MODULE = Sql.ToString(row["TARGET_MODULE"]);
+						string sTARGET_MODULE = bHasTargetModule ? Sql.ToString(row["TARGET_MODULE"]) : String.Empty;
 						int nTARGET_ACLACCESS = Sql.IsEmptyString(sTARGET_MODULE) ? -1 : _security.GetUserAccess(sTARGET_MODULE, "edit");
 						row["TARGET_ACLACCESS"] = nTARGET_ACLACCESS.ToString();
 						if (sLAST_VIEW_NAME != sVIEW_NAME)
@@ -982,7 +984,7 @@ namespace SplendidCRM.Web.Controllers
 					cmd.CommandText =
 						"select *                          " + ControlChars.CrLf
 					  + "  from vwSHORTCUTS                " + ControlChars.CrLf
-					  + " order by MODULE_NAME, ORDER_INDEX" + ControlChars.CrLf;
+					  + " order by MODULE_NAME, SHORTCUT_ORDER" + ControlChars.CrLf;
 					using var da = _dbProviderFactories.CreateDataAdapter();
 					((IDbDataAdapter)da).SelectCommand = cmd;
 					using var dt = new DataTable();
@@ -1017,8 +1019,9 @@ namespace SplendidCRM.Web.Controllers
 
 		private Dictionary<string, object> GetAllSearchColumnsInternal(List<string> lstMODULES)
 		{
+			// 08/09/2020 Paul.  Convert to comma separated string for cache key.
 			string sModuleList = String.Join(",", lstMODULES.ToArray());
-			string sCacheKey   = "vwSEARCH_COLUMNS.ReactClient." + sModuleList;
+			string sCacheKey   = "vwMODULES.Columns.ReactClient." + sModuleList;
 			var objs = _memoryCache.Get<Dictionary<string, object>>(sCacheKey);
 			if (objs != null) return objs;
 			objs = new Dictionary<string, object>();
@@ -1026,41 +1029,45 @@ namespace SplendidCRM.Web.Controllers
 			{
 				if (_security.IsAuthenticated())
 				{
-					using IDbConnection con = _dbProviderFactories.CreateConnection();
-					con.Open();
-					using IDbCommand cmd = con.CreateCommand();
-					cmd.CommandText =
-						"select *                             " + ControlChars.CrLf
-					  + "  from vwSEARCH_COLUMNS               " + ControlChars.CrLf
-					  + " order by MODULE_NAME, COLUMN_INDEX   " + ControlChars.CrLf;
-					using var da = _dbProviderFactories.CreateDataAdapter();
-					((IDbDataAdapter)da).SelectCommand = cmd;
-					using var dt = new DataTable();
-					da.Fill(dt);
-					string sLAST_MODULE = String.Empty;
-					List<Dictionary<string, object>> cols = null;
-					foreach (DataRow row in dt.Rows)
+					// Original SplendidCache.GetAllSearchColumns iterates modules and queries
+					// vwSqlColumns_Searching per module via SplendidCache.SearchColumns().
+					// We replicate that pattern to match the original Rest.svc.cs behavior.
+					foreach (string sMODULE_NAME in lstMODULES)
 					{
-						string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
-						if (!lstMODULES.Contains(sMODULE_NAME)) continue;
-						if (sLAST_MODULE != sMODULE_NAME)
+						string sTABLE_NAME = _splendidCache.ModuleTableName(sMODULE_NAME);
+						if (!Sql.IsEmptyString(sTABLE_NAME))
 						{
-							sLAST_MODULE       = sMODULE_NAME;
-							cols               = new List<Dictionary<string, object>>();
-							objs[sMODULE_NAME] = cols;
+							var arrModuleColumns = new List<object>();
+							using IDbConnection con = _dbProviderFactories.CreateConnection();
+							con.Open();
+							using IDbCommand cmd = con.CreateCommand();
+							cmd.CommandText =
+								"select *                           " + ControlChars.CrLf
+							  + "  from vwSqlColumns_Searching      " + ControlChars.CrLf
+							  + " where ObjectName = @OBJECTNAME    " + ControlChars.CrLf
+							  + " order by colid                    " + ControlChars.CrLf;
+							Sql.AddParameter(cmd, "@OBJECTNAME", Sql.MetadataName(cmd, "vw" + sTABLE_NAME));
+							using var da = _dbProviderFactories.CreateDataAdapter();
+							((IDbDataAdapter)da).SelectCommand = cmd;
+							using var dt = new DataTable();
+							da.Fill(dt);
+							foreach (DataRow row in dt.Rows)
+							{
+								var obj = new Dictionary<string, object>();
+								obj["NAME"        ] = Sql.ToString(row["NAME"        ]);
+								obj["DISPLAY_NAME"] = Sql.ToString(row["DISPLAY_NAME"]);
+								arrModuleColumns.Add(obj);
+							}
+							objs[sMODULE_NAME] = arrModuleColumns;
 						}
-						var drow = new Dictionary<string, object>();
-						for (int j = 0; j < dt.Columns.Count; j++)
-							drow[dt.Columns[j].ColumnName] = row[j];
-						cols.Add(drow);
 					}
 					_memoryCache.Set(sCacheKey, objs, _splendidCache.DefaultCacheExpiration());
 				}
 			}
 			catch (Exception ex)
 			{
+				// 04/28/2019 Paul.  This error is not critical, so we can just log and ignore.
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				throw;
 			}
 			return objs;
 		}
@@ -1161,14 +1168,14 @@ namespace SplendidCRM.Web.Controllers
 					cmd.CommandText =
 						"select *                      " + ControlChars.CrLf
 					  + "  from vwREACT_CUSTOM_VIEWS    " + ControlChars.CrLf
-					  + " order by VIEW_NAME            " + ControlChars.CrLf;
+					  + " order by NAME                 " + ControlChars.CrLf;
 					using var da = _dbProviderFactories.CreateDataAdapter();
 					((IDbDataAdapter)da).SelectCommand = cmd;
 					using var dt = new DataTable();
 					da.Fill(dt);
 					foreach (DataRow row in dt.Rows)
 					{
-						string sVIEW_NAME   = Sql.ToString(row["VIEW_NAME"  ]);
+						string sVIEW_NAME   = Sql.ToString(row["NAME"       ]);
 						string sMODULE_NAME = Sql.ToString(row["MODULE_NAME"]);
 						if (!lstMODULES.Contains(sMODULE_NAME)) continue;
 						var drow = new Dictionary<string, object>();
@@ -2127,12 +2134,10 @@ namespace SplendidCRM.Web.Controllers
 				}
 
 				// Standard database login
-				// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.
-				string sHashedPassword = Security.HashPassword(sPASSWORD);
 				Guid gLoginUserID = Guid.Empty;
 				{
 					// LoginUser(string,string,string,string,string,bool) returns bool; USER_ID set in session on success
-					bool bLoginSuccess = _splendidInit.LoginUser(sUSER_NAME, sHashedPassword, String.Empty, String.Empty, String.Empty, false);
+					bool bLoginSuccess = _splendidInit.LoginUser(sUSER_NAME, sPASSWORD, String.Empty, String.Empty, String.Empty, false);
 					if (bLoginSuccess)
 						gLoginUserID = _security.USER_ID;
 				}
@@ -2859,12 +2864,14 @@ namespace SplendidCRM.Web.Controllers
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
 				using IDbCommand cmd = con.CreateCommand();
+				// Security.Filter appends " where 1 = 1" — so we must NOT add our own WHERE before calling it.
+				// The ID filter is added AFTER Security.Filter.
 				cmd.CommandText =
 					"select *             " + ControlChars.CrLf
-				  + "  from " + sVIEW_NAME + ControlChars.CrLf
-				  + " where ID = @ID     " + ControlChars.CrLf;
-				Sql.AddParameter(cmd, "@ID", gID);
+				  + "  from " + sVIEW_NAME + ControlChars.CrLf;
 				_security.Filter(cmd, ModuleName, "view");
+				cmd.CommandText += "   and ID = @ID" + ControlChars.CrLf;
+				Sql.AddParameter(cmd, "@ID", gID);
 				using var da = _dbProviderFactories.CreateDataAdapter();
 				((IDbDataAdapter)da).SelectCommand = cmd;
 				using var dt = new DataTable();
@@ -3311,8 +3318,9 @@ namespace SplendidCRM.Web.Controllers
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
 				using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_Delete");
-				Sql.AddParameter(cmd, "@ID"        , gID               );
-				Sql.AddParameter(cmd, "@MODIFIED_BY", _security.USER_ID );
+				// SqlProcs.Factory creates params with DeriveParameters — use SetParameter to set existing params
+				Sql.SetParameter(cmd, "@ID"              , gID               );
+				Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID );
 				cmd.ExecuteNonQuery();
 				return JsonContent(new { d = "OK" });
 			}
@@ -3362,8 +3370,8 @@ namespace SplendidCRM.Web.Controllers
 					using IDbConnection con = _dbProviderFactories.CreateConnection();
 					con.Open();
 					using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_Delete");
-					Sql.AddParameter(cmd, "@ID"         , gID              );
-					Sql.AddParameter(cmd, "@MODIFIED_BY", _security.USER_ID );
+					Sql.SetParameter(cmd, "@ID"              , gID              );
+					Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID );
 					cmd.ExecuteNonQuery();
 				}
 				return JsonContent(new { d = "OK" });
@@ -3400,8 +3408,8 @@ namespace SplendidCRM.Web.Controllers
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
 				using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_DeleteRecurrences");
-				Sql.AddParameter(cmd, "@ID"         , gID              );
-				Sql.AddParameter(cmd, "@MODIFIED_BY", _security.USER_ID );
+				Sql.SetParameter(cmd, "@ID"              , gID              );
+				Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID );
 				cmd.ExecuteNonQuery();
 				return JsonContent(new { d = "OK" });
 			}
@@ -3449,8 +3457,8 @@ namespace SplendidCRM.Web.Controllers
 				using IDbConnection con = _dbProviderFactories.CreateConnection();
 				con.Open();
 				using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_MassSync");
-				Sql.AddParameter(cmd, "@MASS_IDS"  , sMassIDs         );
-				Sql.AddParameter(cmd, "@MODIFIED_BY", _security.USER_ID );
+				Sql.SetParameter(cmd, "@ID_LIST"         , sMassIDs         );
+				Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID );
 				cmd.ExecuteNonQuery();
 				return JsonContent(new { d = "OK" });
 			}
@@ -3506,8 +3514,8 @@ namespace SplendidCRM.Web.Controllers
 					using IDbConnection con = _dbProviderFactories.CreateConnection();
 					con.Open();
 					using IDbCommand cmd = SqlProcs.Factory(con, "sp" + sTableName + "_MassUnsync");
-					Sql.AddParameter(cmd, "@MASS_IDS"   , sMassIDs         );
-					Sql.AddParameter(cmd, "@MODIFIED_BY" , _security.USER_ID );
+					Sql.SetParameter(cmd, "@ID_LIST"         , sMassIDs         );
+					Sql.SetParameter(cmd, "@MODIFIED_USER_ID", _security.USER_ID );
 					cmd.ExecuteNonQuery();
 				}
 				return JsonContent(new { d = "OK" });
