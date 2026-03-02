@@ -30,7 +30,7 @@
 //   - REPLACED HttpUtility.UrlEncode → System.Net.WebUtility.UrlEncode
 //   - ADDED: static ambient fields + SetAmbient() for DI-compatible static usage
 //   - PRESERVED: All business logic, type conversion logic, SQL parameter building logic
-#nullable disable
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -134,13 +134,13 @@ namespace SplendidCRM
 			return s;
 		}
 
-		public static string EscapeSQL(string str)
+		public static string EscapeSQL(string? str)
 		{
 			str = str.Replace("\'", "\'\'");
 			return str;
 		}
 
-		public static string EscapeSQLLike(string str)
+		public static string EscapeSQLLike(string? str)
 		{
 			str = str.Replace(@"\", @"\\");
 			str = str.Replace("%" , @"\%");
@@ -149,7 +149,7 @@ namespace SplendidCRM
 		}
 
 		// 04/05/2012 Paul.  EscapeXml is needed in the SearchView. 
-		public static string EscapeXml(string str)
+		public static string EscapeXml(string? str)
 		{
 			// MIGRATION NOTE: XmlConvert.EncodeName() is available but does different escaping.
 			// Preserving original manual XML escape for backward compatibility.
@@ -161,7 +161,7 @@ namespace SplendidCRM
 			return str;
 		}
 
-		public static string EscapeJavaScript(string str)
+		public static string EscapeJavaScript(string? str)
 		{
 			str = str.Replace(@"\", @"\\");
 			str = str.Replace("\'", "\\\'");
@@ -173,7 +173,7 @@ namespace SplendidCRM
 		}
 
 		// 11/18/2014 Paul.  Make it easy to escape an Application variable. 
-		public static string EscapeJavaScript(object o)
+		public static string EscapeJavaScript(object? o)
 		{
 			return EscapeJavaScript(Sql.ToString(o));
 		}
@@ -209,14 +209,14 @@ namespace SplendidCRM
 			return lstClean;
 		}
 
-		public static bool IsEmptyString(string str)
+		public static bool IsEmptyString(string? str)
 		{
 			if ( str == null || str == String.Empty )
 				return true;
 			return false;
 		}
 
-		public static bool IsEmptyString(object obj)
+		public static bool IsEmptyString(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return true;
@@ -225,18 +225,18 @@ namespace SplendidCRM
 			return false;
 		}
 
-		public static string ToString(string str)
+		public static string ToString(string? str)
 		{
 			if ( str == null )
 				return String.Empty;
 			return str;
 		}
 
-		public static string ToString(object obj)
+		public static string ToString(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return String.Empty;
-			return obj.ToString();
+			return obj.ToString() ?? String.Empty;
 		}
 
 		public static object ToDBString(string str)
@@ -248,7 +248,7 @@ namespace SplendidCRM
 			return str;
 		}
 
-		public static object ToDBString(object obj)
+		public static object ToDBString(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -258,14 +258,14 @@ namespace SplendidCRM
 			return str;
 		}
 
-		public static byte[] ToBinary(object obj)
+		public static byte[]? ToBinary(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return new byte[0];
 			return (byte[]) obj;
 		}
 
-		public static object ToDBBinary(object obj)
+		public static object ToDBBinary(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -291,7 +291,7 @@ namespace SplendidCRM
 			return DateTime.MinValue;
 		}
 
-		public static DateTime ToDateTime(object obj)
+		public static DateTime ToDateTime(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DateTime.MinValue;
@@ -309,7 +309,7 @@ namespace SplendidCRM
 			return String.Empty;
 		}
 
-		public static string ToDateString(object obj)
+		public static string ToDateString(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return String.Empty;
@@ -325,7 +325,7 @@ namespace SplendidCRM
 			return dt.ToString();
 		}
 
-		public static string ToTimeString(object obj)
+		public static string ToTimeString(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return String.Empty;
@@ -343,7 +343,7 @@ namespace SplendidCRM
 			return DBNull.Value;
 		}
 
-		public static object ToDBDateTime(object obj)
+		public static object ToDBDateTime(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -357,7 +357,7 @@ namespace SplendidCRM
 			return gID == Guid.Empty;
 		}
 
-		public static bool IsEmptyGuid(object obj)
+		public static bool IsEmptyGuid(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return true;
@@ -380,7 +380,7 @@ namespace SplendidCRM
 			return true;
 		}
 
-		public static Guid ToGuid(object obj)
+		public static Guid ToGuid(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return Guid.Empty;
@@ -400,7 +400,7 @@ namespace SplendidCRM
 		}
 
 		// 01/20/2013 Paul.  Add ToGuid(string) as it is the most common and we don't need the extra checks. 
-		public static Guid ToGuid(string str)
+		public static Guid ToGuid(string? str)
 		{
 			if ( str == null || str == String.Empty )
 				return Guid.Empty;
@@ -415,7 +415,7 @@ namespace SplendidCRM
 		}
 
 		// 10/25/2012 Paul.  Provide a safe version that returns null if string is null. 
-		public static Guid? ToGuidSafe(object obj)
+		public static Guid? ToGuidSafe(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return null;
@@ -447,7 +447,7 @@ namespace SplendidCRM
 			return gID;
 		}
 
-		public static object ToDBGuid(object obj)
+		public static object ToDBGuid(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -491,7 +491,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static Int32 ToInteger(object obj)
+		public static Int32 ToInteger(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -528,7 +528,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static Int64 ToLong(object obj)
+		public static Int64 ToLong(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -554,7 +554,7 @@ namespace SplendidCRM
 			return ToLong(s);
 		}
 
-		public static Int64 ToInt64(object obj)
+		public static Int64 ToInt64(object? obj)
 		{
 			return ToLong(obj);
 		}
@@ -576,7 +576,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static Int16 ToShort(object obj)
+		public static Int16 ToShort(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -602,7 +602,7 @@ namespace SplendidCRM
 			return nValue;
 		}
 
-		public static object ToDBInteger(object obj)
+		public static object ToDBInteger(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -629,7 +629,7 @@ namespace SplendidCRM
 			return n;
 		}
 
-		public static object ToDBLong(object obj)
+		public static object ToDBLong(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -681,7 +681,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static float ToFloat(object obj)
+		public static float ToFloat(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -707,7 +707,7 @@ namespace SplendidCRM
 			return f;
 		}
 
-		public static object ToDBFloat(object obj)
+		public static object ToDBFloat(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -734,7 +734,7 @@ namespace SplendidCRM
 			return f;
 		}
 
-		public static object ToDBDouble(object obj)
+		public static object ToDBDouble(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -771,7 +771,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static double ToDouble(object obj)
+		public static double ToDouble(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -814,7 +814,7 @@ namespace SplendidCRM
 			return 0;
 		}
 
-		public static Decimal ToDecimal(object obj)
+		public static Decimal ToDecimal(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return 0;
@@ -858,7 +858,7 @@ namespace SplendidCRM
 			return d;
 		}
 
-		public static object ToDBDecimal(object obj)
+		public static object ToDBDecimal(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;
@@ -885,7 +885,7 @@ namespace SplendidCRM
 			return d;
 		}
 
-		public static bool ToBoolean(string s)
+		public static bool ToBoolean(string? s)
 		{
 			if ( Sql.IsEmptyString(s) )
 				return false;
@@ -896,7 +896,7 @@ namespace SplendidCRM
 			return false;
 		}
 
-		public static bool ToBoolean(object obj)
+		public static bool ToBoolean(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return false;
@@ -911,7 +911,7 @@ namespace SplendidCRM
 			return b;
 		}
 
-		public static object ToDBBoolean(object obj)
+		public static object ToDBBoolean(object? obj)
 		{
 			if ( obj == null || obj == DBNull.Value )
 				return DBNull.Value;

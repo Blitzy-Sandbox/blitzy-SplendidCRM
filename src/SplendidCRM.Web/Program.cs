@@ -29,7 +29,7 @@
 //     3. AWS Systems Manager Parameter Store
 //     4. appsettings.{Environment}.json
 //     5. appsettings.json
-#nullable disable
+#nullable enable
 using System;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
@@ -512,12 +512,19 @@ app.UseStaticFiles();
 // Routing (enables attribute routing for controllers).
 app.UseRouting();
 
-// Authentication and authorization.
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Session middleware (distributed session from Redis or SQL Server).
+// Session middleware MUST come BEFORE authentication — auth cookie validation reads session data.
+// Without this ordering, the authentication callback cannot access Session["USER_ID"] and every
+// authenticated request fails with 401 even though the user has a valid session.
 app.UseSession();
+
+// Authentication and authorization AFTER session.
+app.UseAuthentication();
+
+// Request logging middleware — logs method, path, status, elapsed time, user, and correlation ID.
+// Placed AFTER UseAuthentication() so User.Identity is populated, BEFORE UseAuthorization().
+app.UseMiddleware<SplendidCRM.Middleware.RequestLoggingMiddleware>();
+
+app.UseAuthorization();
 
 // =====================================================================================
 // APPLICATION INITIALIZATION MIDDLEWARE — Replaces Global.asax.cs Application_BeginRequest.

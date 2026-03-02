@@ -36,7 +36,7 @@
 //   - ADDED:     503 Service Unavailable response on DB connectivity failure (vs. HTML error in WebForms)
 //   - ROUTE:     Exactly GET /api/health per AAP §0.4.4 handoff documentation for Prompt 3
 //   - Minimal change clause: Only changes necessary for .NET Framework 4.8 → .NET 10 ASP.NET Core
-#nullable disable
+#nullable enable
 using System;
 using System.Data;
 using Microsoft.AspNetCore.Authorization;

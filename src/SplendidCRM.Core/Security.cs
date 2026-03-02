@@ -24,7 +24,7 @@
 //   - ACL DataTable stored in session encoded as JSON string for distributed session (Redis/SQL Server) compatibility
 //   - Sql.NextPlaceholder / Sql.MetadataName / Sql.HexEncode inlined as private static helpers
 //   - Application[] module-validity reads: Application["Modules.X.Valid"] → _memoryCache.Get("Modules.X.Valid")
-#nullable disable
+#nullable enable
 using System;
 using System.IO;
 using System.Data;
@@ -98,9 +98,15 @@ namespace SplendidCRM
 		// =====================================================================================
 
 		/// <summary>Gets the ISession from the current HTTP context, or null when outside a request.</summary>
-		private ISession Session
+		private ISession? Session
 		{
 			get { return _httpContextAccessor?.HttpContext?.Session; }
+		}
+
+		/// <summary>Reads a session string, returning empty string when session is null or key is absent.</summary>
+		private string SessionGetString(string key)
+		{
+			return Session?.GetString(key) ?? string.Empty;
 		}
 
 		// =====================================================================================
@@ -123,7 +129,7 @@ namespace SplendidCRM
 				// 02/17/2006 Paul.  Return empty guid when session is unavailable (scheduler / SOAP context).
 				if (Session == null)
 					return Guid.Empty;
-				return Sql.ToGuid(Session.GetString("USER_ID"));
+				return Sql.ToGuid(SessionGetString("USER_ID"));
 			}
 			set
 			{
@@ -145,7 +151,7 @@ namespace SplendidCRM
 				if (Session == null)
 					return String.Empty;
 				// Preserve exact hash format: MD5(USER_ID + ";" + SessionID)
-				string sUserId    = Sql.ToString(Session.GetString("USER_ID"));
+				string sUserId    = Sql.ToString(SessionGetString("USER_ID"));
 				string sSessionId = _httpContextAccessor?.HttpContext?.Session?.Id ?? String.Empty;
 				return Security.HashPassword(sUserId + ";" + sSessionId);
 			}
@@ -159,7 +165,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					return Guid.Empty;
-				return Sql.ToGuid(Session.GetString("USER_LOGIN_ID"));
+				return Sql.ToGuid(SessionGetString("USER_LOGIN_ID"));
 			}
 			set
 			{
@@ -176,7 +182,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_NAME"));
+				return Sql.ToString(SessionGetString("USER_NAME"));
 			}
 			set
 			{
@@ -193,7 +199,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("FULL_NAME"));
+				return Sql.ToString(SessionGetString("FULL_NAME"));
 			}
 			set
 			{
@@ -211,7 +217,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("PICTURE"));
+				return Sql.ToString(SessionGetString("PICTURE"));
 			}
 			set
 			{
@@ -228,7 +234,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToBoolean(Session.GetString("IS_ADMIN"));
+				return Sql.ToBoolean(SessionGetString("IS_ADMIN"));
 			}
 			set
 			{
@@ -245,7 +251,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToBoolean(Session.GetString("IS_ADMIN_DELEGATE"));
+				return Sql.ToBoolean(SessionGetString("IS_ADMIN_DELEGATE"));
 			}
 			set
 			{
@@ -262,7 +268,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToBoolean(Session.GetString("PORTAL_ONLY"));
+				return Sql.ToBoolean(SessionGetString("PORTAL_ONLY"));
 			}
 			set
 			{
@@ -280,7 +286,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToGuid(Session.GetString("TEAM_ID"));
+				return Sql.ToGuid(SessionGetString("TEAM_ID"));
 			}
 			set
 			{
@@ -297,7 +303,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("TEAM_NAME"));
+				return Sql.ToString(SessionGetString("TEAM_NAME"));
 			}
 			set
 			{
@@ -315,7 +321,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("EXCHANGE_ALIAS"));
+				return Sql.ToString(SessionGetString("EXCHANGE_ALIAS"));
 			}
 			set
 			{
@@ -333,7 +339,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("EXCHANGE_EMAIL"));
+				return Sql.ToString(SessionGetString("EXCHANGE_EMAIL"));
 			}
 			set
 			{
@@ -351,7 +357,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("MAIL_SMTPUSER"));
+				return Sql.ToString(SessionGetString("MAIL_SMTPUSER"));
 			}
 			set
 			{
@@ -369,7 +375,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("MAIL_SMTPPASS"));
+				return Sql.ToString(SessionGetString("MAIL_SMTPPASS"));
 			}
 			set
 			{
@@ -387,7 +393,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("EMAIL1"));
+				return Sql.ToString(SessionGetString("EMAIL1"));
 			}
 			set
 			{
@@ -405,7 +411,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToGuid(Session.GetString("PRIMARY_ROLE_ID"));
+				return Sql.ToGuid(SessionGetString("PRIMARY_ROLE_ID"));
 			}
 			set
 			{
@@ -422,7 +428,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("PRIMARY_ROLE_NAME"));
+				return Sql.ToString(SessionGetString("PRIMARY_ROLE_NAME"));
 			}
 			set
 			{
@@ -455,7 +461,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					return "en-US";
-				return Sql.ToString(Session.GetString("USER_LANG")) is string s && s.Length > 0 ? s : "en-US";
+				return Sql.ToString(SessionGetString("USER_LANG")) is string s && s.Length > 0 ? s : "en-US";
 			}
 			set
 			{
@@ -472,7 +478,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_THEME"));
+				return Sql.ToString(SessionGetString("USER_THEME"));
 			}
 			set
 			{
@@ -489,7 +495,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_DATE_FORMAT"));
+				return Sql.ToString(SessionGetString("USER_DATE_FORMAT"));
 			}
 			set
 			{
@@ -506,7 +512,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_TIME_FORMAT"));
+				return Sql.ToString(SessionGetString("USER_TIME_FORMAT"));
 			}
 			set
 			{
@@ -523,7 +529,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_TIMEZONE_ID"));
+				return Sql.ToString(SessionGetString("USER_TIMEZONE_ID"));
 			}
 			set
 			{
@@ -540,7 +546,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_CURRENCY_ID"));
+				return Sql.ToString(SessionGetString("USER_CURRENCY_ID"));
 			}
 			set
 			{
@@ -557,7 +563,7 @@ namespace SplendidCRM
 			{
 				if (Session == null)
 					throw new Exception("HttpContext.Current.Session is null");
-				return Sql.ToString(Session.GetString("USER_EXTENSION"));
+				return Sql.ToString(SessionGetString("USER_EXTENSION"));
 			}
 			set
 			{
@@ -606,7 +612,7 @@ namespace SplendidCRM
 		/// <summary>True when the current session is operating under an admin impersonation context.</summary>
 		public bool IsImpersonating()
 		{
-			return Sql.ToBoolean(Session?.GetString("USER_IMPERSONATION"));
+			return Sql.ToBoolean(SessionGetString("USER_IMPERSONATION"));
 		}
 
 		// =====================================================================================
@@ -627,17 +633,17 @@ namespace SplendidCRM
 				throw new Exception("HttpContext.Current.Session is null");
 
 			// 01/26/2011 Paul.  Retain mobile/browser capability flags across session clear.
-			string sBrowser             = Sql.ToString (Session.GetString("Browser"            ));
-			bool   bIsMobileDevice      = Sql.ToBoolean(Session.GetString("IsMobileDevice"     ));
-			bool   bSupportsPopups      = Sql.ToBoolean(Session.GetString("SupportsPopups"     ));
-			bool   bAllowAutoComplete   = Sql.ToBoolean(Session.GetString("AllowAutoComplete"  ));
+			string sBrowser             = Sql.ToString (SessionGetString("Browser"            ));
+			bool   bIsMobileDevice      = Sql.ToBoolean(SessionGetString("IsMobileDevice"     ));
+			bool   bSupportsPopups      = Sql.ToBoolean(SessionGetString("SupportsPopups"     ));
+			bool   bAllowAutoComplete   = Sql.ToBoolean(SessionGetString("AllowAutoComplete"  ));
 			// 08/22/2012 Paul.  Apple and Android devices should support speech and handwriting.
-			bool   bSupportsSpeech      = Sql.ToBoolean(Session.GetString("SupportsSpeech"     ));
-			bool   bSupportsHandwriting = Sql.ToBoolean(Session.GetString("SupportsHandwriting"));
+			bool   bSupportsSpeech      = Sql.ToBoolean(SessionGetString("SupportsSpeech"     ));
+			bool   bSupportsHandwriting = Sql.ToBoolean(SessionGetString("SupportsHandwriting"));
 			// 11/14/2012 Paul.  Microsoft Surface has Touch in the agent string.
-			bool   bSupportsTouch       = Sql.ToBoolean(Session.GetString("SupportsTouch"      ));
+			bool   bSupportsTouch       = Sql.ToBoolean(SessionGetString("SupportsTouch"      ));
 			// 05/17/2013 Paul.  We need to be able to detect draggable.
-			bool   bSupportsDraggable   = Sql.ToBoolean(Session.GetString("SupportsDraggable"  ));
+			bool   bSupportsDraggable   = Sql.ToBoolean(SessionGetString("SupportsDraggable"  ));
 
 			Session.Clear();
 
@@ -696,7 +702,7 @@ namespace SplendidCRM
 		{
 			UTF8Encoding utf8 = new UTF8Encoding(false);
 
-			string sResult = null;
+			string? sResult = null;
 			byte[] byPassword = utf8.GetBytes(sPASSWORD);
 			using (MemoryStream stm = new MemoryStream())
 			{
@@ -744,7 +750,7 @@ namespace SplendidCRM
 			if (Sql.IsEmptyString(sPASSWORD))
 				throw new Exception("Password is empty.");
 
-			string sResult = null;
+			string? sResult = null;
 			byte[] byPassword = Convert.FromBase64String(sPASSWORD);
 			using (MemoryStream stm = new MemoryStream())
 			{
@@ -879,8 +885,8 @@ namespace SplendidCRM
 				string sAclKey = "ACLACCESS_" + sMODULE_NAME + "_" + sACCESS_TYPE;
 				// 04/27/2006 Paul.  If no specific level is provided, fall back to the Module level (IMemoryCache).
 				// BEFORE: Session[sAclKey] == null ? Application[sAclKey] : Session[sAclKey]
-				// AFTER:  Session.GetString(sAclKey) == null ? _memoryCache.Get(sAclKey) : Session.GetString(sAclKey)
-				string sSessionValue = Session.GetString(sAclKey);
+				// AFTER:  Session?.GetString(sAclKey) == null ? _memoryCache.Get(sAclKey) : Session?.GetString(sAclKey)
+				string? sSessionValue = Session?.GetString(sAclKey);
 				if (sSessionValue == null)
 					nACLACCESS = Sql.ToInteger(_memoryCache.Get(sAclKey));
 				else
@@ -892,7 +898,7 @@ namespace SplendidCRM
 					// Take the minimum — if either value is denied the result is negative.
 					sAclKey = "ACLACCESS_" + sMODULE_NAME + "_access";
 					int nAccessLevel = 0;
-					string sAccessSessionValue = Session.GetString(sAclKey);
+					string? sAccessSessionValue = Session?.GetString(sAclKey);
 					if (sAccessSessionValue == null)
 						nAccessLevel = Sql.ToInteger(_memoryCache.Get(sAclKey));
 					else
@@ -1122,7 +1128,7 @@ namespace SplendidCRM
 				return ACL_FIELD_ACCESS.FULL_ACCESS;
 #endif
 			string sAclKey = "ACLFIELD_" + sMODULE_NAME + "_" + sFIELD_NAME;
-			int nACLACCESS = Sql.ToInteger(Session.GetString(sAclKey));
+			int nACLACCESS = Sql.ToInteger(SessionGetString(sAclKey));
 			// 01/17/2010 Paul.  Zero is a special value that means NOT_SET, so grant full access.
 			if (nACLACCESS == 0)
 				return ACL_FIELD_ACCESS.FULL_ACCESS;

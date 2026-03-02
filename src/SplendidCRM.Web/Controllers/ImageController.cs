@@ -48,6 +48,7 @@ using System.IO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace SplendidCRM
 {
@@ -77,6 +78,7 @@ namespace SplendidCRM
 		// =====================================================================================
 		private readonly SplendidError       _splendidError;
 		private readonly IWebHostEnvironment _env          ;
+		private readonly ILogger<ImageController> _logger  ;
 
 		/// <summary>
 		/// Embedded 1×1 transparent GIF tracking pixel byte array.
@@ -129,10 +131,11 @@ namespace SplendidCRM
 		///   Web host environment used to resolve the physical file path of blank.gif via WebRootPath,
 		///   replacing the legacy Request.MapPath("~/include/images/blank.gif") call at line 63.
 		/// </param>
-		public ImageController(SplendidError splendidError, IWebHostEnvironment env)
+		public ImageController(SplendidError splendidError, IWebHostEnvironment env, ILogger<ImageController> logger)
 		{
 			_splendidError = splendidError;
 			_env           = env          ;
+			_logger        = logger       ;
 		}
 
 		/// <summary>
@@ -196,6 +199,7 @@ namespace SplendidCRM
 			{
 				// Log exception via static SplendidError.SystemError — preserved from image.aspx.cs lines 58–61.
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				_logger.LogError(ex, "ImageController: Error processing image tracking request");
 			}
 
 			// BEFORE (.NET Framework):

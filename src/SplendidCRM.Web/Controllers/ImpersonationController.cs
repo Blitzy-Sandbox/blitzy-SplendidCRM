@@ -67,6 +67,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Caching.Memory;
@@ -105,6 +106,7 @@ namespace SplendidCRM
 		private readonly IHttpContextAccessor _httpContextAccessor;
 		private readonly IWebHostEnvironment  _env                ;
 		private readonly IMemoryCache         _memoryCache        ;
+		private readonly ILogger<ImpersonationController> _logger ;
 
 		// =====================================================================================
 		// Constructor
@@ -140,6 +142,7 @@ namespace SplendidCRM
 			, IHttpContextAccessor httpContextAccessor
 			, IWebHostEnvironment  env
 			, IMemoryCache         memoryCache
+			, ILogger<ImpersonationController> logger
 			)
 		{
 			_security            = security           ;
@@ -147,6 +150,7 @@ namespace SplendidCRM
 			_httpContextAccessor = httpContextAccessor;
 			_env                 = env                ;
 			_memoryCache         = memoryCache        ;
+			_logger              = logger             ;
 		}
 
 		// =====================================================================================
@@ -292,6 +296,7 @@ namespace SplendidCRM
 			}
 			catch ( Exception ex )
 			{
+				_logger.LogError(ex, "ImpersonationController: Error processing impersonation request");
 				// Environment-conditional error detail: expose exception message only in Development
 				string sErrorMessage = _env.EnvironmentName == "Development" ? ex.Message : "An internal error occurred.";
 				return StatusCode(500, new { error = sErrorMessage });

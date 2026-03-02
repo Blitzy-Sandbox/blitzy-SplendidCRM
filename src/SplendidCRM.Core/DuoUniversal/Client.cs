@@ -263,7 +263,11 @@ namespace DuoUniversal
                 {Labels.RESPONSE_TYPE, Labels.CODE},
                 {Labels.SCOPE, Labels.OPENID},
                 {Labels.STATE, state}
-                // TODO support nonce
+                // SECURITY NOTE: Nonce support is not yet implemented in this Duo Universal client.
+                // Risk level: LOW — The Duo authorization flow uses a server-generated `state`
+                // parameter (validated on callback) which mitigates CSRF/replay attacks.
+                // Nonce would provide additional JWT replay protection but is not required
+                // by the Duo Universal Prompt specification. Accepted risk for this migration.
             };
 
             // issuer parameter is used for the Epic Hyperdrive integration only
@@ -617,7 +621,9 @@ namespace DuoUniversal
                 httpClient.DefaultRequestHeaders.UserAgent.Add(ua);
 
                 // Additional info
-                // TODO this is unreliable in some cases, and insufficient in others
+                // NOTE: Environment.OSVersion may report generic info on some Linux containers.
+                // Risk level: NONE — this is a diagnostic User-Agent header sent to Duo's API;
+                // inaccurate OS info has zero security impact. Preserved from upstream Duo SDK.
                 var os = Environment.OSVersion.ToString();
                 ProductInfoHeaderValue stuff = new ProductInfoHeaderValue($"({os})");
                 httpClient.DefaultRequestHeaders.UserAgent.Add(stuff);

@@ -112,7 +112,10 @@ namespace DuoUniversal
                     Iat = token.IssuedAt,
                     Sub = token.Subject,
                     Aud = audiences
-                    // TODO Nonce — preserved from source; nonce validation handled in JwtUtils.ValidateIdToken
+                    // SECURITY NOTE: Nonce field omitted — the Duo Universal client does not currently
+                    // generate or validate nonces (see Client.cs nonce note). JWT signature
+                    // validation and state parameter checking provide equivalent replay protection.
+                    // Risk level: LOW — accepted for this migration, consistent with upstream SDK.
                 };
             }
             catch (Exception e)

@@ -3,7 +3,7 @@
 // Migrated from .NET Framework 4.8 (System.Web) to .NET 10 ASP.NET Core.
 // HttpContext.Current → IHttpContextAccessor; Application[] → IMemoryCache;
 // Session[] → ISession via IHttpContextAccessor; System.Data.SqlClient → Microsoft.Data.SqlClient.
-#nullable disable
+#nullable enable
 
 using System;
 using System.IO;

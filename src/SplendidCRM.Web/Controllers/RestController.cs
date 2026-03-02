@@ -8,7 +8,7 @@
 // ConfigurationManager.AppSettings → IConfiguration
 // JavaScriptSerializer → Newtonsoft.Json / System.Text.Json
 // Stream return → IActionResult (Content with application/json)
-#nullable disable
+#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -23,6 +23,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -156,6 +158,18 @@ namespace SplendidCRM.Web.Controllers
 		{
 			string json = JsonConvert.SerializeObject(obj);
 			return Content(json, "application/json", Encoding.UTF8);
+		}
+
+		/// <summary>
+		/// Returns a 500 error response that includes the correlation ID from the
+		/// RequestLoggingMiddleware for distributed tracing. In Development mode,
+		/// the actual exception message is included; in Production, a generic message.
+		/// </summary>
+		private IActionResult InternalError(Exception ex)
+		{
+			string correlationId = HttpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty;
+			string errorMessage  = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred.";
+			return StatusCode(500, new { error = errorMessage, correlationId });
 		}
 
 		/// <summary>
@@ -1843,7 +1857,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -1860,7 +1874,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -1967,7 +1981,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -1985,7 +1999,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2156,13 +2170,35 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
 		/// <summary>Builds the login response dictionary for a successfully authenticated user.</summary>
+		/// <summary>
+		/// Issues the ASP.NET Core authentication cookie after a successful login and returns
+		/// the standard login response JSON.  For Forms auth mode, this calls SignInAsync so that
+		/// the [Authorize] attribute on subsequent requests passes the cookie principal check.
+		/// Without this SignInAsync call, the auth cookie is never set and every request to an
+		/// [Authorize]-guarded endpoint returns 401 even though the session has USER_ID.
+		/// Windows and SSO modes manage their own principal via their respective middleware;
+		/// calling SignInAsync for those modes is harmless but unnecessary.
+		/// </summary>
 		private async Task<IActionResult> BuildLoginResult(Guid gUSER_ID)
 		{
+			string authMode = _configuration["Authentication:Mode"] ?? "Forms";
+			if (string.Equals(authMode, "Forms", StringComparison.OrdinalIgnoreCase))
+			{
+				var claims = new List<System.Security.Claims.Claim>
+				{
+					new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, gUSER_ID.ToString()),
+					new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, _security.USER_NAME ?? string.Empty),
+				};
+				var identity  = new System.Security.Claims.ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+				var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+				await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+			}
+
 			var result = new Dictionary<string, object>();
 			result["USER_ID"     ] = gUSER_ID;
 			result["USER_SESSION"] = _security.USER_SESSION;
@@ -2222,7 +2258,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2246,7 +2282,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2282,7 +2318,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2305,7 +2341,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2324,7 +2360,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2343,7 +2379,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2362,7 +2398,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2381,7 +2417,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2400,7 +2436,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2419,7 +2455,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2437,7 +2473,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2469,7 +2505,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2580,7 +2616,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2668,7 +2704,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2731,7 +2767,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2793,7 +2829,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2866,7 +2902,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2932,7 +2968,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -2970,7 +3006,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3046,7 +3082,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3099,7 +3135,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3137,7 +3173,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3169,7 +3205,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3203,7 +3239,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3235,7 +3271,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3283,7 +3319,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3335,7 +3371,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3372,7 +3408,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3421,7 +3457,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3479,7 +3515,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3519,7 +3555,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -3555,7 +3591,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -4239,7 +4275,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 
@@ -4728,7 +4764,7 @@ namespace SplendidCRM.Web.Controllers
 			catch (Exception ex)
 			{
 				SplendidError.SystemError(new StackFrame(1, true), ex);
-				return StatusCode(500, new { error = _webHostEnvironment.IsDevelopment() ? ex.Message : "An internal error occurred." });
+				return InternalError(ex);
 			}
 		}
 

@@ -50,6 +50,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 
@@ -80,15 +81,17 @@ namespace SplendidCRM
 		// TwilioManager.Instance.NewSmsMessage(...). In .NET 10, TwilioManager is registered as a DI
 		// service in Program.cs and injected directly, eliminating the singleton lifecycle management.
 		private readonly TwilioManager _twilioManager;
+		private readonly ILogger<TwiMLController> _logger;
 
 		/// <summary>
 		/// Constructs TwiMLController with the required DI services.
 		/// </summary>
-		public TwiMLController(IMemoryCache memoryCache, IConfiguration configuration, TwilioManager twilioManager)
+		public TwiMLController(IMemoryCache memoryCache, IConfiguration configuration, TwilioManager twilioManager, ILogger<TwiMLController> logger)
 		{
 			_memoryCache   = memoryCache  ;
 			_configuration = configuration;
 			_twilioManager = twilioManager;
+			_logger        = logger       ;
 		}
 
 		/// <summary>
@@ -236,6 +239,7 @@ namespace SplendidCRM
 			catch(Exception ex)
 			{
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				_logger.LogError(ex, "TwiMLController: Error processing Twilio webhook request");
 			}
 			// Return 200 OK with no body — Twilio only requires a successful HTTP response code
 			return Ok();

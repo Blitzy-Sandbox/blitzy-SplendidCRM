@@ -37,7 +37,7 @@
 //       'en-US.{entryName}'                        — English fallback
 //       'ALIAS_{module}.{name}'                    — alias mapping
 //       'CONFIG.alternate_language.{culture}'      — culture remapping (e.g. en-CA → en-US)
-#nullable disable
+#nullable enable
 using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
@@ -253,7 +253,7 @@ namespace SplendidCRM
 		/// <returns>
 		/// Localized string if found; empty string if sListName is empty; oField unchanged if null/DBNull.
 		/// </returns>
-		public static object Term(IMemoryCache memoryCache, string sCultureName, string sListName, object oField)
+		public static object? Term(IMemoryCache memoryCache, string sCultureName, string sListName, object? oField)
 		{
 			// 08/17/2005 Paul.  Special Term function that helps with a list.
 			// 01/11/2008 Paul.  Protect against uninitialized variables.
@@ -305,7 +305,7 @@ namespace SplendidCRM
 			// BEFORE: object oDisplayName = Application[sCultureName + "." + sEntryName];
 			// AFTER:  Use IMemoryCache.TryGetValue() for the primary culture lookup.
 			//         Key pattern preserved exactly from .NET Framework version.
-			object oDisplayName;
+			object? oDisplayName;
 			if ( !memoryCache.TryGetValue(sCultureName + "." + sEntryName, out oDisplayName) )
 				oDisplayName = null;
 
@@ -340,7 +340,7 @@ namespace SplendidCRM
 					return sEntryName;
 				}
 			}
-			return oDisplayName.ToString();
+			return oDisplayName?.ToString() ?? sEntryName;
 		}
 
 		// =====================================================================================
@@ -371,7 +371,7 @@ namespace SplendidCRM
 			// BEFORE: HttpApplicationState Application = HttpContext.Current.Application;
 			//         object oDisplayName = Application[NAME + "." + sEntryName];
 			// AFTER:  Use _memoryCache.TryGetValue() for primary culture lookup.
-			object oDisplayName;
+			object? oDisplayName;
 			if ( !_memoryCache.TryGetValue(NAME + "." + sEntryName, out oDisplayName) )
 				oDisplayName = null;
 
@@ -386,7 +386,7 @@ namespace SplendidCRM
 			}
 			// 06/30/2007 Paul.  AccessKey too long, cannot be more than one character.
 			// 07/03/2007 Paul.  Protect against an empty AccessKey string.
-			string sAccessKey = oDisplayName.ToString();
+			string sAccessKey = oDisplayName.ToString() ?? String.Empty;
 			if ( sAccessKey.Length == 0 )
 				return String.Empty;
 			return sAccessKey.Substring(0, 1);
@@ -420,10 +420,10 @@ namespace SplendidCRM
 			// BEFORE: HttpApplicationState Application = HttpContext.Current.Application;
 			//         object oAliasedName = Application["ALIAS_" + sEntryName];
 			// AFTER:  _memoryCache.Get<object>("ALIAS_" + sEntryName)
-			object oAliasedName = _memoryCache.Get<object>("ALIAS_" + sEntryName);
+			object? oAliasedName = _memoryCache.Get<object>("ALIAS_" + sEntryName);
 			if ( oAliasedName == null )
 				return Term(sEntryName);
-			return Term(oAliasedName.ToString());
+			return Term(oAliasedName.ToString() ?? sEntryName);
 		}
 
 		// =====================================================================================

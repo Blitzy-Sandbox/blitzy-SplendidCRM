@@ -22,7 +22,7 @@
  *   - Added DI constructor; static ambient fields preserved for backward-compatible callers
  *   - Minimal change clause: all business logic preserved exactly
  *********************************************************************************************************************/
-#nullable disable
+#nullable enable
 using System;
 using System.IO;
 using System.Xml;

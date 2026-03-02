@@ -48,6 +48,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace SplendidCRM
 {
@@ -77,6 +78,7 @@ namespace SplendidCRM
 		// =====================================================================================
 		private readonly SplendidError      _splendidError      ;
 		private readonly DbProviderFactories _dbProviderFactories;
+		private readonly ILogger<CampaignTrackerController> _logger;
 
 		/// <summary>
 		/// Constructs a CampaignTrackerController with required services via dependency injection.
@@ -89,10 +91,11 @@ namespace SplendidCRM
 		///   Database connection factory, replacing the static DbProviderFactories.GetFactory() call at
 		///   campaign_trackerv2.aspx.cs line 65.
 		/// </param>
-		public CampaignTrackerController(SplendidError splendidError, DbProviderFactories dbProviderFactories)
+		public CampaignTrackerController(SplendidError splendidError, DbProviderFactories dbProviderFactories, ILogger<CampaignTrackerController> logger)
 		{
 			_splendidError       = splendidError      ;
 			_dbProviderFactories = dbProviderFactories;
+			_logger              = logger             ;
 		}
 
 		/// <summary>
@@ -205,6 +208,7 @@ namespace SplendidCRM
 			{
 				// Log exception via static SplendidError.SystemError — preserved from line 86.
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				_logger.LogError(ex, "CampaignTrackerController: Error processing campaign tracker request");
 			}
 
 			// No redirect URL found, tracker ID was empty, or an exception was handled.

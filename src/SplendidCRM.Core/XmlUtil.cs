@@ -647,7 +647,9 @@ namespace SplendidCRM
 				foreach ( XmlAttribute attr in parent.Attributes )
 				{
 					sb.Append(" "  + attr.Name  + "=");
-					sb.Append("\"" + attr.Value + "\""); // TODO: encode the value.  
+					// .NET 10 Migration: Encode XML attribute value to prevent XML injection.
+					// SecurityElement.Escape handles &, <, >, ", ' — the five XML-sensitive characters.
+					sb.Append("\"" + System.Security.SecurityElement.Escape(attr.Value) + "\"");
 				}
 			}
 			if ( parent.HasChildNodes )

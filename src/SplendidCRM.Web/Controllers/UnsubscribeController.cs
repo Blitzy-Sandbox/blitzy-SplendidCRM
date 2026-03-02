@@ -57,6 +57,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace SplendidCRM
 {
@@ -92,6 +93,7 @@ namespace SplendidCRM
 		/// when used via the static overloads that accept HttpContext.
 		/// </summary>
 		private readonly SplendidError      _splendidError      ;
+		private readonly ILogger<UnsubscribeController> _logger;
 
 		/// <summary>
 		/// Metadata caching service. Provides the remove_me_reason_dom dropdown DataTable
@@ -130,12 +132,14 @@ namespace SplendidCRM
 			, SplendidCache       splendidCache
 			, IHttpContextAccessor httpContextAccessor
 			, IMemoryCache         memoryCache
+			, ILogger<UnsubscribeController> logger
 			)
 		{
 			_splendidError       = splendidError      ;
 			_splendidCache       = splendidCache      ;
 			_httpContextAccessor = httpContextAccessor;
 			_memoryCache         = memoryCache        ;
+			_logger              = logger             ;
 		}
 
 		// =====================================================================================
@@ -326,6 +330,7 @@ namespace SplendidCRM
 				//         lblError.Text = ex.Message; radREASON.Visible = false; btnSubmit.Visible = false;
 				// AFTER:  Log error and return HTTP 500 with message
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				_logger.LogError(ex, "UnsubscribeController: Error loading unsubscribe page");
 				return StatusCode(500, new { error = ex.Message });
 			}
 		}
@@ -411,6 +416,7 @@ namespace SplendidCRM
 				//         lblError.Text = ex.Message;
 				// AFTER:  Log error and return HTTP 500 with message
 				SplendidError.SystemError(new StackTrace(true).GetFrame(0), ex);
+				_logger.LogError(ex, "UnsubscribeController: Error processing unsubscribe submission");
 				return StatusCode(500, new { error = ex.Message });
 			}
 		}
