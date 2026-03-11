@@ -270,7 +270,7 @@ Source: `SplendidCRM/Web.config:L4-5`
 
 There are no `web.config` transforms (no `Web.Debug.config`, `Web.Release.config`), no environment-based configuration management, no configuration builder, and no external secret store integration. The same connection string containing `sa` credentials is used in every environment.
 
-**Risk Severity:** Critical (credential exposure) / Moderate (deployment inflexibility)
+**Risk Severity:** Critical — Hardcoded credentials in Web.config with no environment-based configuration management create direct credential exposure risk; deployment inflexibility is a secondary consequence.
 
 **Governing Controls:** NIST CM-6 (Configuration Settings), CIS Control 4 (Secure Configuration of Enterprise Assets and Software)
 
@@ -624,7 +624,7 @@ If any step in this chain throws an exception, subsequent steps are skipped, lea
 
 Source: `SplendidCRM/Global.asax.cs:L92-102`, `SplendidCRM/Global.asax.cs:L192-219`, `SplendidCRM/Global.asax.cs:L330-333`, `SplendidCRM/Global.asax.cs:L87-90`, `SplendidCRM/Global.asax.cs:L335-369`
 
-**Risk Severity:** Critical (no error handling around initialization chain) / Moderate (empty `Application_Error`)
+**Risk Severity:** Critical — The application initialization sequence is unprotected by error handling, and the empty `Application_Error` handler means unhandled exceptions are neither captured nor recovered from. The initialization chain gap is the primary risk; the empty global handler is a compounding factor.
 
 **Governing Controls:** NIST SI-11 (Error Handling), CIS Control 16 (Application Software Security)
 

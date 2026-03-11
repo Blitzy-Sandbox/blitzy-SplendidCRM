@@ -54,7 +54,9 @@ Architectural layers represent the technology stack tiers where code physically 
 - **Static**: Configuration, infrastructure, or compiled artifacts that change infrequently. Evaluated with 1 sample instance in Directive 6 accuracy validation.
 - **Dynamic**: Runtime behavior with variable state, execution paths, or user-dependent logic. Evaluated with 10–25 sample instances in Directive 6 accuracy validation.
 
-### System Decomposition Grid
+### System Domain and Layer Listing
+
+The following diagram enumerates all functional domains (vertical axis) and architectural layers (horizontal axis) with system counts per category. The complete two-axis grid mapping — showing which domain-layer intersections contain auditable systems — is detailed in the Vertical Domain Registry and Horizontal Layer Registry sections below.
 
 ```mermaid
 graph TB
@@ -785,58 +787,58 @@ Detailed framework mappings are provided in companion documents. This index prov
 
 | system_id | COSO Principles | NIST SP 800-53 | NIST CSF | CIS Controls v8 |
 |---|---|---|---|---|
-| `SYS-SECURITY` | P3, P5, P10, P11 | AC, IA, SC | Protect | CIS 5, 6, 16 |
-| `SYS-AUTH-AD` | P3, P5, P10 | IA, AC | Protect | CIS 5, 6 |
-| `SYS-AUTH-DUO` | P5, P10, P11 | IA | Protect | CIS 6 |
-| `SYS-API-REST` | P10, P11, P13 | AC, SC, SI | Protect, Detect | CIS 6, 16 |
-| `SYS-API-SOAP` | P10, P11, P13 | AC, SC, SI | Protect, Detect | CIS 6, 16 |
-| `SYS-API-ADMIN` | P3, P5, P10 | AC, CM | Protect | CIS 4, 6 |
-| `SYS-CACHE` | P10, P13 | CM, SI | Protect | CIS 4, 16 |
-| `SYS-INIT` | P3, P10 | CM, SI | Protect | CIS 4 |
-| `SYS-DB-ACCESS` | P10, P11, P13 | CM, SI, SC | Protect | CIS 3, 16 |
-| `SYS-ERROR-OBSERVABILITY` | P10, P16, P17 | AU, SI | Detect, Respond | CIS 8 |
-| `SYS-BUSINESS-LOGIC` | P10, P11, P12 | AC, SI | Protect | CIS 6, 16 |
-| `SYS-IMPORT-EXPORT` | P10, P11 | SI, SC | Protect | CIS 16 |
-| `SYS-CAMPAIGN` | P10, P11 | SI, SC | Protect | CIS 16 |
-| `SYS-EMAIL` | P10, P11 | SC, SI | Protect | CIS 9, 16 |
-| `SYS-SMS-TELEPHONY` | P10, P11 | SC, SI | Protect | CIS 9, 16 |
-| `SYS-REALTIME` | P10, P11 | AC, SC | Protect | CIS 6, 16 |
-| `SYS-SCHEDULER` | P10, P12, P16 | CM, SI | Protect, Detect | CIS 4, 8 |
-| `SYS-WORKFLOW` | P10 | CM | Identify | CIS 4 |
-| `SYS-CONFIG` | P3, P10, P12 | CM | Identify, Protect | CIS 4 |
-| `SYS-ADMIN` | P3, P5, P10 | AC, CM | Protect | CIS 4, 5, 6 |
-| `SYS-REPORTING` | P13, P15 | AU, SI | Detect | CIS 8 |
-| `SYS-CONTENT` | P10, P13 | SI | Protect | CIS 16 |
-| `SYS-L10N` | P14 | CM | Identify | CIS 4 |
-| `SYS-INTEGRATION-STUBS` | P9, P10 | CM | Identify | CIS 2 |
-| `SYS-SQL-DB` | P10, P13, P16 | AU, CM, SI | Identify, Protect | CIS 1, 3, 4 |
-| `SYS-AUDIT` | P16, P17 | AU | Detect | CIS 8 |
-| `SYS-ASPNET-APP` | P3, P10 | CM, SI | Protect | CIS 4, 16 |
-| `SYS-IIS-CFG` | P3, P10, P12 | CM, SC | Protect | CIS 4 |
-| `SYS-REACT-SPA` | P10, P11 | SI | Protect | CIS 2, 16 |
-| `SYS-ANGULAR-CLIENT` | P10 | SI | Identify | CIS 2 |
-| `SYS-HTML5-CLIENT` | P10, P11 | SI | Identify, Protect | CIS 2, 16 |
-| `SYS-WEBFORMS` | P10, P11 | AC, SI | Protect | CIS 6, 16 |
-| `SYS-BUILD-PIPELINE` | P10, P12 | CM, SI | Protect | CIS 2, 4 |
-| `SYS-DEPENDENCY-MGMT` | P9, P10 | CM | Identify | CIS 2 |
+| `SYS-SECURITY` | COSO Principle 3, COSO Principle 5, COSO Principle 10, COSO Principle 11 | AC, IA, SC | Protect | CIS Control 5, CIS Control 6, CIS Control 16 |
+| `SYS-AUTH-AD` | COSO Principle 3, COSO Principle 5, COSO Principle 10 | IA, AC | Protect | CIS Control 5, CIS Control 6 |
+| `SYS-AUTH-DUO` | COSO Principle 5, COSO Principle 10, COSO Principle 11 | IA | Protect | CIS Control 6 |
+| `SYS-API-REST` | COSO Principle 10, COSO Principle 11, COSO Principle 13 | AC, SC, SI | Protect, Detect | CIS Control 6, CIS Control 16 |
+| `SYS-API-SOAP` | COSO Principle 10, COSO Principle 11, COSO Principle 13 | AC, SC, SI | Protect, Detect | CIS Control 6, CIS Control 16 |
+| `SYS-API-ADMIN` | COSO Principle 3, COSO Principle 5, COSO Principle 10 | AC, CM | Protect | CIS Control 4, CIS Control 6 |
+| `SYS-CACHE` | COSO Principle 10, COSO Principle 13 | CM, SI | Protect | CIS Control 4, CIS Control 16 |
+| `SYS-INIT` | COSO Principle 3, COSO Principle 10 | CM, SI | Protect | CIS Control 4 |
+| `SYS-DB-ACCESS` | COSO Principle 10, COSO Principle 11, COSO Principle 13 | CM, SI, SC | Protect | CIS Control 3, CIS Control 16 |
+| `SYS-ERROR-OBSERVABILITY` | COSO Principle 10, COSO Principle 16, COSO Principle 17 | AU, SI | Detect, Respond | CIS Control 8 |
+| `SYS-BUSINESS-LOGIC` | COSO Principle 10, COSO Principle 11, COSO Principle 12 | AC, SI | Protect | CIS Control 6, CIS Control 16 |
+| `SYS-IMPORT-EXPORT` | COSO Principle 10, COSO Principle 11 | SI, SC | Protect | CIS Control 16 |
+| `SYS-CAMPAIGN` | COSO Principle 10, COSO Principle 11 | SI, SC | Protect | CIS Control 16 |
+| `SYS-EMAIL` | COSO Principle 10, COSO Principle 11 | SC, SI | Protect | CIS Control 9, CIS Control 16 |
+| `SYS-SMS-TELEPHONY` | COSO Principle 10, COSO Principle 11 | SC, SI | Protect | CIS Control 9, CIS Control 16 |
+| `SYS-REALTIME` | COSO Principle 10, COSO Principle 11 | AC, SC | Protect | CIS Control 6, CIS Control 16 |
+| `SYS-SCHEDULER` | COSO Principle 10, COSO Principle 12, COSO Principle 16 | CM, SI | Protect, Detect | CIS Control 4, CIS Control 8 |
+| `SYS-WORKFLOW` | COSO Principle 10 | CM | Identify | CIS Control 4 |
+| `SYS-CONFIG` | COSO Principle 3, COSO Principle 10, COSO Principle 12 | CM | Identify, Protect | CIS Control 4 |
+| `SYS-ADMIN` | COSO Principle 3, COSO Principle 5, COSO Principle 10 | AC, CM | Protect | CIS Control 4, CIS Control 5, CIS Control 6 |
+| `SYS-REPORTING` | COSO Principle 13, COSO Principle 15 | AU, SI | Detect | CIS Control 8 |
+| `SYS-CONTENT` | COSO Principle 10, COSO Principle 13 | SI | Protect | CIS Control 16 |
+| `SYS-L10N` | COSO Principle 14 | CM | Identify | CIS Control 4 |
+| `SYS-INTEGRATION-STUBS` | COSO Principle 9, COSO Principle 10 | CM | Identify | CIS Control 2 |
+| `SYS-SQL-DB` | COSO Principle 10, COSO Principle 13, COSO Principle 16 | AU, CM, SI | Identify, Protect | CIS Control 1, CIS Control 3, CIS Control 4 |
+| `SYS-AUDIT` | COSO Principle 16, COSO Principle 17 | AU | Detect | CIS Control 8 |
+| `SYS-ASPNET-APP` | COSO Principle 3, COSO Principle 10 | CM, SI | Protect | CIS Control 4, CIS Control 16 |
+| `SYS-IIS-CFG` | COSO Principle 3, COSO Principle 10, COSO Principle 12 | CM, SC | Protect | CIS Control 4 |
+| `SYS-REACT-SPA` | COSO Principle 10, COSO Principle 11 | SI | Protect | CIS Control 2, CIS Control 16 |
+| `SYS-ANGULAR-CLIENT` | COSO Principle 10 | SI | Identify | CIS Control 2 |
+| `SYS-HTML5-CLIENT` | COSO Principle 10, COSO Principle 11 | SI | Identify, Protect | CIS Control 2, CIS Control 16 |
+| `SYS-WEBFORMS` | COSO Principle 10, COSO Principle 11 | AC, SI | Protect | CIS Control 6, CIS Control 16 |
+| `SYS-BUILD-PIPELINE` | COSO Principle 10, COSO Principle 12 | CM, SI | Protect | CIS Control 2, CIS Control 4 |
+| `SYS-DEPENDENCY-MGMT` | COSO Principle 9, COSO Principle 10 | CM | Identify | CIS Control 2 |
 
 ### COSO Principle Legend
 
 | Principle | Name | Primary Audit Application |
 |---|---|---|
-| P1 | Demonstrates Commitment to Integrity and Ethical Values | System identification completeness |
-| P3 | Establishes Structure, Authority, and Responsibility | System decomposition rationale |
-| P5 | Enforces Accountability | Access control, admin privilege boundaries |
-| P7 | Identifies and Analyzes Risk | Static/Dynamic classification for risk assessment |
-| P9 | Identifies and Analyzes Significant Change | Dependency change management, integration stubs |
-| P10 | Selects and Develops Control Activities | Core control implementation quality |
-| P11 | Selects and Develops Technology Controls | Input validation, encryption, security mechanisms |
-| P12 | Deploys Through Policies and Procedures | Configuration management, build processes |
-| P13 | Uses Relevant Information | Data quality, cache integrity, API contracts |
-| P14 | Communicates Internally | Documentation, localization |
-| P15 | Communicates Externally | Reporting, external interfaces |
-| P16 | Conducts Ongoing and/or Separate Evaluations | Audit trails, monitoring, accuracy validation |
-| P17 | Evaluates and Communicates Deficiencies | Error handling, deficiency reporting |
+| Principle 1 | Demonstrates Commitment to Integrity and Ethical Values | System identification completeness |
+| Principle 3 | Establishes Structure, Authority, and Responsibility | System decomposition rationale |
+| Principle 5 | Enforces Accountability | Access control, admin privilege boundaries |
+| Principle 7 | Identifies and Analyzes Risk | Static/Dynamic classification for risk assessment |
+| Principle 9 | Identifies and Analyzes Significant Change | Dependency change management, integration stubs |
+| Principle 10 | Selects and Develops Control Activities | Core control implementation quality |
+| Principle 11 | Selects and Develops Technology Controls | Input validation, encryption, security mechanisms |
+| Principle 12 | Deploys Through Policies and Procedures | Configuration management, build processes |
+| Principle 13 | Uses Relevant Information | Data quality, cache integrity, API contracts |
+| Principle 14 | Communicates Internally | Documentation, localization |
+| Principle 15 | Communicates Externally | Reporting, external interfaces |
+| Principle 16 | Conducts Ongoing and/or Separate Evaluations | Audit trails, monitoring, accuracy validation |
+| Principle 17 | Evaluates and Communicates Deficiencies | Error handling, deficiency reporting |
 
 ---
 

@@ -78,7 +78,7 @@ CIS Control 2 requires organizations to actively manage all software on the netw
 
 | system_id | CIS Safeguard | Coverage | Evidence/Notes |
 |---|---|---|---|
-| `SYS-DEPENDENCY-MGMT` | 2.1 — Software Inventory | Not Implemented | 24+ manually managed DLLs in `BackupBin2012/` referenced via HintPath in the `.csproj` file. No NuGet package management, no Software Bill of Materials (SBOM), no centralized software inventory. Risk Severity: **Critical**. Source: `SplendidCRM/SplendidCRM7_VS2017.csproj:L56–100` |
+| `SYS-DEPENDENCY-MGMT` | 2.1 — Software Inventory | Not Implemented | 38 manually managed DLLs in `BackupBin2012/` referenced via HintPath in the `.csproj` file. No NuGet package management, no Software Bill of Materials (SBOM), no centralized software inventory. Risk Severity: **Critical**. Source: `SplendidCRM/SplendidCRM7_VS2017.csproj:L56–100` |
 | `SYS-REACT-SPA` | 2.1 — Software Inventory | Partial | npm-managed dependencies listed in `SplendidCRM/React/package.json` with 80+ direct dependencies. `yarn.lock` provides version pinning. No SBOM generation observed. Source: `SplendidCRM/React/package.json` |
 | `SYS-ANGULAR-CLIENT` | 2.1 — Software Inventory | Partial | npm-managed dependencies in `SplendidCRM/Angular/package.json`. Experimental client (Angular ~13.3.0). Package version trails main release (14.5.8220 vs 15.2). Source: `SplendidCRM/Angular/package.json` |
 | `SYS-HTML5-CLIENT` | 2.1 — Software Inventory | Not Implemented | jQuery (1.4.2–2.2.4), RequireJS 2.3.3, and other libraries are manually included as static files. No package management system. No version tracking mechanism. Risk Severity: **Critical**. |
@@ -425,7 +425,7 @@ CIS Control 16 requires managing the security life cycle of in-house developed, 
 | system_id | CIS Safeguard | Coverage | Evidence/Notes |
 |---|---|---|---|
 | `SYS-BUILD-PIPELINE` | 16.2 — Vulnerability Process | Not Implemented | No vulnerability disclosure policy, no security advisory process, no automated vulnerability scanning in the build pipeline. |
-| `SYS-DEPENDENCY-MGMT` | 16.2 — Vulnerability Process | Not Implemented | No `npm audit`, NuGet vulnerability scan, or OWASP Dependency-Check integration. 24+ manually managed DLLs have no version update or vulnerability tracking process. |
+| `SYS-DEPENDENCY-MGMT` | 16.2 — Vulnerability Process | Not Implemented | No `npm audit`, NuGet vulnerability scan, or OWASP Dependency-Check integration. 38 manually managed DLLs have no version update or vulnerability tracking process. |
 
 ### Safeguard 16.3 — Perform Root Cause Analysis on Security Vulnerabilities
 
@@ -437,7 +437,7 @@ CIS Control 16 requires managing the security life cycle of in-house developed, 
 
 | system_id | CIS Safeguard | Coverage | Evidence/Notes |
 |---|---|---|---|
-| `SYS-DEPENDENCY-MGMT` | 16.4 — Third-Party Inventory | Not Implemented | No SBOM. 24+ .NET DLLs in `BackupBin2012/` are inventoried only through `.csproj` HintPath references. No third-party component tracking system. Risk Severity: **Critical**. Source: `SplendidCRM/SplendidCRM7_VS2017.csproj` |
+| `SYS-DEPENDENCY-MGMT` | 16.4 — Third-Party Inventory | Not Implemented | No SBOM. 38 .NET DLLs in `BackupBin2012/` are inventoried only through `.csproj` HintPath references. No third-party component tracking system. Risk Severity: **Critical**. Source: `SplendidCRM/SplendidCRM7_VS2017.csproj` |
 
 ### Safeguard 16.5 — Use Up-to-Date and Trusted Third-Party Software Components
 
@@ -561,7 +561,7 @@ This gap analysis summarizes the most critical CIS Controls deficiencies observe
 
 | CIS Control | Gap Description | Risk Severity | Affected system_ids | COSO Principle |
 |---|---|---|---|---|
-| **CIS Control 2** — Software Inventory | 24+ manually managed .NET DLLs in `BackupBin2012/` with no NuGet package management, no SBOM, and no automated vulnerability scanning. jQuery 1.4.2 in HTML5 client is critically outdated. | **Critical** | `SYS-DEPENDENCY-MGMT`, `SYS-HTML5-CLIENT`, `SYS-INTEGRATION-STUBS` | COSO Principle 9 |
+| **CIS Control 2** — Software Inventory | 38 manually managed .NET DLLs in `BackupBin2012/` with no NuGet package management, no SBOM, and no automated vulnerability scanning. jQuery 1.4.2 in HTML5 client is critically outdated. | **Critical** | `SYS-DEPENDENCY-MGMT`, `SYS-HTML5-CLIENT`, `SYS-INTEGRATION-STUBS` | COSO Principle 9 |
 | **CIS Control 4** — Secure Configuration | Multiple `Web.config` security relaxations: `requestValidationMode="2.0"`, `enableEventValidation="false"`, `validateRequest="false"`, `customErrors mode="Off"`, and plaintext SA credentials in connection string. | **Critical** | `SYS-IIS-CFG`, `SYS-CONFIG`, `SYS-ASPNET-APP` | COSO Principle 12 |
 | **CIS Control 8** — Audit Log Management | All audit data is database-internal with no external SIEM integration, no centralized log aggregation, no automated alerting on security events, and no formal log retention policy. | **Critical** | `SYS-AUDIT`, `SYS-ERROR-OBSERVABILITY`, `SYS-EMAIL`, `SYS-SMS-TELEPHONY` | COSO Principle 16 |
 | **CIS Control 16** — Application Security | Zero automated testing infrastructure across all tiers (no unit tests, integration tests, E2E tests). No CI/CD pipeline. No static analysis. No vulnerability management process. | **Critical** | `SYS-BUILD-PIPELINE`, `SYS-ASPNET-APP`, `SYS-DEPENDENCY-MGMT`, `SYS-HTML5-CLIENT` | COSO Principle 10 |

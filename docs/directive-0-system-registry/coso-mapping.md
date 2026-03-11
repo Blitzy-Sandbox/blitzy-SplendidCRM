@@ -483,7 +483,7 @@ The following matrix maps each `system_id` from the [system registry](./system-r
 - ⊘ = Not Implemented
 - — = Not Applicable
 
-| system_id | P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8 | P9 | P10 | P11 | P12 | P13 | P14 | P15 | P16 | P17 |
+| system_id | Principle 1 | Principle 2 | Principle 3 | Principle 4 | Principle 5 | Principle 6 | Principle 7 | Principle 8 | Principle 9 | Principle 10 | Principle 11 | Principle 12 | Principle 13 | Principle 14 | Principle 15 | Principle 16 | Principle 17 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `SYS-SECURITY` | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ | ⊘ | ❌ | ⊘ | ⚠️ | ⚠️ | ❌ | ⚠️ | ⊘ | ❌ | ❌ | ❌ |
 | `SYS-AUTH-AD` | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ | ⊘ | ❌ | ⊘ | ⚠️ | ⚠️ | ❌ | — | ⊘ | — | ❌ | ❌ |

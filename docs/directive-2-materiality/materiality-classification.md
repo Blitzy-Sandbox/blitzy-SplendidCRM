@@ -10,7 +10,7 @@
 
 The materiality classification of SplendidCRM Community Edition v15.2 reveals a **Theme of Failure** in the Information and Communication dimension of internal controls, as assessed under COSO Principle 14 (Communicates Internally). The monolithic architecture creates a high concentration of Material components because virtually every functional domain depends on the same centralized infrastructure layer — `Security.cs` for authorization, `SplendidCache.cs` for metadata, `Sql.cs` for database access, and `SplendidError.cs` for observability. This tight coupling means that a deficiency in any of these core components propagates across all dependent systems, amplifying the operational reliability impact of each finding from Directives 1 and 3. The absence of documentation — a direct COSO Principle 14 gap — compounds this risk: developers cannot understand the WHY behind implementation decisions, making safe modification of Material components effectively impossible without reverse-engineering the codebase. Per COSO Principle 10 (Selects and Develops Control Activities), the Control Activities component depends entirely on Material components functioning correctly; their identification is therefore the gateway to all subsequent quality assessment.
 
-Of the **227 components** examined across the SplendidCRM codebase — comprising 74 `_code/` utility classes, 18 `_code/` subdirectories, 49 Administration sub-modules and files, 41 CRM module folders, 4 API surfaces, 11 SQL schema directories, 5 client applications, 3 configuration files, 7 root application files, 14 supporting directories, and 1 dependency store — **144 components are classified as Material** based on their governance of access control, audit logging, configuration hardening, network segmentation, system/software integrity, secret management, or core business logic. The remaining **83 components are classified as Non-Material** — primarily UI presentation layers, static assets, localization data, enterprise integration stubs, and the experimental Angular client. Material components will proceed to the Directive 3 Code Quality Audit per COSO Principle 10 (Control Activities); Non-Material components are explicitly excluded from detailed code quality analysis per the audit mandate.
+Of the **229 components** examined across the SplendidCRM codebase — comprising 74 `_code/` utility classes, 18 `_code/` subdirectories, 51 Administration sub-modules and files, 41 CRM module folders, 4 API surfaces, 11 SQL schema directories, 5 client applications, 3 configuration files, 7 root application files, 14 supporting directories, and 1 dependency store — **144 components are classified as Material** based on their governance of access control, audit logging, configuration hardening, network segmentation, system/software integrity, secret management, or core business logic. The remaining **85 components are classified as Non-Material** — primarily UI presentation layers, static assets, localization data, enterprise integration stubs, and the experimental Angular client. Material components will proceed to the Directive 3 Code Quality Audit per COSO Principle 10 (Control Activities); Non-Material components are explicitly excluded from detailed code quality analysis per the audit mandate.
 
 This classification directly feeds COSO Principle 10 via Directive 3: only Material components undergo the code quality audit that assesses whether Control Activities are properly designed and operating effectively. The classification criteria are aligned with COSO Principle 14 (Communicates Internally) — Material components are those whose failure would impair the organization's ability to communicate information necessary for internal control to function. All `system_id` references in this report correspond to the authoritative registry in the [System Registry](../directive-0-system-registry/system-registry.md).
 
@@ -200,7 +200,7 @@ The `SplendidCRM/_code/` directory contains **14 subdirectories** in addition to
 
 ## Administration Layer — Sub-Modules
 
-The `SplendidCRM/Administration/` directory contains **45 sub-module directories** plus approximately 4 top-level files (Rest.svc.cs, Impersonation.svc.cs, default.aspx.cs, ListView.ascx.cs, SystemView.ascx.cs, Versions.xml). Per COSO Principle 10, administration sub-modules that govern access control, audit logging, configuration hardening, or core business logic are Material. Per COSO Principle 3 (Establishes Structure, Authority, and Responsibility), the admin layer defines the governance structure for the entire application. All administration components are associated with `SYS-ADMIN` unless a more specific `system_id` applies.
+The `SplendidCRM/Administration/` directory contains **45 sub-module directories** plus 6 top-level files (Rest.svc.cs, Impersonation.svc.cs, default.aspx(.cs), ListView.ascx(.cs), SystemView.ascx(.cs), Versions.xml). Per COSO Principle 10, administration sub-modules that govern access control, audit logging, configuration hardening, or core business logic are Material. Per COSO Principle 3 (Establishes Structure, Authority, and Responsibility), the admin layer defines the governance structure for the entire application. All administration components are associated with `SYS-ADMIN` unless a more specific `system_id` applies.
 
 ### Material Administration Sub-Modules
 
@@ -273,7 +273,7 @@ The `SplendidCRM/Administration/` directory contains **45 sub-module directories
 |---|---|---|---|---|
 | `Administration/Versions.xml` | `SYS-ADMIN` | **Non-Material** | — | Reference data. Version history metadata with no governance function. |
 
-**Total Administration Components: 49 (30 Material, 19 Non-Material — 61% Material)**
+**Total Administration Components: 51 (30 Material, 21 Non-Material — 59% Material)**
 
 ---
 
@@ -428,7 +428,7 @@ Supporting directories contain shared UI controls, themes, static assets, and th
 | Component Path | system_id | Classification | Criteria Match | Justification |
 |---|---|---|---|---|
 | `SplendidCRM/_controls/` | `SYS-WEBFORMS` | **Material** | Core Business Logic | Shared WebForms user controls (CRON, DatePicker, SearchText, etc.) consumed across all CRM modules. |
-| `BackupBin2012/` | `SYS-DEPENDENCY-MGMT` | **Material** | System Integrity | 24+ manually managed .NET DLLs; critical dependency store with no version management per NIST CM-3. |
+| `BackupBin2012/` | `SYS-DEPENDENCY-MGMT` | **Material** | System Integrity | 38 manually managed .NET DLLs; critical dependency store with no version management per NIST CM-3. |
 | `SplendidCRM/App_MasterPages/` | `SYS-WEBFORMS` | **Non-Material** | — | Presentation. Master page templates (layout/chrome). |
 | `SplendidCRM/App_Themes/` | `SYS-WEBFORMS` | **Non-Material** | — | Presentation. 7 CSS themes (Arctic, Atlantic, Mobile, Pacific, Seven, Six, Sugar). |
 | `SplendidCRM/App_Browsers/` | `SYS-WEBFORMS` | **Non-Material** | — | Presentation. Browser capability definitions. |
@@ -452,7 +452,7 @@ Per COSO Principle 9 (Identifies and Analyzes Significant Change), the dependenc
 
 | Component Path | system_id | Classification | Criteria Match | Justification |
 |---|---|---|---|---|
-| `BackupBin2012/` | `SYS-DEPENDENCY-MGMT` | **Material** | System Integrity | 24+ .NET DLLs including security-critical libraries: BouncyCastle.Crypto.dll (cryptography), MailKit.dll (email security boundary), Microsoft.AspNet.SignalR.Core.dll (real-time security), Microsoft.Owin.Security.dll (authentication pipeline), Newtonsoft.Json.dll (API data handling), Twilio.Api.dll (external communication). No NuGet, no SBOM, no version management. |
+| `BackupBin2012/` | `SYS-DEPENDENCY-MGMT` | **Material** | System Integrity | 38 .NET DLLs including security-critical libraries: BouncyCastle.Crypto.dll (cryptography), MailKit.dll (email security boundary), Microsoft.AspNet.SignalR.Core.dll (real-time security), Microsoft.Owin.Security.dll (authentication pipeline), Newtonsoft.Json.dll (API data handling), Twilio.Api.dll (external communication). No NuGet, no SBOM, no version management. |
 
 **Total Dependency Components: 1 (1 Material, 0 Non-Material — 100% Material)**
 
@@ -466,7 +466,7 @@ The following table aggregates materiality classification counts across all comp
 |---|---|---|---|---|
 | _code/ Utility Classes | 74 | 43 | 31 | 58% |
 | _code/ Subdirectories | 18 | 4 | 14 | 22% |
-| Administration Sub-Modules and Files | 49 | 30 | 19 | 61% |
+| Administration Sub-Modules and Files | 51 | 30 | 21 | 59% |
 | CRM Module Folders | 41 | 41 | 0 | 100% |
 | API Surfaces | 4 | 4 | 0 | 100% |
 | SQL Schema Directories | 11 | 10 | 1 | 91% |
@@ -475,7 +475,7 @@ The following table aggregates materiality classification counts across all comp
 | Root Application Files | 7 | 4 | 3 | 57% |
 | Supporting Directories | 14 | 2 | 12 | 14% |
 | Dependency Management | 1 | 1 | 0 | 100% |
-| **TOTAL** | **227** | **144** | **83** | **63%** |
+| **TOTAL** | **229** | **144** | **85** | **63%** |
 
 ### Classification Analysis
 

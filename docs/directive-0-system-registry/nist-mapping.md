@@ -97,7 +97,7 @@ The Audit and Accountability family assesses the creation, protection, and revie
 
 ### CM — Configuration Management
 
-The Configuration Management family assesses how SplendidCRM maintains baseline configurations, controls changes, and inventories system components. This family reveals some of the most significant gaps in the codebase. Per COSO Principle 12 (Deploys Through Policies and Procedures), configuration management must enforce policies that govern how technology infrastructure is deployed and maintained. The observed state — 24 manually managed DLLs, security-weakening Web.config settings, 16 non-functional integration stubs, and no CI/CD pipeline — represents systemic failure in configuration change control.
+The Configuration Management family assesses how SplendidCRM maintains baseline configurations, controls changes, and inventories system components. This family reveals some of the most significant gaps in the codebase. Per COSO Principle 12 (Deploys Through Policies and Procedures), configuration management must enforce policies that govern how technology infrastructure is deployed and maintained. The observed state — 38 manually managed DLLs, security-weakening Web.config settings, 16 non-functional integration stubs, and no CI/CD pipeline — represents systemic failure in configuration change control.
 
 | system_id | CM Control | Implementation Status | Evidence / Notes |
 |---|---|---|---|

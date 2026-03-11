@@ -480,6 +480,9 @@ This means the build is designed as a one-time initialization rather than a repe
 - **Critical Findings:** 3 (no testing, universal `public` grant, audit trigger SPOF)
 - **Moderate Findings:** 7 (DRY violations, stacked views, no rollback, dynamic SQL, missing documentation, conditional complexity, cross-reference integrity)
 - **Minor Findings:** 4 (magic numbers, determinism, XSS filter verification, naming convention)
+- **Total Granular Findings:** 14 (3 Critical, 7 Moderate, 4 Minor)
+
+**Counting Methodology Note:** The 14 findings above represent **granular per-component observations** documented in the detailed sections of this sub-report. The [Directive 3 Aggregate Summary](./code-quality-summary.md) consolidates these into **9 thematic assessment findings** (3 Critical, 4 Moderate, 2 Minor) by grouping related per-component observations into broader audit themes — for example, the 7 individual Moderate findings for DRY violations, stacked views, no rollback, dynamic SQL, missing documentation, conditional complexity, and cross-reference integrity are consolidated into 4 thematic Moderate categories at the domain level. Both counting levels are valid and intentional: this sub-report provides evidence-level detail for remediation planning, while the aggregate summary provides the strategic assessment view.
 
 ---
 

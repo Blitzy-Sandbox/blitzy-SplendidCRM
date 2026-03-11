@@ -588,6 +588,8 @@ sequenceDiagram
 | **Minor** | 8 | DRY violations (3), magic numbers (2), bounce detection fragility (1), TLS additive-only (1), empty handlers (1) |
 | **Total** | **21** | |
 
+**Counting Methodology Note:** The 21 findings above represent **granular per-component observations** documented in the detailed sections of this sub-report, counted at the individual finding ID level (e.g., CS-SCHED-01 through CS-SCHED-06, CS-EMAIL-01 through CS-EMAIL-06, SQ-SCHED-01 through SQ-SCHED-04, SQ-EMAIL-01 through SQ-EMAIL-04, CS-GLOBAL-01 through CS-GLOBAL-03, SQ-GLOBAL-01 through SQ-GLOBAL-03). The [Directive 3 Aggregate Summary](./code-quality-summary.md) consolidates these into **10 thematic assessment findings** (1 Critical, 7 Moderate, 2 Minor) by grouping related per-component observations into broader audit themes — for example, the individual reentrancy race conditions (2 findings), extreme method lengths (4 findings), and SRP violations (2 findings) in the Moderate category are consolidated into thematic groups at the domain level. Both counting levels are valid and intentional: this sub-report provides evidence-level detail for remediation planning, while the aggregate summary provides the strategic assessment view.
+
 ### Framework Control Coverage
 
 | Framework | Controls Assessed | Findings Mapped |

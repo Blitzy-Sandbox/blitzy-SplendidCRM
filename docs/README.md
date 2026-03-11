@@ -278,12 +278,12 @@ flowchart LR
 | SQL stored procedures | 300+ procedures |
 | SQL audit triggers | Entity-level triggers for all CRM tables |
 | Client interfaces | 4 (React, Angular, HTML5, WebForms) |
-| Manually managed DLLs (`BackupBin2012/`) | 24 assemblies |
+| Manually managed DLLs (`BackupBin2012/`) | 38 assemblies |
 | Enterprise integration stubs | 16 directories (`Spring.Social.*`) |
 
 ### Assess-Only Mandate
 
-This audit documentation was produced under a strict assess-only mandate consistent with COSO Principle 16 (Conducts Ongoing and/or Separate Evaluations). No source code, configuration files, SQL scripts, client applications, or existing documentation within the SplendidCRM repository were created, modified, or remediated during this audit. All 19 documentation artifacts in this `docs/` directory are newly generated audit outputs.
+This audit documentation was produced under a strict assess-only mandate consistent with COSO Principle 16 (Conducts Ongoing and/or Separate Evaluations). No source code, configuration files, SQL scripts, client applications, or existing documentation within the SplendidCRM repository were created, modified, or remediated during this audit. All 20 documentation artifacts in this `docs/` directory are newly generated audit outputs.
 
 ---
 
