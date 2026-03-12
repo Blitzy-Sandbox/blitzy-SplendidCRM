@@ -479,6 +479,8 @@ This guide synthesizes findings from the complete SplendidCRM v15.2 codebase aud
 | Cross-Cutting Dependencies | [cross-cutting-dependency-report.md](../directive-4-dependency-audit/cross-cutting-dependency-report.md) | Dependency map, shared utilities, blast radius scores |
 | Documentation Coverage | [documentation-coverage-report.md](../directive-5-documentation-coverage/documentation-coverage-report.md) | WHY documentation verification per Material component |
 | Accuracy Validation | [accuracy-validation-report.md](../directive-6-accuracy-validation/accuracy-validation-report.md) | Statistical sampling results, PASS/FAIL per system |
+| Global Executive Summary | [artifact-0-global-executive-summary.md](./artifact-0-global-executive-summary.md) | Overall COSO effectiveness assessment, top 5 risk systems, NIST CSF posture overview |
+| Operational Flowchart | [artifact-1-operational-flowchart.md](./artifact-1-operational-flowchart.md) | NIST CSF swimlane flowchart with audit dimension sub-lanes |
 
 ---
 

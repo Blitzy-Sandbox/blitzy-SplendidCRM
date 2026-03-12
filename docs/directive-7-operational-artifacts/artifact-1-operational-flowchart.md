@@ -43,7 +43,7 @@ flowchart TB
     subgraph IDENTIFY["IDENTIFY - Asset Management and Risk Assessment"]
         direction TB
         subgraph ID_REG["System Registry - D0"]
-            D0A["Decompose ~30 system_ids\nVerticals x Horizontals"]
+            D0A["Decompose 34 system_ids\nVerticals x Horizontals"]
             D0B["Classify Static 12\nvs Dynamic 22"]
             D0C["Map COSO P1-17\nNIST 6 families, CIS v8"]
         end
@@ -124,7 +124,7 @@ flowchart TB
     RESPOND --> RECOVER
 ```
 
-The audit progresses through the NIST CSF lifecycle. The **Identify** function establishes the system registry (~30 system_ids across 12 Static and 22 Dynamic systems) and materiality scope (~140 Material components, 63%). **Protect** assesses structural integrity and code quality for Material components, revealing Critical findings including MD5 password hashing (Source: `SplendidCRM/_code/Security.cs:L393-406`), monolithic file architectures (Rest.svc.cs at 8,369 LOC, SplendidCache.cs at 11,582 LOC), and the complete absence of automated testing. **Detect** evaluates documentation coverage (0% WHY documentation across ~140 Material components) and dependency monitoring (38 unmanaged DLLs without SBOM). **Respond** assesses error handling (SQL-dependent logging creating observability blackout risk) and incident response readiness (zero IR procedures). **Recover** validates audit accuracy (100% PASS across all 34 systems, exceeding the ≥87% threshold per COSO Principle 16) and establishes prioritized remediation recommendations. Per COSO Principle 10, the control activities assessed in Protect and Respond are the primary focus of the audit. Per COSO Principle 16, the Recover function provides the ongoing evaluation mechanism.
+The audit progresses through the NIST CSF lifecycle. The **Identify** function establishes the system registry (34 system_ids across 12 Static and 22 Dynamic systems) and materiality scope (~140 Material components, 63%). **Protect** assesses structural integrity and code quality for Material components, revealing Critical findings including MD5 password hashing (Source: `SplendidCRM/_code/Security.cs:L393-406`), monolithic file architectures (Rest.svc.cs at 8,369 LOC, SplendidCache.cs at 11,582 LOC), and the complete absence of automated testing. **Detect** evaluates documentation coverage (0% WHY documentation across ~140 Material components) and dependency monitoring (38 unmanaged DLLs without SBOM). **Respond** assesses error handling (SQL-dependent logging creating observability blackout risk) and incident response readiness (zero IR procedures). **Recover** validates audit accuracy (100% PASS across all 34 systems, exceeding the ≥87% threshold per COSO Principle 16) and establishes prioritized remediation recommendations. Per COSO Principle 10, the control activities assessed in Protect and Respond are the primary focus of the audit. Per COSO Principle 16, the Recover function provides the ongoing evaluation mechanism.
 
 ---
 
@@ -135,7 +135,7 @@ The following diagram shows the directive dependency chain — how each directiv
 ```mermaid
 flowchart LR
     subgraph CHAIN["Directive Execution Chain"]
-        D0["D0\nSystem Registry\n~30 system_ids"]
+        D0["D0\nSystem Registry\n34 system_ids"]
         D1["D1\nStructural Integrity\n6 finding categories"]
         D2["D2\nMateriality\n140 Material / 82 Non-Material"]
         D3["D3\nCode Quality\n5 domain sub-reports"]
@@ -411,7 +411,7 @@ The following tables provide a comprehensive summary of all findings mapped to t
 
 | Finding | system_id | COSO Principle | Risk Severity |
 |---|---|---|---|
-| ~30 systems identified across 8 vertical domains × 6 horizontal layers | All | Principle 7 | N/A (classification) |
+| 34 systems identified across 8 vertical domains × 6 horizontal layers | All | Principle 7 | N/A (classification) |
 | 12 Static systems, 22 Dynamic systems classified | All | Principle 7 | N/A (classification) |
 | ~140 components classified as Material (63%) | All | Principle 14 | N/A (classification) |
 | ~82 components classified as Non-Material (37%) | All | Principle 14 | N/A (classification) |
@@ -472,7 +472,7 @@ The following tables provide a comprehensive summary of all findings mapped to t
 This operational flowchart synthesizes findings from all preceding directive reports. The following cross-references link to the source documentation for each audit dimension:
 
 ### Directive 0 — System Registry
-- [System Registry](../directive-0-system-registry/system-registry.md) — Complete system decomposition and classification (~30 system_ids)
+- [System Registry](../directive-0-system-registry/system-registry.md) — Complete system decomposition and classification (34 system_ids)
 - [COSO Mapping](../directive-0-system-registry/coso-mapping.md) — COSO Principles 1–17 assessment per system
 - [NIST Mapping](../directive-0-system-registry/nist-mapping.md) — NIST SP 800-53 Rev 5 and NIST CSF control mapping
 - [CIS Mapping](../directive-0-system-registry/cis-mapping.md) — CIS Controls v8 IG2/IG3 safeguard mapping

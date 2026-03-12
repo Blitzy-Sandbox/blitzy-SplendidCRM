@@ -187,7 +187,7 @@ The Center for Internet Security (CIS) Controls v8 provides implementation-level
 | Control | Safeguard Name | Audit Application |
 |---|---|---|
 | CIS Control 1 | Inventory and Control of Enterprise Assets | Directive 0 system registry — enterprise asset identification |
-| CIS Control 2 | Inventory and Control of Software Assets | Directive 4 dependency inventory — 24 manual DLLs, npm packages, SQL components |
+| CIS Control 2 | Inventory and Control of Software Assets | Directive 4 dependency inventory — 38 DLLs in BackupBin2012/ (24 unique third-party), npm packages, SQL components |
 | CIS Control 4 | Secure Configuration of Enterprise Assets and Software | Directive 1 (Web.config hardening), Directive 3 (configuration quality assessment) |
 | CIS Control 5 | Account Management | Directive 3 (Security.cs account lifecycle assessment) |
 | CIS Control 6 | Access Control Management | Directive 3 (4-tier authorization model assessment) |
