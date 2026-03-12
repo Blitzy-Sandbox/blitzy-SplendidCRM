@@ -429,7 +429,7 @@ The following tables provide a comprehensive summary of all findings mapped to t
 | 15 phantom DLL HintPaths (BackupBin2022/2025) | SYS-DEPENDENCY-MGMT | Principle 10 | NIST CM-2 | Critical |
 | Empty Application_Error handler | SYS-ASPNET-APP | Principle 10 | NIST SI | Critical |
 | 8 orphaned Spring.Social.* stubs (334 files) | SYS-INTEGRATION-STUBS | Principle 10 | NIST CM-7 | Moderate |
-| 3 in-process timers with race condition risk | SYS-BG-SCHEDULER | Principle 10 | NIST SI | Moderate |
+| 3 in-process timers with race condition risk | SYS-SCHEDULER | Principle 10 | NIST SI | Moderate |
 | 833 procedures, 581 views, zero DB testing | SYS-SQL-DB | Principle 10 | NIST SI | Moderate |
 
 ### Detect Function Findings
