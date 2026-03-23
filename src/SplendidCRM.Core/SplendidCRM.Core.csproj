@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SplendidCRM</RootNamespace>
+    <AssemblyName>SplendidCRM.Core</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Data Access: replaces System.Data.SqlClient -->
+    <PackageReference Include="LogicBuilder.Workflow.Activities.Rules" Version="2.0.4" />
+    <PackageReference Include="LogicBuilder.Workflow.ComponentModel.Serialization" Version="2.0.4" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+
+    <!-- JSON Serialization: backward compatibility fallback -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!-- Email: SMTP/IMAP/POP3 client -->
+    <PackageReference Include="MailKit" Version="4.15.0" />
+    <PackageReference Include="MimeKit" Version="4.15.0" />
+
+    <!-- Cryptography: MailKit dependency + DuoUniversal HMAC SHA-512 -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+
+    <!-- Document Handling: OpenXML import/export -->
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+
+    <!-- Compression: ZIP/language pack handling -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+
+    <!-- HTTP Client: integration stubs (Spring.Social replacement) -->
+    <PackageReference Include="RestSharp" Version="112.1.0" />
+    <PackageReference Include="System.CodeDom" Version="10.0.0" />
+
+    <!-- Telephony: Twilio SMS/Voice API -->
+    <PackageReference Include="Twilio" Version="7.8.0" />
+
+    <!-- Identity/JWT: DuoUniversal 2FA + Security token validation -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.7.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.7.0" />
+
+    <!-- Serialization Security: [SecurityPermission] attribute for binary serialization compatibility -->
+    <!-- Used in Spring.Social integration stubs for GetObjectData overrides -->
+    <PackageReference Include="System.Security.Permissions" Version="10.0.0" />
+
+    <!-- ODBC: dBase (.dbf) import via Microsoft dBase ODBC driver (Windows-only at runtime) -->
+    <!-- Required by SplendidImport.cs ConvertDBaseToXml() and ConvertStreamToXml() dbase/act paths -->
+    <PackageReference Include="System.Data.Odbc" Version="9.0.1" />
+
+  </ItemGroup>
+
+</Project>

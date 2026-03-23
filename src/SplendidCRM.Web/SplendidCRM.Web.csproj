@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SplendidCRM</RootNamespace>
+    <AssemblyName>SplendidCRM.Web</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>618</NoWarn>
+    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SplendidCRM.Core\SplendidCRM.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SOAP Middleware: replaces soap.asmx.cs ASMX web service -->
+    <PackageReference Include="SoapCore" Version="1.2.1.12" />
+
+    <!-- Authentication: Windows Auth (Negotiate/NTLM) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.0" />
+
+    <!-- Authentication: OIDC/SAML SSO -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.0" />
+
+    <!-- Distributed Session: Redis provider (SESSION_PROVIDER=Redis) -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+
+    <!-- Distributed Session: SQL Server provider (SESSION_PROVIDER=SqlServer) -->
+    <PackageReference Include="Microsoft.Extensions.Caching.SqlServer" Version="10.0.0" />
+
+    <!-- AWS Config Provider: Secrets Manager (tier 1 - highest priority) -->
+    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.500" />
+
+    <!-- AWS Config Provider: Systems Manager Parameter Store (tier 3) -->
+    <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="3.7.405.5" />
+
+    <!-- JSON serialization: Newtonsoft.Json integration for ASP.NET Core MVC -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

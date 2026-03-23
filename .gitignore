@@ -1,4 +1,5 @@
 bin/
+obj/
 checkin.bat
 Build.sql
 Manifest.xml
