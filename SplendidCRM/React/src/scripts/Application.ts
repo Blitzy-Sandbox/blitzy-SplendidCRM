@@ -19,7 +19,6 @@ import { CreateSplendidRequest, GetSplendidResult } from './SplendidRequest'    
 import { AdminRequestAll, SystemCacheRequestAll }   from '../scripts/SystemCacheRequest';
 import { UpdateApplicationTheme, StartsWith }       from '../scripts/utility'           ;
 import { GetUserSession }                           from '../scripts/Login'             ;
-import SignalRStore                                 from '../SignalR/SignalRStore'      ;
 import SignalRCoreStore                             from '../SignalR/SignalRCoreStore'  ;
 
 // 07/11/2019 Paul.  Keep original React State object for debugging. 
@@ -360,11 +359,7 @@ export async function Application_GetReactState(source): Promise<any>
 	// 06/15/2021 Paul.  Allow SignalR to be disabled.
 	if ( !Sql.ToBoolean(SplendidCache.Config('SignalR.Disabled')) )
 	{
-		// 06/19/2023 Paul.  Separate implementation for SignalR on ASP.NET Core. 
-		if ( Sql.ToBoolean(SplendidCache.Config('SignalR.Core')) )
-			SignalRCoreStore.Startup();
-		else
-			SignalRStore.Startup();
+		SignalRCoreStore.Startup();
 	}
 
 	// 05/28/2019 Paul.  We are getting an empty modules list, not sure why.  Use that to determine success. 
@@ -616,11 +611,7 @@ export async function Admin_GetReactState(sCaller?: string): Promise<any>
 	// 06/15/2021 Paul.  Allow SignalR to be disabled.
 	if ( !Sql.ToBoolean(SplendidCache.Config('SignalR.Disabled')) )
 	{
-		// 06/19/2023 Paul.  Separate implementation for SignalR on ASP.NET Core. 
-		if ( Sql.ToBoolean(SplendidCache.Config('SignalR.Core')) )
-			SignalRCoreStore.Startup();
-		else
-			SignalRStore.Startup();
+		SignalRCoreStore.Startup();
 	}
 	
 	// 05/28/2019 Paul.  We are getting an empty modules list, not sure why.  Use that to determine success. 
