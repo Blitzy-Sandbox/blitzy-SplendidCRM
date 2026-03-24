@@ -10,11 +10,10 @@
 import Sql  from '../../../../../scripts/Sql' ;
 import L10n from '../../../../../scripts/L10n';
 
-var find                  = require('lodash/collection/find');
-var entryFactory          = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
+import find from 'lodash/find';
+import entryFactory from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
+import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
 import popupEntryFactory  from './factory/ModulePopupEntryFactory';
 
 function ensureNotNull(prop)
