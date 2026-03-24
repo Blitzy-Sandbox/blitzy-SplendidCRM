@@ -13,7 +13,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import { useLocation, useNavigate, useParams, useMatches } from  'react-router-dom';
+import { useLocation, useNavigate, useParams, useMatches } from  'react-router';
 // 2. Store and Types. 
 // 3. Scripts. 
 import { StartsWith, EndsWith }                            from './scripts/utility';
@@ -53,7 +53,7 @@ export class SplendidHistory
 	public push(to: string)
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.push', to);
-		this.navigate(to, { relative: 'route', replace: false, unstable_flushSync: true, unstable_viewTransition: true });
+		this.navigate(to, { relative: 'route', replace: false, flushSync: true, viewTransition: true });
 		let url = window.splendidBaseUrl + to;
 		if ( EndsWith(window.splendidBaseUrl, '/') && StartsWith(to, '/') )
 		{
@@ -65,7 +65,7 @@ export class SplendidHistory
 	public replace(to: string)
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.replace', to);
-		this.navigate(to, { relative: 'route', replace: true, unstable_flushSync: true, unstable_viewTransition: true });
+		this.navigate(to, { relative: 'route', replace: true, flushSync: true, viewTransition: true });
 		let url = window.splendidBaseUrl + to;
 		if ( EndsWith(window.splendidBaseUrl, '/') && StartsWith(to, '/') )
 		{
@@ -150,4 +150,4 @@ export const withRouter = <Props extends RouteComponentProps<any>>(Component: Re
 	};
 };
 
-export { Link, Route, Navigate } from  'react-router-dom';
+export { Link, Route, Navigate } from  'react-router';

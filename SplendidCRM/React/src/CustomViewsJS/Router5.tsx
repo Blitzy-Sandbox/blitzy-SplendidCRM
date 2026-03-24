@@ -9,4 +9,5 @@
  */
 
 // 1. React and fabric. 
-export { SplendidHistory, RouteComponentProps, withRouter, Link, Route, Navigate } from '../Router5';
+export { SplendidHistory, withRouter, Link, Route, Navigate } from '../Router5';
+export type { RouteComponentProps } from '../Router5';
