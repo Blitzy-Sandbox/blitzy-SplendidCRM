@@ -37,8 +37,8 @@ import ReportDesignerPopupView                      from '../../../ReportDesigne
 import BpmnModeler                                  from 'bpmn-js/lib/Modeler'                          ;
 import propertiesPanelModule                        from 'bpmn-js-properties-panel'                     ;
 //import propertiesProviderModule                     from 'bpmn-js-properties-panel/lib/provider/camunda';
-const camundaModdleDescriptor                       = require('camunda-bpmn-moddle/resources/camunda.json');
-const crmModdleDescriptor                           = require('./descriptors/crm.json');
+import camundaModdleDescriptor                      from 'camunda-bpmn-moddle/resources/camunda.json';
+import crmModdleDescriptor                          from './descriptors/crm.json';
 import propertiesProviderModule                     from './provider'            ;
 import paletteProvider                              from './palette'             ;
 import replaceProvider                              from './replace'             ;
