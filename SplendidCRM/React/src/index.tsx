@@ -25,7 +25,7 @@ import Sql                                         from './scripts/Sql'         
 import Credentials                                 from './scripts/Credentials'  ;
 import SplendidCache                               from './scripts/SplendidCache';
 import { StartsWith, EndsWith }                    from './scripts/utility'      ;
-import SignalRStore                                from './SignalR/SignalRStore' ;
+import SignalRCoreStore                            from './SignalR/SignalRCoreStore' ;
 // 4. Components and Views. 
 import App                                         from './App'                  ;
 import PrivateRoute                                from './PrivateRoute'         ;
@@ -205,7 +205,7 @@ const stores =
 	routing      : routingStore ,
 	credentials  : Credentials  ,
 	splendidCache: SplendidCache,
-	signalRStore : SignalRStore ,
+	signalRStore : SignalRCoreStore ,
 };
 
 // https://www.telerik.com/blogs/react-basics-how-to-use-react-router-v6

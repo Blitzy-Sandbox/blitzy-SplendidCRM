@@ -30,9 +30,8 @@ import { ListView_LoadModule }                   from '../scripts/ListView'     
 import { UpdateModule, UpdateModuleTable }       from '../scripts/ModuleUpdate'                ;
 import { jsonReactState }                        from '../scripts/Application'                 ;
 import { AuthenticatedMethod, LoginRedirect }    from '../scripts/Login'                       ;
-import SignalRStore                              from '../SignalR/SignalRStore'                ;
 import SignalRCoreStore                          from '../SignalR/SignalRCoreStore'            ;
-import { ChatMessageProps }                      from '../SignalR/Chat'                        ;
+import { ChatMessageProps }                      from '../SignalR/ChatCore'                    ;
 // 4. Components and Views. 
 import HeaderButtonsFactory                      from '../ThemeComponents/HeaderButtonsFactory';
 import PopupView                                 from '../views/PopupView'                     ;
@@ -131,11 +130,6 @@ class ChatDashboardView extends React.Component<IChatDashboardViewProps, IChatDa
 				LoginRedirect(this.props.history, this.constructor.name + '.componentDidMount');
 			}
 			window.addEventListener("resize", this.updateDimensions);
-			if ( SignalRStore.chatManager )
-			{
-				SignalRStore.chatManager.on('newMessage', this.newMessage);
-			}
-			// 04/27/2024 Paul.  Core needs separate event. 
 			if ( SignalRCoreStore.chatManager )
 			{
 				SignalRCoreStore.chatManager.hub.on('newMessage', this.newMessage);
@@ -160,9 +154,9 @@ class ChatDashboardView extends React.Component<IChatDashboardViewProps, IChatDa
 	{
 		this._isMounted = false;
 		window.removeEventListener("resize", this.updateDimensions);
-		if ( SignalRStore.chatManager )
+		if ( SignalRCoreStore.chatManager )
 		{
-			SignalRStore.chatManager.off('newMessage', this.newMessage);
+			SignalRCoreStore.chatManager.hub.off('newMessage', this.newMessage);
 		}
 	}
 

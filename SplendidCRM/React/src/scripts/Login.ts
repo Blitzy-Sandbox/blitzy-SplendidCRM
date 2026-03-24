@@ -20,7 +20,7 @@ import AuthenticationContext                        from './adal'               
 import { bMOBILE_CLIENT }                           from './SplendidInitUI'       ;
 import { SplendidUI_Init }                          from './SplendidInitUI'       ;
 import { CreateSplendidRequest, GetSplendidResult } from './SplendidRequest'      ;
-import SignalRStore                                 from '../SignalR/SignalRStore';
+import SignalRCoreStore                             from '../SignalR/SignalRCoreStore';
 import { jsonReactState, Application_ClearStore, Application_UpdateStoreLastDate, Application_GetReactLoginState } from './Application'          ;
 import { Crm_Config }                               from './Crm'                  ;
 import { StartsWith }                               from './utility'              ;
@@ -150,7 +150,7 @@ export async function Logout(): Promise<any>
 		try
 		{
 			// 09/19/2020 Paul.  Provide events to start/stop SignalR. 
-			SignalRStore.Shutdown();
+			SignalRCoreStore.Shutdown();
 			let res = await CreateSplendidRequest('Rest.svc/Logout');
 			let json = await GetSplendidResult(res);
 			//console.log((new Date()).toISOString() + ' ' + 'Logout complete', json);
@@ -210,7 +210,7 @@ export async function Impersonate(row: any): Promise<any>
 		//Logout();
 		try
 		{
-			SignalRStore.Shutdown();
+			SignalRCoreStore.Shutdown();
 		}
 		catch(error)
 		{
