@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                  from 'react-pose'                       ;
 import { RouteComponentProps, withRouter }    from '../Router5'                 ;
 import { observer }                           from 'mobx-react'                       ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'   ;
-import { Appear }                             from 'react-lifecycle-appear'           ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP               from '../../../types/DETAILVIEWS_RELATIONSHIP';
 import RELATIONSHIPS                          from '../../../types/RELATIONSHIPS'           ;
@@ -38,17 +36,10 @@ import PopupView                              from '../../../views/PopupView'   
 import EditView                               from '../../../views/EditView'               ;
 import SubPanelButtonsFactory                 from '../../../ThemeComponents/SubPanelButtonsFactory';
 
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
+class Appear extends React.Component<{onAppearOnce?: (ioe?: any) => void, children?: React.ReactNode}> {
+	componentDidMount() { if (this.props.onAppearOnce) this.props.onAppearOnce(); }
+	render() { return this.props.children || null; }
+}
 
 interface ISubPanelViewProps extends RouteComponentProps<any>
 {
@@ -711,7 +702,7 @@ class SystemCurrencyLog extends React.Component<ISubPanelViewProps, ISubPanelVie
 						: null
 						}
 					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					<div style={ {overflow: (open ? 'visible' : 'hidden'), height: (open ? 'auto' : '0'), transition: 'height 0.3s ease'} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							<div style={ cssSearch }>
@@ -820,7 +811,7 @@ class SystemCurrencyLog extends React.Component<ISubPanelViewProps, ISubPanelVie
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}
