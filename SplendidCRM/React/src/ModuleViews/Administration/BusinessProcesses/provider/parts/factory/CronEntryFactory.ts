@@ -10,8 +10,8 @@
 // 03/02/2022 Paul.  Remvoe unused imports. 
 //var domQuery              = require('min-dom/lib/query');
 //var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil'            ).getBusinessObject;
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var eventDefinitionHelper = require('bpmn-js-properties-panel/lib/helper/EventDefinitionHelper');
+import cmdHelper             from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import eventDefinitionHelper from 'bpmn-js-properties-panel/lib/helper/EventDefinitionHelper';
 import cron               from './cron';
 
 function ensureNotNull(prop)
