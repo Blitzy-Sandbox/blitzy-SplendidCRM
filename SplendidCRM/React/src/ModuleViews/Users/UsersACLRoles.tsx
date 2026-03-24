@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                  from 'react-pose'                          ;
 import { RouteComponentProps, withRouter }    from '../Router5'                    ;
 import { observer }                           from 'mobx-react'                          ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'      ;
-import { Appear }                             from 'react-lifecycle-appear'              ;
 // 2. Store and Types. 
 import ACL_FIELD_ACCESS                       from '../../types/ACL_FIELD_ACCESS'        ;
 import DETAILVIEWS_RELATIONSHIP               from '../../types/DETAILVIEWS_RELATIONSHIP';
@@ -42,18 +40,6 @@ import SearchView                             from '../../views/SearchView'     
 import PopupView                              from '../../views/PopupView'              ;
 import EditView                               from '../../views/EditView'               ;
 import SubPanelButtonsFactory                 from '../../ThemeComponents/SubPanelButtonsFactory';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ISubPanelViewProps extends RouteComponentProps<any>
 {
@@ -104,6 +90,8 @@ interface ISubPanelViewState
 class UsersACLRoles extends React.Component<ISubPanelViewProps, ISubPanelViewState>
 {
 	private _isMounted = false;
+	private appearRef = React.createRef<HTMLDivElement>();
+	private appearObserver: IntersectionObserver | null = null;
 
 	private searchView           = React.createRef<SearchView>();
 	private splendidGrid         = React.createRef<SplendidGrid>();
@@ -273,11 +261,50 @@ class UsersACLRoles extends React.Component<ISubPanelViewProps, ISubPanelViewSta
 			console.error((new Date()).toISOString() + ' ' + this.constructor.name + '.componentDidMount', error);
 			this.setState({ error });
 		}
+		// Lazy-load subpanel when it becomes visible in viewport (replaces react-lifecycle-appear)
+		if ( this.appearRef.current && !this.state.subPanelVisible )
+		{
+			this.appearObserver = new IntersectionObserver(
+				(entries) =>
+				{
+					if ( entries[0]?.isIntersecting && this._isMounted )
+					{
+						this.setState({ subPanelVisible: true });
+						this.appearObserver?.disconnect();
+						this.appearObserver = null;
+					}
+				},
+				{ threshold: 0.1 }
+			);
+			this.appearObserver.observe(this.appearRef.current);
+		}
+	}
+
+	componentDidUpdate()
+	{
+		// Setup appear observer if not yet initialized (handles case where initial render showed spinner)
+		if ( this.appearRef.current && !this.state.subPanelVisible && !this.appearObserver )
+		{
+			this.appearObserver = new IntersectionObserver(
+				(entries) =>
+				{
+					if ( entries[0]?.isIntersecting && this._isMounted )
+					{
+						this.setState({ subPanelVisible: true });
+						this.appearObserver?.disconnect();
+						this.appearObserver = null;
+					}
+				},
+				{ threshold: 0.1 }
+			);
+			this.appearObserver.observe(this.appearRef.current);
+		}
 	}
 
 	componentWillUnmount()
 	{
 		this._isMounted = false;
+		this.appearObserver?.disconnect();
 	}
 
 	componentDidCatch(error, info)
@@ -1081,13 +1108,13 @@ class UsersACLRoles extends React.Component<ISubPanelViewProps, ISubPanelViewSta
 						multiSelect={ multiSelect }
 						ClearDisabled={ true }
 					/>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<div ref={ this.appearRef }>
 						{ headerButtons
 						? React.createElement(headerButtons, { MODULE_NAME, ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: GRID_NAME, row: item, Page_Command: this.Page_Command, showButtons: !showInlineEdit, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</div>
+					<div style={ {overflow: (open ? 'visible' : 'hidden'), height: (open ? 'auto' : '0'), transition: 'height 0.3s ease'} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							<div style={ cssSearch }>
@@ -1195,7 +1222,7 @@ class UsersACLRoles extends React.Component<ISubPanelViewProps, ISubPanelViewSta
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}
