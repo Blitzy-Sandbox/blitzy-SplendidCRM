@@ -19,9 +19,8 @@ import Credentials from '../scripts/Credentials';
 import SplendidCache from '../scripts/SplendidCache';
 import { Logout } from '../scripts/Login';
 import L10n from '../scripts/L10n'
+import icon from '../assets/img/SplendidCRM_Icon.gif';
 // 4. Components and Views. 
-
-const icon = require('../assets/img/SplendidCRM_Icon.gif');
 
 interface IUserDropdownProps extends RouteComponentProps<any>
 {
