@@ -10,17 +10,16 @@
 import Sql  from '../../../../../scripts/Sql' ;
 import L10n from '../../../../../scripts/L10n';
 
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var getExtensionElements  = require('bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper').getExtensionElements;
-var extensionElements     = require('bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/ExtensionElements');
-var properties            = require('bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/Properties');
-var entryFactory          = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
-var elementHelper         = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
-var find                  = require('lodash/collection/find');
-var forEach               = require('lodash/collection/forEach');
-var assign                = require('lodash/object/assign');
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
+import { getExtensionElements } from 'bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper';
+import extensionElements from 'bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/ExtensionElements';
+import properties from 'bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/Properties';
+import entryFactory from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
+import elementHelper from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import find from 'lodash/find';
+import forEach from 'lodash/forEach';
+import assign from 'lodash/assign';
 import formHelper         from './factory/ReportHelper';
 
 //var inputOutputProps      = require('bpmn-js-properties-panel/lib/provider/camunda/parts/InputOutputProps');
