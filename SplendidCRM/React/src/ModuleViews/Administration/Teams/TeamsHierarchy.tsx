@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                        from 'react-pose'                             ;
 import { RouteComponentProps, withRouter }          from '../Router5'                       ;
 import { observer }                                 from 'mobx-react'                             ;
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome'         ;
-import { Appear }                                   from 'react-lifecycle-appear'                 ;
 import TreeView                                     from 'react-treeview'                         ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP                     from '../../../types/DETAILVIEWS_RELATIONSHIP';
@@ -29,17 +27,11 @@ import { CreateSplendidRequest, GetSplendidResult } from '../../../scripts/Splen
 // 4. Components and Views. 
 import SubPanelButtonsFactory                       from '../../../ThemeComponents/SubPanelButtonsFactory';
 
-const Content = posed.div(
+class Appear extends React.Component<{onAppearOnce?: (ioe?: any) => void, children?: React.ReactNode}>
 {
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
+	componentDidMount() { if (this.props.onAppearOnce) this.props.onAppearOnce(); }
+	render() { return this.props.children || null; }
+}
 
 interface ISubPanelViewProps extends RouteComponentProps<any>
 {
@@ -206,7 +198,7 @@ class TeamsHierarchy extends React.Component<ISubPanelViewProps, ISubPanelViewSt
 						: null
 						}
 					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					<div style={ {overflow: (open ? 'visible' : 'hidden'), height: open ? 'auto' : '0', transition: 'height 0.3s ease'} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							{ team.TEAMS == null
@@ -223,7 +215,7 @@ class TeamsHierarchy extends React.Component<ISubPanelViewProps, ISubPanelViewSt
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}
