@@ -7,8 +7,8 @@
  * the Appropriate Legal Notices must display the following words on all interactive user interfaces: 
  * "Copyright (C) 2005-2022 SplendidCRM Software, Inc. All rights reserved."
  */
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
+import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
 
 function ensureNotNull(prop)
 {
