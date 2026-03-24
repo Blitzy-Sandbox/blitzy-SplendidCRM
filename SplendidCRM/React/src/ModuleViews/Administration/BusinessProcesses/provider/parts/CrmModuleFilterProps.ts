@@ -11,10 +11,9 @@ import Sql           from '../../../../../scripts/Sql' ;
 import L10n          from '../../../../../scripts/L10n';
 import SplendidCache from  '../../../../../scripts/SplendidCache';
 
-var entryFactory          = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
+import entryFactory from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
 import queryEntryFactory  from './factory/QueryEntryFactory';
 
 function ensureNotNull(prop)
