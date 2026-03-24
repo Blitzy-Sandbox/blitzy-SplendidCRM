@@ -23,8 +23,7 @@ import { ProcessButtons_GetProcessStatus, ProcessButtons_ProcessAction, ProcessB
 // 4. Components and Views. 
 import ErrorComponent                      from '../components/ErrorComponent';
 import PopupView                           from '../views/PopupView'          ;
-
-const icon = require('../assets/img/SplendidCRM_Icon.gif');
+import icon                                from '../assets/img/SplendidCRM_Icon.gif';
 
 interface IProcessButtonsProps extends RouteComponentProps<any>
 {
