@@ -9,12 +9,12 @@
  */
 import L10n              from '../../../../../../scripts/L10n';
 
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
-var elementHelper         = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var inputOutputHelper     = require('bpmn-js-properties-panel/lib/helper/InputOutputHelper');
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var utils                 = require('bpmn-js-properties-panel/lib/Utils');
-var entryFactory          = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
+import { is }              from 'bpmn-js/lib/util/ModelUtil';
+import elementHelper       from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import inputOutputHelper   from 'bpmn-js-properties-panel/lib/helper/InputOutputHelper';
+import cmdHelper           from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import utils               from 'bpmn-js-properties-panel/lib/Utils';
+import entryFactory        from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
 //var script                = require('bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/Script')('scriptFormat', 'value', true);
 
 /*
