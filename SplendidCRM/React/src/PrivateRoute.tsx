@@ -10,7 +10,7 @@
 
 // 1. React and fabric. 
 import React, { useState, useEffect }         from 'react'                            ;
-import { Outlet, useParams, useLocation, useNavigate, useOutletContext } from  'react-router-dom'       ;
+import { Outlet, useParams, useLocation, useNavigate, useOutletContext } from  'react-router'            ;
 import {  SplendidHistory }                   from './Router5'                        ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'   ;
 // 2. Store and Types. 
