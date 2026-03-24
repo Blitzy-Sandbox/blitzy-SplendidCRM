@@ -10,10 +10,9 @@
 import Sql  from '../../../../../scripts/Sql' ;
 import L10n from '../../../../../scripts/L10n';
 
-var find              = require('lodash/collection/find');
-var entryFactory      = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
-var is                = require('bpmn-js/lib/util/ModelUtil').is;
-var getBusinessObject = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
+import find from 'lodash/find';
+import entryFactory from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
+import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 
 function hasEventDefinition(element, eventDefinition)
 {
