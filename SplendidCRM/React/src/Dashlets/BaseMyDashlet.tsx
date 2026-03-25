@@ -12,7 +12,6 @@
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from '../Router5'              ;
 import { FontAwesomeIcon }                 from '@fortawesome/react-fontawesome';
-import { Appear }                          from 'react-lifecycle-appear'        ;
 // 2. Store and Types. 
 import IDashletProps                       from '../types/IDashletProps'        ;
 // 3. Scripts. 
@@ -96,6 +95,11 @@ export default class BaseMyDashlet extends React.Component<IBaseMyDashletProps, 
 		}
 	}
 
+	componentDidMount()
+	{
+		this.setState({ dashletVisible: true });
+	}
+
 	private _onRefresh = async (e) =>
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '._onRefresh');
@@ -147,7 +151,6 @@ export default class BaseMyDashlet extends React.Component<IBaseMyDashletProps, 
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
 					<div className="card-body DashletHeader">
 						<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
 						<span
@@ -170,7 +173,6 @@ export default class BaseMyDashlet extends React.Component<IBaseMyDashletProps, 
 							}
 						</span>
 					</div>
-				</Appear>
 				{ dashletVisible
 				? <div style={ {clear: 'both'} }>
 					<hr />
