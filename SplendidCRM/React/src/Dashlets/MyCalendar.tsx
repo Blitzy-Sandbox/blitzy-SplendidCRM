@@ -12,7 +12,6 @@
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from '../Router5'              ;
 import { FontAwesomeIcon }                 from '@fortawesome/react-fontawesome';
-import { Appear }                          from 'react-lifecycle-appear'        ;
 // 2. Store and Types. 
 import IDashletProps                       from '../types/IDashletProps'        ;
 // 3. Scripts. 
@@ -41,6 +40,11 @@ export default class MyCalendar extends React.Component<IMyCalendarProps, IMyCal
 		}
 	}
 
+	componentDidMount()
+	{
+		this.setState({ dashletVisible: true });
+	}
+
 	public render()
 	{
 		const { TITLE } = this.props;
@@ -50,11 +54,9 @@ export default class MyCalendar extends React.Component<IMyCalendarProps, IMyCal
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
-					<div className="card-body DashletHeader">
-						<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
-					</div>
-				</Appear>
+				<div className="card-body DashletHeader">
+					<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
+				</div>
 				{ dashletVisible
 				? <div style={ {clear: 'both'} }>
 					<hr />
