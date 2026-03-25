@@ -14,7 +14,7 @@
 // 02/26/2022 Paul.  Remove whatwg-fetch as it is no londer needed as we require latest browsers. 
 import React                                       from 'react'                  ;
 import ReactDOM                                    from 'react-dom/client'       ;
-import { createBrowserRouter, RouterProvider, redirect }     from  'react-router-dom'      ;
+import { createBrowserRouter, RouterProvider, redirect }     from  'react-router'           ;
 import { resetRoutes, publicRoutes, privateRoutes, cleanupRoutes, redirectRoutes, SplendidRedirect, SplendidRoute }  from './routes';
 import { Provider }                                from 'mobx-react'             ;
 import { RouterStore, syncHistoryWithStore }       from 'mobx-react-router'      ;
@@ -25,6 +25,7 @@ import Sql                                         from './scripts/Sql'         
 import Credentials                                 from './scripts/Credentials'  ;
 import SplendidCache                               from './scripts/SplendidCache';
 import { StartsWith, EndsWith }                    from './scripts/utility'      ;
+import { getConfig, initConfig }                    from './config'               ;
 import SignalRCoreStore                            from './SignalR/SignalRCoreStore' ;
 // 4. Components and Views. 
 import App                                         from './App'                  ;
@@ -50,6 +51,11 @@ declare global
 	interface Window
 	{
 		[key: string]: any;
+		__SPLENDID_CONFIG__?: {
+			API_BASE_URL?: string;
+			SIGNALR_URL?: string;
+			ENVIRONMENT?: string;
+		};
 	}
 }
 
@@ -93,30 +99,41 @@ if ( EndsWith(pathname, 'default.aspx') )
 {
 	pathname = pathname.substring(0, pathname.indexOf('default.aspx', 1));
 }
-// 11/12/2020 Paul.  Detect iOS. 
-if ( window.location.pathname.indexOf('/www/index.html') > 0 || ( window.cordova && (window.cordova.platformId == 'android' || window.cordova.platformId == 'ios' || window.location.pathname == '/android_asset/www/index.html')) )
+// Load runtime config from index.html inline script (populated from /config.json).
+// initConfig() reads window.__SPLENDID_CONFIG__ and populates the config singleton.
+// Runtime config takes precedence when available; existing URL-based detection serves
+// as fallback for Cordova and legacy same-origin deployments.
+initConfig();
+const runtimeConfig = getConfig();
+if ( runtimeConfig.API_BASE_URL )
 {
-	pathname      = '';
-	sRemoteServer = '';
-	//console.log((new Date()).toISOString() + ' index.tsx Android');
-}
-else if ( process.env.PATH )
-{
-	//console.log((new Date()).toISOString() + ' ' + 'process.env.PATH = ' + process.env.PATH);
-	pathname = process.env.PATH;
-	sRemoteServer = pathname.substring(0, pathname.indexOf('/', 1) + 1);
-}
-// 05/21/2023 Paul.  SplendidApp uses ASP.Net Core and will not have /React in the URL. 
-// 09/20/2023 Paul.  Start at position 0, otherwise ASP.Net 4.8 apps with site at root will fail. 
-else if ( pathname.toLowerCase().indexOf('/react', 0) >= 0 )
-{
-	// 04/28/2020 Paul.  Allow for /react, or other case issues. 
-	sRemoteServer = window.location.origin + pathname.substring(0, pathname.toLowerCase().indexOf('/react', 0) + 1);
+	sRemoteServer = runtimeConfig.API_BASE_URL;
+	if ( !sRemoteServer.endsWith('/') )
+	{
+		sRemoteServer += '/';
+	}
 }
 else
 {
-	// 05/21/2023 Paul.  baseUrl is working with SplendidApp, so use directly. 
-	sRemoteServer = window.location.origin + baseUrl;
+	// 11/12/2020 Paul.  Detect iOS. 
+	if ( window.location.pathname.indexOf('/www/index.html') > 0 || ( window.cordova && (window.cordova.platformId == 'android' || window.cordova.platformId == 'ios' || window.location.pathname == '/android_asset/www/index.html')) )
+	{
+		pathname      = '';
+		sRemoteServer = '';
+		//console.log((new Date()).toISOString() + ' index.tsx Android');
+	}
+	// 05/21/2023 Paul.  SplendidApp uses ASP.Net Core and will not have /React in the URL. 
+	// 09/20/2023 Paul.  Start at position 0, otherwise ASP.Net 4.8 apps with site at root will fail. 
+	else if ( pathname.toLowerCase().indexOf('/react', 0) >= 0 )
+	{
+		// 04/28/2020 Paul.  Allow for /react, or other case issues. 
+		sRemoteServer = window.location.origin + pathname.substring(0, pathname.toLowerCase().indexOf('/react', 0) + 1);
+	}
+	else
+	{
+		// 05/21/2023 Paul.  baseUrl is working with SplendidApp, so use directly. 
+		sRemoteServer = window.location.origin + baseUrl;
+	}
 }
 // 04/28/2020 Paul.  Allow for /react, or other case issues. 
 if ( StartsWith(pathname.toLowerCase(), baseUrl.toLowerCase()) )
