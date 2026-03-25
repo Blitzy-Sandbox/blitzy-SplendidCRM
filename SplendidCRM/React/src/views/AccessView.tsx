@@ -10,10 +10,8 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed from 'react-pose';
 import { RouteComponentProps }                      from '../Router5'               ;
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome' ;
-import { Appear }                                   from 'react-lifecycle-appear'         ;
 // 2. Store and Types. 
 import ACL_ACCESS                                   from '../types/ACL_ACCESS'            ;
 import { SubPanelHeaderButtons }                    from '../types/SubPanelHeaderButtons' ;
@@ -31,18 +29,6 @@ import ErrorComponent                               from '../components/ErrorCom
 import SubPanelButtonsFactory                       from '../ThemeComponents/SubPanelButtonsFactory';
 
 const CONTROL_VIEW_NAME: string = 'AccessView';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface IAccessViewProps
 {
@@ -132,6 +118,8 @@ export default class AccessView extends React.Component<IAccessViewProps, IAcces
 	{
 		const { USER_ID, ROLE_ID } = this.props;
 		this._isMounted = true;
+		// 07/30/2021 Paul.  Set subPanelVisible on mount (replaces react-lifecycle-appear Appear callback).
+		this.setState({ subPanelVisible: true });
 		try
 		{
 			let status = await AuthenticatedMethod(this.props, this.constructor.name + '.componentDidMount');
@@ -405,13 +393,13 @@ export default class AccessView extends React.Component<IAccessViewProps, IAcces
 			// 07/30/2021 Paul.  Load when the panel appears. 
 			return (
 				<React.Fragment>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<div>
 						{ headerButtons && !EnableACLEditing
 						? React.createElement(headerButtons, { MODULE_NAME: 'AccessView', ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: 'ActivityStream.Subpanel', row: null, Page_Command: null, showButtons: false, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, history: null, location: null, match: null, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</div>
+					<div style={ {overflow: (open ? 'visible' : 'hidden')} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 						<ErrorComponent error={ error } />
@@ -488,7 +476,7 @@ export default class AccessView extends React.Component<IAccessViewProps, IAcces
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}
