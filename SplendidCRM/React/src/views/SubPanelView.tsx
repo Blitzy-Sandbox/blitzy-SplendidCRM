@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                  from 'react-pose'                       ;
 import { RouteComponentProps, withRouter }    from '../Router5'                 ;
 import { observer }                           from 'mobx-react'                       ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'   ;
-import { Appear }                             from 'react-lifecycle-appear'           ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP               from '../types/DETAILVIEWS_RELATIONSHIP';
 import RELATIONSHIPS                          from '../types/RELATIONSHIPS'           ;
@@ -39,18 +37,6 @@ import SearchView                             from '../views/SearchView'        
 import DynamicPopupView                       from '../views/DynamicPopupView'       ;
 import EditView                               from '../views/EditView'               ;
 import SubPanelButtonsFactory                 from '../ThemeComponents/SubPanelButtonsFactory';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ISubPanelViewProps extends RouteComponentProps<any>
 {
@@ -247,6 +233,7 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 	{
 		const { RELATED_MODULE } = this.state;
 		this._isMounted = true;
+		this.setState({ subPanelVisible: true });
 		try
 		{
 			let status = await AuthenticatedMethod(this.props, this.constructor.name + '.componentDidMount');
@@ -729,13 +716,13 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 						multiSelect={ multiSelect }
 						ClearDisabled={ true }
 					/>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<div>
 						{ headerButtons
 						? React.createElement(headerButtons, { MODULE_NAME, ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: GRID_NAME, row: item, Page_Command: this.Page_Command, showButtons: !showInlineEdit, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</div>
+					<div style={ {overflow: (open ? 'visible' : 'hidden')} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							<div style={ cssSearch }>
@@ -844,7 +831,7 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}
