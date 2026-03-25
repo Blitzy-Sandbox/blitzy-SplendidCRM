@@ -12,7 +12,6 @@
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from '../Router5'              ;
 import { FontAwesomeIcon }                 from '@fortawesome/react-fontawesome';
-import { Appear }                          from 'react-lifecycle-appear'        ;
 import { observer }                        from 'mobx-react'                    ;
 // https://www.amcharts.com/docs/v4/getting-started/basics/
 import * as am4core                        from "@amcharts/amcharts4/core"      ;
@@ -93,6 +92,7 @@ export default class PipelineByMonthByOutcome extends React.Component<IDashletPr
 	componentDidMount()
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.componentDidMount');
+		this.setState({ dashletVisible: true });
 		if ( !this.chart )
 		{
 			this.createChart();
@@ -371,7 +371,6 @@ export default class PipelineByMonthByOutcome extends React.Component<IDashletPr
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
 					<div className="card-body DashletHeader">
 						<ErrorComponent error={error} />
 						<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
@@ -394,7 +393,6 @@ export default class PipelineByMonthByOutcome extends React.Component<IDashletPr
 							}
 						</span>
 					</div>
-				</Appear>
 				<div style={{ clear: 'both' }}>
 					<hr />
 					{ dashletVisible
