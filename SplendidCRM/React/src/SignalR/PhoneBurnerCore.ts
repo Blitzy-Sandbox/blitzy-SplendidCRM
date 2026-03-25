@@ -13,6 +13,7 @@ import * as H         from 'history'                 ;
 import * as signalR   from "@microsoft/signalr"      ;
 // 2. Store and Types. 
 // 3. Scripts. 
+import { getConfig }  from '../config'                ;
 import Sql            from '../scripts/Sql'          ;
 import { Crm_Config } from '../scripts/Crm'          ;
 
@@ -115,7 +116,7 @@ export class PhoneBurnerServerCore
 export function PhoneBurnerCreateHub(history: H.History, sUSER_ID: string, dtPHONEBURNER_TOKEN_EXPIRES_AT: Date): PhoneBurnerServerCore
 {
 	const hub: signalR.HubConnection = new signalR.HubConnectionBuilder()
-		.withUrl("/signalr_phoneburnerhub")
+		.withUrl((getConfig().SIGNALR_URL || getConfig().API_BASE_URL) + '/hubs/phoneburner')
 		//.configureLogging(signalR.LogLevel.Debug)  // https://learn.microsoft.com/en-us/aspnet/core/signalr/diagnostics?view=aspnetcore-5.0
 		.withAutomaticReconnect()
 		.build();
