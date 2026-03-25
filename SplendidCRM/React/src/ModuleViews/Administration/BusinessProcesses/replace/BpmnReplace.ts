@@ -1,8 +1,7 @@
-var pick              = require( 'lodash/object/pick'        );
-var assign            = require( 'lodash/object/assign'      );
-var is                = require( 'bpmn-js/lib/util/ModelUtil').is;
-var isExpanded        = require( 'bpmn-js/lib/util/DiUtil'   ).isExpanded;
-var isEventSubProcess = require( 'bpmn-js/lib/util/DiUtil'   ).isEventSubProcess;
+import pick from 'lodash/pick';
+import assign from 'lodash/assign';
+import { is } from 'bpmn-js/lib/util/ModelUtil';
+import { isExpanded, isEventSubProcess } from 'bpmn-js/lib/util/DiUtil';
 
 var CUSTOM_PROPERTIES =
 [
