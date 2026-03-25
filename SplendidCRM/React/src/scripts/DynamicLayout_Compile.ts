@@ -133,16 +133,23 @@ import BaseMyTeamDashlet from '../Dashlets/BaseMyTeamDashlet';
 
 // 02/04/2024 Paul.  Some modules need fixing.  Don't know why. 
 // These modules have circular dependency issues and are imported via namespace to allow FixNulledModules() recovery.
+// ESM Migration Note: In Vite/ESM, accessing .default on an uninitialized circular import
+// triggers the ES Module Temporal Dead Zone — a fatal ReferenceError that cannot be caught.
+// Unlike CommonJS (where circular imports return undefined and FixNulledModules recovers),
+// ESM requires deferring property access to function-call time when all modules are initialized.
+// The namespace imports (import * as All_X) are safe — they create a live binding object
+// that exists immediately. Only the property access (.default) must be deferred.
 import * as All_AuthenticationContext    from '../scripts/adal'                    ;
 import * as All_PopupView                from '../views/PopupView'                 ;
 import * as All_SplendidDynamic_EditView from '../scripts/SplendidDynamic_EditView';
 import * as All_ModuleViewFactory        from '../ModuleViews'                     ;
 import * as All_DynamicLayout_Module     from '../scripts/DynamicLayout'           ;
-let AuthenticationContext                = All_AuthenticationContext.default            ;
-let PopupView                            = All_PopupView.default                        ;
-let SplendidDynamic_EditView             = All_SplendidDynamic_EditView.default         ;
-let ModuleViewFactory                    = All_ModuleViewFactory.default                ;
-let DynamicLayout_Module                 = All_DynamicLayout_Module.DynamicLayout_Module;
+// Deferred initialization: set to null now, resolved by FixNulledModules() at first use.
+let AuthenticationContext               : any = null;
+let PopupView                           : any = null;
+let SplendidDynamic_EditView            : any = null;
+let ModuleViewFactory                   : any = null;
+let DynamicLayout_Module                : any = null;
 
 // 02/04/2024 Paul.  Modules being null is back. 
 const allModules: any[] =
@@ -203,8 +210,10 @@ function FixNulledModules()
 	if ( AuthenticationContext == null || AuthenticationContext === undefined )
 	{
 		const m = allModules.find(x => x.Name == 'AuthenticationContext');
-		m.Module              = All_AuthenticationContext.default.AuthenticationContext;
-		AuthenticationContext = All_AuthenticationContext.default.AuthenticationContext;
+		// adal.ts exports the constructor directly as default export.
+		const resolved       = All_AuthenticationContext.default;
+		m.Module              = resolved;
+		AuthenticationContext = resolved;
 		console.log((new Date()).toISOString() + ' ' + 'DynamicLayout_Compile.FixNulledModules: AuthenticationContext Restored');
 	}
 	if ( PopupView == null || PopupView === undefined )
@@ -358,18 +367,20 @@ const moduleRegistry: Record<string, any> =
 
 // Global require shim for @babel/standalone compiled components.
 // @babel/standalone with es2015 preset outputs require() calls in compiled code.
-// The 5 circular dependency modules are resolved dynamically (reading current let values)
-// because FixNulledModules() can update them after module initialization.
+// The 5 circular dependency modules are resolved from namespace imports directly.
+// By the time require() is called (during DynamicLayout_Compile execution, after all
+// module evaluation is complete), the namespace bindings are fully initialized.
 (window as any).require = function(name: string)
 {
-	// Dynamic resolution for circular dependency modules — reads current let variable values.
+	// Dynamic resolution for circular dependency modules — reads from namespace imports
+	// which are live ESM bindings, fully resolved by the time this function is called.
 	switch ( name )
 	{
-		case '../scripts/adal'                    : return { __esModule: true, default: AuthenticationContext     };
-		case '../views/PopupView'                 : return { __esModule: true, default: PopupView                };
-		case '../scripts/SplendidDynamic_EditView': return { __esModule: true, default: SplendidDynamic_EditView };
-		case '../ModuleViews'                     : return { __esModule: true, default: ModuleViewFactory        };
-		case '../scripts/DynamicLayout'           : return { __esModule: true, DynamicLayout_Module              };
+		case '../scripts/adal'                    : return { __esModule: true, default: All_AuthenticationContext.default            };
+		case '../views/PopupView'                 : return { __esModule: true, default: All_PopupView.default                       };
+		case '../scripts/SplendidDynamic_EditView': return { __esModule: true, default: All_SplendidDynamic_EditView.default        };
+		case '../ModuleViews'                     : return { __esModule: true, default: All_ModuleViewFactory.default               };
+		case '../scripts/DynamicLayout'           : return { __esModule: true, DynamicLayout_Module: All_DynamicLayout_Module.DynamicLayout_Module };
 	}
 	const mod = moduleRegistry[name];
 	if ( mod !== undefined )
