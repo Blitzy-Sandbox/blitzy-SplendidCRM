@@ -9,7 +9,7 @@
  */
 import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
 // 03/01/2022 Paul.  Updated packaging for min-dom. 
-import minDom from 'min-dom';
+import * as minDom from 'min-dom';
 var domQuery   = minDom.query  ;
 var domAttr    = minDom.attr   ;
 var domClosest = minDom.closest;

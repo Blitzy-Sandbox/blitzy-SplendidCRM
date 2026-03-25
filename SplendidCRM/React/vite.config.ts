@@ -136,6 +136,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    commonjsOptions: {
+      include: [/node_modules/, /ckeditor5-custom-build/],
+    },
     rollupOptions: {
       external: ['xlsx', 'canvg', 'pdfmake'],
       output: {
@@ -167,7 +170,7 @@ export default defineConfig({
    * directive forces pre-bundling for packages that might otherwise be missed.
    */
   optimizeDeps: {
-    include: ['@babel/standalone'],
+    include: ['@babel/standalone', 'ckeditor5-custom-build'],
   },
 
   /*

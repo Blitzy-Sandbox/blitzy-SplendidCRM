@@ -6,7 +6,22 @@ import forEach from 'lodash/forEach';
 // 03/02/2022 Paul.  Must switch to from instead of require to support diagram-js >= 1.0. 
 import inherits          from 'inherits';
 //var inherits             = require('inherits'                                       );
-import { getParents, isAny } from 'bpmn-js/lib/features/modeling/util/ModelingUtil';
+import { isAny } from 'bpmn-js/lib/features/modeling/util/ModelingUtil';
+
+// Local getParents implementation: walks the parent chain and collects all ancestor elements.
+// bpmn-js 1.3.3 exports getParent (singular) which returns a single typed parent.
+// The original SplendidCRM code expects getParents (plural) returning an array of all ancestors.
+function getParents(element: any): any[]
+{
+	const parents: any[] = [];
+	let current = element;
+	while ( current && current.parent )
+	{
+		current = current.parent;
+		parents.push(current);
+	}
+	return parents;
+}
 import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 import { isExpanded, isEventSubProcess, isInterrupting } from 'bpmn-js/lib/util/DiUtil';
 // 03/02/2022 Paul.  Must switch to from instead of require to support diagram-js >= 1.0. 

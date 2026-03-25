@@ -13,7 +13,6 @@ import { History }                                 from 'history'               
 // 2. Store and Types. 
 // 3. Scripts. 
 import Credentials                                 from '../scripts/Credentials';
-import { getConfig }                               from '../config'              ;
 // 4. SignalR hubs.
 import { AsteriskServerCore   , AsteriskCreateHub    } from './AsteriskCore'            ;
 import { AvayaServerCore      , AvayaCreateHub       } from './AvayaCore'               ;
