@@ -19,6 +19,8 @@ import Aes                   from '../scripts/aes'             ;
 import SplendidCache         from '../scripts/SplendidCache'   ;
 import { Crm_Config }        from '../scripts/Crm'             ;
 import { FromJsonDate }      from '../scripts/Formatting'      ;
+// 4. Runtime configuration for decoupled frontend hosting.
+import { getConfig }         from '../config'                   ;
 
 function IsMobileClient()
 {
@@ -193,11 +195,20 @@ class CredentialsStore
 	// 12/09/2014 Paul.  Remote Server is on the background page of the browser extensions. 
 	get RemoteServer()
 	{
-		if ( this.sREMOTE_SERVER == null )
+		if ( this.sREMOTE_SERVER == null || this.sREMOTE_SERVER === '' )
 		{
 			if ( window.location.pathname == '/android_asset/www/index.html' )
 			{
 				this.sREMOTE_SERVER = './';
+			}
+			else
+			{
+				// Fall back to runtime config API_BASE_URL if RemoteServer not explicitly set
+				const apiBaseUrl = getConfig().API_BASE_URL;
+				if ( apiBaseUrl )
+				{
+					this.sREMOTE_SERVER = apiBaseUrl.endsWith('/') ? apiBaseUrl : apiBaseUrl + '/';
+				}
 			}
 		}
 		return this.sREMOTE_SERVER;
