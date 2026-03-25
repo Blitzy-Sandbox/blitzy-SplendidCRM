@@ -151,34 +151,60 @@ export default class ArcticSubPanelHeaderButtons extends SubPanelHeaderButtons
 		let sMODULE_TITLE: string = !Sql.IsEmptyString(MODULE_TITLE) ? L10n.Term(MODULE_TITLE) : L10n.Term('.moduleList.' + MODULE_NAME);
 		let themeURL     : string = Credentials.RemoteServer + 'App_Themes/' + SplendidCache.UserTheme + '/';
 		let sError       : string = null;
+		// 03/25/2026 Paul.  Sanitize error messages to prevent exposing internal SQL or server details.
+		const sanitizeErrorMessage = (msg: string): string =>
+		{
+			if ( !msg ) return msg;
+			const sqlPatterns = [
+				/Invalid object name/i,
+				/Incorrect syntax near/i,
+				/FETCH statement/i,
+				/stored procedure/i,
+				/SQL Server/i,
+				/SqlException/i,
+				/EXECUTE permission/i,
+				/transaction \(Process ID/i,
+				/deadlock/i,
+				/constraint.*violated/i,
+			];
+			for ( const pattern of sqlPatterns )
+			{
+				if ( pattern.test(msg) )
+				{
+					console.error('SubPanelHeaderButtons sanitized error:', msg);
+					return 'An unexpected error occurred. Please try again or contact your administrator.';
+				}
+			}
+			return msg;
+		};
 		if ( error !== undefined && error != null )
 		{
 			if ( error.message !== undefined )
 			{
-				sError = error.message;
+				sError = sanitizeErrorMessage(error.message);
 			}
 			else if ( typeof(error) == 'string' )
 			{
-				sError = error;
+				sError = sanitizeErrorMessage(error);
 			}
 			else if ( typeof(error) == 'object' )
 			{
-				sError = JSON.stringify(error);
+				sError = sanitizeErrorMessage(JSON.stringify(error));
 			}
 		}
 		else if ( headerError !== undefined && headerError != null )
 		{
 			if ( headerError.message !== undefined )
 			{
-				sError = headerError.message;
+				sError = sanitizeErrorMessage(headerError.message);
 			}
 			else if ( typeof(headerError) == 'string' )
 			{
-				sError = headerError;
+				sError = sanitizeErrorMessage(headerError);
 			}
 			else if ( typeof(headerError) == 'object' )
 			{
-				sError = JSON.stringify(headerError);
+				sError = sanitizeErrorMessage(JSON.stringify(headerError));
 			}
 		}
 		// 04/28/2019 Paul.  Can't use react-bootstrap Breadcrumb as it will reload the app is is therefore slow. 

@@ -237,6 +237,11 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 		try
 		{
 			let status = await AuthenticatedMethod(this.props, this.constructor.name + '.componentDidMount');
+			// 03/25/2026 Paul.  Guard against unmounted component after async call completes.
+			if ( !this._isMounted )
+			{
+				return;
+			}
 			if ( status == 1 )
 			{
 				if ( Credentials.ADMIN_MODE )
@@ -252,7 +257,10 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 		catch(error)
 		{
 			console.error((new Date()).toISOString() + ' ' + this.constructor.name + '.componentDidMount', error);
-			this.setState({ error });
+			if ( this._isMounted )
+			{
+				this.setState({ error });
+			}
 		}
 	}
 
@@ -646,25 +654,41 @@ class SubPanelView extends React.Component<ISubPanelViewProps, ISubPanelViewStat
 
 	private onToggleCollapse = (open) =>
 	{
-		const { CONTROL_VIEW_NAME, onComponentCollapse } = this.props;
-		this.setState({ open }, () =>
+		// 03/25/2026 Paul.  Defensive guard — prevent setState on unmounted component (intermittent crash on rapid toggle).
+		if ( !this._isMounted )
 		{
-			if ( open )
+			return;
+		}
+		const { CONTROL_VIEW_NAME, onComponentCollapse } = this.props;
+		try
+		{
+			this.setState({ open }, () =>
 			{
-				localStorage.setItem(CONTROL_VIEW_NAME, 'true');
-			}
-			else
-			{
-				// 11/10/2020 Paul.  Save false instead of remove so that config value default_subpanel_open will work properly. 
-				//localStorage.removeItem(CONTROL_VIEW_NAME);
-				localStorage.setItem(CONTROL_VIEW_NAME, 'false');
-			}
-			// 03/30/2022 Paul.  Pacific theme needs collapse notification. 
-			if ( onComponentCollapse )
-			{
-				onComponentCollapse(CONTROL_VIEW_NAME, open);
-			}
-		});
+				if ( !this._isMounted )
+				{
+					return;
+				}
+				if ( open )
+				{
+					localStorage.setItem(CONTROL_VIEW_NAME, 'true');
+				}
+				else
+				{
+					// 11/10/2020 Paul.  Save false instead of remove so that config value default_subpanel_open will work properly. 
+					//localStorage.removeItem(CONTROL_VIEW_NAME);
+					localStorage.setItem(CONTROL_VIEW_NAME, 'false');
+				}
+				// 03/30/2022 Paul.  Pacific theme needs collapse notification. 
+				if ( onComponentCollapse )
+				{
+					onComponentCollapse(CONTROL_VIEW_NAME, open);
+				}
+			});
+		}
+		catch(error)
+		{
+			console.error((new Date()).toISOString() + ' ' + this.constructor.name + '.onToggleCollapse', error);
+		}
 	}
 
 	private _onButtonsLoaded = async () =>

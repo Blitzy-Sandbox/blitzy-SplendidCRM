@@ -26,6 +26,49 @@ class ErrorComponent extends React.Component<IErrorComponentProps>
 		super(props);
 	}
 
+	// Sanitize error messages to prevent leaking internal details (SQL table names,
+	// stored procedure names, stack traces) to end users.  Only generic messages are
+	// shown; the full error is still logged to the browser console for debugging.
+	private sanitizeError(error: any): string
+	{
+		let sRaw: string = '';
+		if ( error.message !== undefined )
+		{
+			sRaw = error.message;
+		}
+		else if ( typeof error === 'string' )
+		{
+			sRaw = error;
+		}
+		else if ( typeof error === 'object' )
+		{
+			sRaw = JSON.stringify(error);
+		}
+		// Detect internal implementation details that should not be shown to users
+		const sensitivePatterns: RegExp[] = [
+			/Invalid object name/i,
+			/Incorrect syntax near/i,
+			/FETCH statement/i,
+			/stored procedure/i,
+			/SQL Server/i,
+			/SqlException/i,
+			/EXECUTE permission/i,
+			/transaction \(Process ID/i,
+			/deadlock/i,
+			/constraint.*violated/i,
+		];
+		for ( const pattern of sensitivePatterns )
+		{
+			if ( pattern.test(sRaw) )
+			{
+				// Log the full error to the console for developers
+				console.error('ErrorComponent: sanitized internal error', error);
+				return 'An unexpected error occurred. Please try again or contact your administrator.';
+			}
+		}
+		return sRaw;
+	}
+
 	public render()
 	{
 		const { error } = this.props;
@@ -34,19 +77,7 @@ class ErrorComponent extends React.Component<IErrorComponentProps>
 			//console.error((new Date()).toISOString() + ' ' + this.constructor.name + '.render', error);
 			if (error)
 			{
-				let sError = error;
-				if ( error.message !== undefined )
-				{
-					sError = error.message;
-				}
-				else if ( typeof(error) == 'string' )
-				{
-					sError = error;
-				}
-				else if ( typeof(error) == 'object' )
-				{
-					sError = JSON.stringify(error);
-				}
+				let sError: string = this.sanitizeError(error);
 				return <Alert variant='danger'>{sError}</Alert>;
 			}
 			return null;

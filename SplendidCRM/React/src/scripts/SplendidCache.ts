@@ -67,6 +67,9 @@ export class SplendidCacheStore
 	SHORTCUTS                 : any     = new Object();
 	TERMINOLOGY               : any     = new Object();
 	TERMINOLOGY_LISTS         : any     = new Object();
+	// Stores the original {key: displayName} mapping from TERMINOLOGY_LISTS before array conversion.
+	// Used by L10n.ListTerm to resolve display names for list values.
+	TERMINOLOGY_LIST_VALUES   : any     = new Object();
 	// 07/01/2019 Paul.  The SubPanelsView needs to understand how to manage all relationships. 
 	RELATIONSHIPS             : any     = new Object();
 	// 03/01/2016 Paul.  Order management lists. 
@@ -546,6 +549,23 @@ export class SplendidCacheStore
 			return null;
 		}
 		return this.TERMINOLOGY_LISTS[Credentials.sUSER_LANG + '.' + sListName];
+	}
+
+	// Resolves a display name for a specific list value (e.g., 'Active' in 'user_status_dom').
+	// Returns the display name from the original backend data, or the raw sName if not found.
+	TerminologyListDisplayName(sListName: string, sName: string): string
+	{
+		if ( this.TERMINOLOGY_LIST_VALUES )
+		{
+			// Try with language prefix first
+			const sLangKey = Credentials.sUSER_LANG + '.' + sListName;
+			const values = this.TERMINOLOGY_LIST_VALUES[sLangKey] || this.TERMINOLOGY_LIST_VALUES[sListName];
+			if ( values && values[sName] !== undefined && values[sName] !== null )
+			{
+				return values[sName];
+			}
+		}
+		return sName;
 	}
 
 	// 05/15/2020 Paul.  EmailTemplates needs to be able to insert CampaignTrackers. 
@@ -1286,7 +1306,12 @@ export class SplendidCacheStore
 		// 03/25/2026 Fix.  The .NET 10 backend may serialize TERMINOLOGY_LISTS values as
 		// objects {key: displayName} instead of arrays [key1, key2, ...].
 		// Consumers (ChatDashboardView, L10n.GetList, dropdowns) call .map() on these values,
-		// which crashes on plain objects.  Normalize each value to an array of its keys.
+		// which crashes on plain objects.  Normalize each value to an array of its keys,
+		// but also preserve the display-name mapping so L10n.ListTerm can resolve labels.
+		if ( !this.TERMINOLOGY_LIST_VALUES )
+		{
+			this.TERMINOLOGY_LIST_VALUES = {};
+		}
 		for ( let sKey in obj )
 		{
 			if ( obj.hasOwnProperty(sKey) )
@@ -1294,6 +1319,8 @@ export class SplendidCacheStore
 				let val = obj[sKey];
 				if ( val && typeof val === 'object' && !Array.isArray(val) )
 				{
+					// Preserve the {key: displayName} mapping before converting to array
+					this.TERMINOLOGY_LIST_VALUES[sKey] = val;
 					obj[sKey] = Object.keys(val);
 				}
 			}
@@ -1308,18 +1335,20 @@ export class SplendidCacheStore
 		if ( keys.length > 0 && !langPattern.test(keys[0]) )
 		{
 			const normalized: any = {};
+			const normalizedValues: any = {};
 			for ( const key of keys )
 			{
-				if ( !langPattern.test(key) )
+				const normalizedKey = !langPattern.test(key) ? sLang + '.' + key : key;
+				normalized[normalizedKey] = obj[key];
+				// Also normalize TERMINOLOGY_LIST_VALUES keys to match
+				if ( this.TERMINOLOGY_LIST_VALUES && this.TERMINOLOGY_LIST_VALUES[key] )
 				{
-					normalized[sLang + '.' + key] = obj[key];
-				}
-				else
-				{
-					normalized[key] = obj[key];
+					normalizedValues[normalizedKey] = this.TERMINOLOGY_LIST_VALUES[key];
 				}
 			}
 			this.TERMINOLOGY_LISTS = normalized;
+			// Merge any normalized values into the main store
+			Object.assign(this.TERMINOLOGY_LIST_VALUES, normalizedValues);
 			return;
 		}
 		this.TERMINOLOGY_LISTS = obj;

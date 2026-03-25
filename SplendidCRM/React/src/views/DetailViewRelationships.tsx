@@ -437,7 +437,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 							<div style={ {margin: '0', padding: '1em'} }>
 							{
 								items.map(item =>
-								(<div className='col-xs-6 col-sm-3 col-md-2' style={ {margin: '0', padding: '0'} }>
+								(<div key={ 'insight_' + item.CONTROL_VIEW_NAME } className='col-xs-6 col-sm-3 col-md-2' style={ {margin: '0', padding: '0'} }>
 									<div style={ {margin: '4px', padding: '0', borderRadius: '4px', border: '.15em solid #ced4da', borderTop: '3px solid #534d64', backgroundColor: (item.IS_PANEL_OPEN ? '#554d661f' : 'inherit'), cursor: 'pointer'} } onClick={ () => this.onSubPanelCollapse(item.CONTROL_VIEW_NAME, !item.IS_PANEL_OPEN) }>
 										<div style={ {padding: '0 .5em', marginTop: '.5em', textAlign: 'right'} }>
 											<img src={ this.themeURL + item.RELATED_TYPE + '.gif' } style={ {borderWidth: '0px', height: '24px', width: '24px'} } />
@@ -461,6 +461,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 								items.map(item =>
 								( item.IS_PANEL_OPEN
 								? <DynamicSubPanelView
+									key={ 'subpanel_open_' + item.CONTROL_VIEW_NAME }
 									PARENT_TYPE={ PARENT_TYPE }
 									row={ item.row }
 									layout={ item.layout }
@@ -484,6 +485,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 				return items.map(item =>
 				(
 					<DynamicSubPanelView
+						key={ 'subpanel_' + item.CONTROL_VIEW_NAME }
 						PARENT_TYPE={ PARENT_TYPE }
 						row={ item.row }
 						layout={ item.layout }

@@ -206,7 +206,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 						sCONTROL_TEXT = '  +  ';
 					}
 					let titleChildren = [];
-					let title: any = React.createElement('span', {style: {verticalAlign: 'bottom'}}, titleChildren);
+					let title: any = React.createElement('span', {key: 'title', style: {verticalAlign: 'bottom'}}, titleChildren);
 					// 12/13/2019 Paul.  Only change search to icon for Seven theme. 
 					// 01/05/2022 Paul.  First button might be a button link. 
 					let onClick = this._onButtonClick;
@@ -222,13 +222,13 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 					{
 						let iNavSearch = React.createElement(FontAwesomeIcon, { icon: 'search' });
 						// 01/05/2022 Paul.  First button might be a button link. 
-						let first = React.createElement('input', {type: 'button', className: ButtonStyle + 'FirstButton', style: {}, onClick: (e) => onClick(lay)}, iNavSearch);
+						let first = React.createElement('input', {key: 'firstBtn', type: 'button', className: ButtonStyle + 'FirstButton', style: {}, onClick: (e) => onClick(lay)}, iNavSearch);
 						titleChildren.push(first);
 					}
 					else
 					{
 						// 01/05/2022 Paul.  First button might be a button link. 
-						let first = React.createElement('input', {type: 'submit', className: ButtonStyle + 'FirstButton', style: {}, value: sCONTROL_TEXT, onClick: (e) => onClick(lay)});
+						let first = React.createElement('input', {key: 'firstBtn', type: 'submit', className: ButtonStyle + 'FirstButton', style: {}, value: sCONTROL_TEXT, onClick: (e) => onClick(lay)});
 						titleChildren.push(first);
 					}
 					if ( layout.length > 1 )
@@ -240,16 +240,16 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 							let pacific = React.createElement('div', {style: {display: 'flex', flexDirection: 'row', flexWrap: 'nowrap'}}, pacificChildren);
 							// 04/02/2022 Paul.  Write title in a div to correct spacing alignment issues. 
 							let firstDivChildren = [];
-							let firstDiv = React.createElement('div', {}, firstDivChildren);
+							let firstDiv = React.createElement('div', {key: 'firstDiv'}, firstDivChildren);
 							pacificChildren.push(firstDiv);
 							firstDivChildren.push(title);
 							
 							let actionTitleChildren = [];
-							let actionTitle = React.createElement('div', {className: ButtonStyle + 'FirstButton', style: {}}, actionTitleChildren);
-							let actions = React.createElement('span', {style: {}}, L10n.Term('.LBL_ACTIONS'));
+							let actionTitle = React.createElement('div', {key: 'actionTitle', className: ButtonStyle + 'FirstButton', style: {}}, actionTitleChildren);
+							let actions = React.createElement('span', {key: 'actions', style: {}}, L10n.Term('.LBL_ACTIONS'));
 							actionTitleChildren.push(actions);
 							let iDown = React.createElement(FontAwesomeIcon, { icon: 'caret-down' });
-							let more = React.createElement('span', {className: ButtonStyle + 'MoreButton', style: {}}, iDown);
+							let more = React.createElement('span', {key: 'moreAction', className: ButtonStyle + 'MoreButton', style: {}}, iDown);
 							actionTitleChildren.push(more);
 							let navItem = React.createElement(NavItem, { id: 'pnlDynamicButtons', key: 'pnlDynamicButtons', title: actionTitle, alignRight: true, children: null}, pnlDynamicButtonsChildren);
 							pacificChildren.push(navItem);
@@ -259,12 +259,12 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 						{
 							if ( ButtonStyle == 'ListHeader' )
 							{
-								let more = React.createElement('input', {type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'bottom', height: '26px'}, src: themeURL + 'images/subpanel_more.gif', onClick: (e) => { e.preventDefault() }});
+								let more = React.createElement('input', {key: 'moreBtn', type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'bottom', height: '26px'}, src: themeURL + 'images/subpanel_more.gif', onClick: (e) => { e.preventDefault() }});
 								titleChildren.push(more);
 							}
 							else
 							{
-								let more = React.createElement('input', {type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'bottom'}, src: themeURL + 'images/moreWhite.gif', onClick: (e) => { e.preventDefault() }});
+								let more = React.createElement('input', {key: 'moreBtn', type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'bottom'}, src: themeURL + 'images/moreWhite.gif', onClick: (e) => { e.preventDefault() }});
 								titleChildren.push(more);
 							}
 							// 02/25/2022 Paul.  NavDropdownProps requires children parameter, though it does not seem to be used.  This error appeared with bootstrap 5. 
@@ -299,7 +299,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 				{
 					let titleChildren = [];
 					let title = React.createElement('span', {style: {verticalAlign: 'top'}}, titleChildren);
-					more = React.createElement('input', {type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'top', width: '20px', height: '20px'}, src: themeURL + 'images/datagrid_more.gif', onClick: (e) => { e.preventDefault() }});
+					more = React.createElement('input', {key: 'moreBtn', type: 'image', className: ButtonStyle + 'MoreButton', style: {verticalAlign: 'top', width: '20px', height: '20px'}, src: themeURL + 'images/datagrid_more.gif', onClick: (e) => { e.preventDefault() }});
 					titleChildren.push(more);
 				}
 				// 02/25/2022 Paul.  NavDropdownProps requires children parameter, though it does not seem to be used.  This error appeared with bootstrap 5. 
@@ -467,6 +467,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 						{
 							let props: any =
 							{
+								key: 'btnMore_' + MODULE_NAME + '_' + iButton,
 								type: 'submit',
 								className: ButtonStyle + 'OtherButton',
 								value: L10n.Term(CONTROL_TEXT),
@@ -515,6 +516,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 				{
 					let lnkProps: any = {};
 					let lnk: JSX.Element = null;
+					lnkProps.key = 'lnk_' + MODULE_NAME + '_' + iButton;
 					if ( !Sql.IsEmptyString(sCONTROL_ID) )
 					{
 						lnkProps.id = sCONTROL_ID;
@@ -551,6 +553,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 					{
 						let props: any =
 						{
+							key: 'lnkMore_' + MODULE_NAME + '_' + iButton,
 							type: 'submit',
 							className: ButtonStyle + 'OtherButton',
 								value: L10n.Term(CONTROL_TEXT),
@@ -588,6 +591,7 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 					{
 						let props: any =
 						{
+							key: 'blnkMore_' + MODULE_NAME + '_' + iButton,
 							type: 'submit',
 							className: ButtonStyle + 'OtherButton',
 							value: L10n.Term(CONTROL_TEXT),
@@ -1090,9 +1094,9 @@ class DynamicButtons extends React.Component<IDynamicButtonsProps, IDynamicButto
 			return (
 				<div style={ FrameStyle }>
 					{ this.LoadButtons() }
-					<ErrorComponent error={error} />
+					<ErrorComponent key='dynBtnError' error={error} />
 					{ busy
-					? <div id={ this.constructor.name + '_spinner' } style={ {textAlign: 'center'} }>
+					? <div key='dynBtnSpinner' id={ this.constructor.name + '_spinner' } style={ {textAlign: 'center'} }>
 						<FontAwesomeIcon icon="spinner" spin={ true } size="5x" />
 					</div>
 					: null

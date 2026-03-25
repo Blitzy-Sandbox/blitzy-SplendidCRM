@@ -726,7 +726,8 @@ namespace SplendidCRM.Web.Controllers
 					da.Fill(dt);
 					if (!dt.Columns.Contains("MODULE_ACLACCESS" )) dt.Columns.Add("MODULE_ACLACCESS" , typeof(string));
 					if (!dt.Columns.Contains("TARGET_ACLACCESS" )) dt.Columns.Add("TARGET_ACLACCESS" , typeof(string));
-					bool bHasTargetModule = dt.Columns.Contains("TARGET_MODULE");
+					// 03/25/2026 Paul.  Use TARGET_NAME column (not TARGET_MODULE which does not exist in vwDYNAMIC_BUTTONS).
+					bool bHasTargetModule = dt.Columns.Contains("TARGET_NAME");
 					string sLAST_VIEW_NAME = String.Empty;
 					List<Dictionary<string, object>> layout = null;
 					foreach (DataRow row in dt.Rows)
@@ -738,8 +739,9 @@ namespace SplendidCRM.Web.Controllers
 						if (!lstWithAdmin.Contains(sMODULE_NAME)) continue;
 						int nMODULE_ACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
 						row["MODULE_ACLACCESS"] = nMODULE_ACLACCESS.ToString();
-						string sTARGET_MODULE = bHasTargetModule ? Sql.ToString(row["TARGET_MODULE"]) : String.Empty;
-						int nTARGET_ACLACCESS = Sql.IsEmptyString(sTARGET_MODULE) ? -1 : _security.GetUserAccess(sTARGET_MODULE, "edit");
+						// 03/25/2026 Paul.  Read TARGET_NAME; when empty use 0 (neutral) instead of -1 (denied).
+						string sTARGET_MODULE = bHasTargetModule ? Sql.ToString(row["TARGET_NAME"]) : String.Empty;
+						int nTARGET_ACLACCESS = Sql.IsEmptyString(sTARGET_MODULE) ? 0 : _security.GetUserAccess(sTARGET_MODULE, "edit");
 						row["TARGET_ACLACCESS"] = nTARGET_ACLACCESS.ToString();
 						if (sLAST_VIEW_NAME != sVIEW_NAME)
 						{

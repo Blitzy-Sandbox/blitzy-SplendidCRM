@@ -548,10 +548,10 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 			return (
 			<div>
 				{ headerButtons
-				? React.createElement(headerButtons, { MODULE_NAME, ID, SUB_TITLE, enableFavorites: false, error, enableHelp: true, helpName: 'DetailView', ButtonStyle: 'ModuleHeader', VIEW_NAME: DETAIL_NAME + '.MyAccount', row: item, Page_Command: this.Page_Command, showButtons: true, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons, showProcess: false })
+				? React.createElement(headerButtons, { key: 'headerButtons', MODULE_NAME, ID, SUB_TITLE, enableFavorites: false, error, enableHelp: true, helpName: 'DetailView', ButtonStyle: 'ModuleHeader', VIEW_NAME: DETAIL_NAME + '.MyAccount', row: item, Page_Command: this.Page_Command, showButtons: true, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons, showProcess: false })
 				: null
 				}
-				<DumpSQL SQL={ __sql } />
+				<DumpSQL key='dumpSQL' SQL={ __sql } />
 				<PasswordPopupView
 					USER_ID={ ID }
 					isOpen={ passwordOpen }
@@ -570,14 +570,14 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 							<td style={ {width: '35%', verticalAlign: 'top'} } className='tabDetailViewDF'>{ item.USER_NAME }</td>
 						</tr>
 						<tr>
-							<td style={ {verticalAlign: 'top'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_STATUS') }</td>
-							<td style={ {verticalAlign: 'top'} } className='tabDetailViewDF'>{ L10n.ListTerm('user_status_dom', item.STATUS) }</td>
+							<td key='tdStatusLabel' style={ {verticalAlign: 'top'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_STATUS') }</td>
+							<td key='tdStatusField' style={ {verticalAlign: 'top'} } className='tabDetailViewDF'>{ L10n.ListTerm('user_status_dom', item.STATUS) }</td>
 							{ Crm_Config.enable_team_management()
-							? <td id='tdDEFAULT_TEAM_Label' style={ {verticalAlign: 'top'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_DEFAULT_TEAM') }</td>
+							? <td key='tdDEFAULT_TEAM_Label' id='tdDEFAULT_TEAM_Label' style={ {verticalAlign: 'top'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_DEFAULT_TEAM') }</td>
 							: null
 							}
 							{ Crm_Config.enable_team_management()
-							? <td id='tdDEFAULT_TEAM_Field' style={ {verticalAlign: 'top'} } className='tabDetailViewDF'>{ item.DEFAULT_TEAM_NAME }</td>
+							? <td key='tdDEFAULT_TEAM_Field' id='tdDEFAULT_TEAM_Field' style={ {verticalAlign: 'top'} } className='tabDetailViewDF'>{ item.DEFAULT_TEAM_NAME }</td>
 							: null
 							}
 						</tr>
@@ -591,11 +591,11 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 				</div>
 				<div id='divUserSettings'>
 					<table className='tabDetailView'>
-						<tbody><tr>
+						<tbody><tr key='trSettingsHeader'>
 							<th colSpan={ 3 } className='dataLabel'><h4>{ L10n.Term('Users.LBL_USER_SETTINGS') }</h4></th>
 						</tr>
 						{ Security.IS_ADMIN()
-						? <tr>
+						? <tr key='trIsAdmin'>
 							<td style={ {width: '20%'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_ADMIN') }</td>
 							<td style={ {width: '15%'} } className='tabDetailViewDF'><input type='checkbox' id='chkIS_ADMIN' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.IS_ADMIN } /></td>
 							<td style={ {width: '65%'} } className='tabDetailViewDF'>{ L10n.Term('Users.LBL_ADMIN_TEXT') }</td>
@@ -603,7 +603,7 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 						: null
 						}
 						{ SplendidCache.AdminUserAccess('Users', 'view') >= 0
-						? <tr>
+						? <tr key='trAdminDelegate'>
 							<td style={ {width: '20%'} } className='tabDetailViewDL'>{ L10n.Term('Users.LBL_ADMIN_DELEGATE') }</td>
 							<td style={ {width: '15%'} } className='tabDetailViewDF'><input type='checkbox' id='chkIS_ADMIN_DELEGATE' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.IS_ADMIN_DELEGATE } /></td>
 							<td style={ {width: '65%'} } className='tabDetailViewDF'>{ L10n.Term('Users.LBL_ADMIN_DELEGATE_TEXT') }</td>
@@ -611,7 +611,7 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 						: null
 						}
 						{ false
-						? <tr>
+						? <tr key='trPortalOnly'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_PORTAL_ONLY') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkPORTAL_ONLY' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.PORTAL_ONLY } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_PORTAL_ONLY_TEXT') }</td>
@@ -619,45 +619,45 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 						: null
 						}
 						{ true
-						? <tr>
+						? <tr key='trReceiveNotifications'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_RECEIVE_NOTIFICATIONS') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkRECEIVE_NOTIFICATIONS' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.RECEIVE_NOTIFICATIONS } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_RECEIVE_NOTIFICATIONS_TEXT') }</td>
 						</tr>
 						: null
 						}
-						<tr>
+						<tr key='trTheme'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_THEME') }</td>
 							<td className='tabDetailViewDF'>{ item.THEME }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_THEME_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trLanguage'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_LANGUAGE') }</td>
 							<td className='tabDetailViewDF'>{ item.LANGUAGE }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_LANGUAGE_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trDateFormat'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_DATE_FORMAT') }</td>
 							<td className='tabDetailViewDF'>{ item.DATE_FORMAT }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_DATE_FORMAT_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trTimeFormat'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_TIME_FORMAT') }</td>
 							<td className='tabDetailViewDF'>{ item.TIME_FORMAT }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_TIME_FORMAT_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trTimezone'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_TIMEZONE') }</td>
 							<td className='tabDetailViewDF'>{ item.TIMEZONE }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_TIMEZONE_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trCurrency'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_CURRENCY') }</td>
 							<td className='tabDetailViewDF'>{ item.CURRENCY }</td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_CURRENCY_TEXT') }</td>
 						</tr>
 						{ false
-						? <tr>
+						? <tr key='trReminder'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_REMINDER') }</td>
 							<td className='tabDetailViewDF'>
 								<input type='checkbox' id='chkREMINDER' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.REMINDER } />
@@ -666,23 +666,23 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 						</tr>
 						: null
 						}
-						<tr>
+						<tr key='trSaveQuery'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_SAVE_QUERY') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkSAVE_QUERY' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.SAVE_QUERY } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_SAVE_QUERY_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trGroupTabs'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_GROUP_TABS') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkGROUP_TABS' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.GROUP_TABS } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_GROUP_TABS_TEXT') }</td>
 						</tr>
-						<tr>
+						<tr key='trSubpanelTabs'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_SUBPANEL_TABS') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkSUBPANEL_TABS' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.SUBPANEL_TABS } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_SUBPANEL_TABS_TEXT') }</td>
 						</tr>
 						{ Security.IS_ADMIN()
-						? <tr>
+						? <tr key='trSysGenPassword'>
 							<td className='tabDetailViewDL'>{ L10n.Term('Users.LBL_SYSTEM_GENERATED_PASSWORD') }</td>
 							<td className='tabDetailViewDF'><input type='checkbox' id='chkSYSTEM_GENERATED_PASSWORD' disabled={ true } className='checkbox' style={ styCheckbox } checked={ item.SYSTEM_GENERATED_PASSWORD } /></td>
 							<td className='tabDetailViewDF'>{ L10n.Term('Users.LBL_SYSTEM_GENERATED_PASSWORD') }</td>
@@ -698,9 +698,10 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 					{ SplendidDynamic_DetailView.AppendDetailViewFields(item, layout, this.refMap, 'tabDetailView', null, this.Page_Command) }
 				</div>
 				<div id='divMailOptions' style={ {marginTop: '10px'} }>
-					<h4>{ L10n.Term('Users.LBL_MAIL_OPTIONS_TITLE') }</h4>
+					<h4 key='hMailOptionsTitle'>{ L10n.Term('Users.LBL_MAIL_OPTIONS_TITLE') }</h4>
 					{ bExchangeEnabled
 					? <DynamicButtons
+						key='btnExchangeSync'
 						ButtonStyle='ListHeader'
 						VIEW_NAME='Users.ExchangeSync'
 						row={ item }
@@ -715,9 +716,10 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 				</div>
 				{ bGoogleAppsEnabled
 				? <div id='pnlGoogleAppsOptions' style={ {marginTop: '10px'} }>
-					<h4>{ L10n.Term('Users.LBL_GOOGLEAPPS_OPTIONS_TITLE') }</h4>
+					<h4 key='hGoogleTitle'>{ L10n.Term('Users.LBL_GOOGLEAPPS_OPTIONS_TITLE') }</h4>
 					{ !Sql.IsEmptyString(item.GOOGLEAPPS_USERNAME)
 					? <DynamicButtons
+						key='btnGoogleSync'
 						ButtonStyle='ListHeader'
 						VIEW_NAME='Users.GoogleSync'
 						row={ item }
@@ -734,9 +736,10 @@ class MyAccountView extends React.Component<IDetailViewProps, IDetailViewState>
 				}
 				{ biCloudEnabled
 				? <div id='pnlICloudOptions' style={ {marginTop: '10px'} }>
-					<h4>{ L10n.Term('Users.LBL_ICLOUD_OPTIONS_TITLE') }</h4>
+					<h4 key='hICloudTitle'>{ L10n.Term('Users.LBL_ICLOUD_OPTIONS_TITLE') }</h4>
 					{ !Sql.IsEmptyString(item.ICLOUD_USERNAME)
 					? <DynamicButtons
+						key='btnICloudSync'
 						ButtonStyle='ListHeader'
 						VIEW_NAME='Users.iCloudSync'
 						row={ item }

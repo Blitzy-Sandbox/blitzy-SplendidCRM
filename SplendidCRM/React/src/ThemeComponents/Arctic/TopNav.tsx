@@ -964,7 +964,7 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 							{
 								// 06/30/2021 Paul.  Provide the URL to the module so that right-click-new-tab would navigate to the correct location. 
 								this.tabsSecondary.map((tabMenu) => (
-									<a href={ this.moduleUrl(tabMenu.MODULE_NAME, null) } className='otherTabMoreLink' style={ {minWidth: '10rem'} } onClick={ (e) => { e.preventDefault(); this._onModuleClick(tabMenu.MODULE_NAME); } }>{ L10n.Term(tabMenu.DISPLAY_NAME) }</a>
+									<a key={ 'secondary_' + tabMenu.MODULE_NAME } href={ this.moduleUrl(tabMenu.MODULE_NAME, null) } className='otherTabMoreLink' style={ {minWidth: '10rem'} } onClick={ (e) => { e.preventDefault(); this._onModuleClick(tabMenu.MODULE_NAME); } }>{ L10n.Term(tabMenu.DISPLAY_NAME) }</a>
 								))
 							}
 							</td>
@@ -1171,12 +1171,12 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 <div id='divHeader' style={ {marginTop: '48px'} }>
 	<div id='ctlSixToolbar' className='divSixToolbar' ref={ this.ctlSixToolbar }>
 		<table cellSpacing={ 0 } cellPadding={ 0 } style={ {borderCollapse: 'collapse'} } className='SixToolbar'>
-			<tr>
-				<td>
+			<tbody data-test='sixToolbarBody'><tr>
+				<td key='menuCell'>
 					<div id='divTabMenu'>
 						<table id='ctlSixToolbar_ctlTabMenu_tblSixMenu' className='tabToolbarFrame' cellSpacing={ 0 } cellPadding={ 0 } style={ {borderCollapse: 'collapse'} } >
-							<tr>
-								<td id='ctlSixToolbar_tabToolbar_Home'
+							<tbody><tr>
+								<td key='home' id='ctlSixToolbar_tabToolbar_Home'
 									className='otherHome'
 									style={ {backgroundImage: 'url(' + sCompanyHomeImage + ')'} }
 									ref={ (element) => this.moduleTabRef(element, 'Home') }
@@ -1189,7 +1189,7 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 								this.tabsPrimary.map((tabMenu, index) => 
 								{
 									// 06/30/2021 Paul.  Provide the URL to the module so that right-click-new-tab would navigate to the correct location. 
-									return (<td valign='bottom'>
+									return (<td key={ 'primary_' + tabMenu.MODULE_NAME } valign='bottom'>
 									<table id={ 'ctlSixToolbar_tabToolbar_' + tabMenu.MODULE_NAME } className='tabToolbarFrame' cellSpacing={ 0 } cellPadding={ 0 }
 										ref={ (element) => this.moduleTabRef(element, tabMenu.MODULE_NAME) }
 										onMouseOver={ (e) => this.moduleTabMouseOver(e, tabMenu.MODULE_NAME) }
@@ -1207,7 +1207,7 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 								})
 							}
 							{ this.tabsSecondary.length > 0
-							? <td style={ {display: 'inline', verticalAlign: 'bottom'} }>
+							? <td key='more' style={ {display: 'inline', verticalAlign: 'bottom'} }>
 								<table id='ctlSixToolbar_tabToolbar__more' className='tabToolbarFrame' cellSpacing={ 0 } cellPadding={ 0 }
 									ref={ (element) => this.moduleTabRef(element, 'more') }
 									onMouseOver={ (e) => this.moduleTabMouseOver(e, 'more') }
@@ -1224,12 +1224,12 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 								</td>
 							: null
 							}
-							</tr>
+							</tr></tbody>
 						</table>
 					</div>
 				</td>
 				{ showUnifiedSearch && unifiedSearchItems > 0
-				? <td align='right' valign='middle'>
+				? <td key='searchCell' align='right' valign='middle'>
 					<div id='ctlSixToolbar_cntUnifiedSearch'
 						ref={ (element) => this.moduleTabRef(element, 'unifiedSearch') }
 						onMouseOver={ (e) => this.moduleTabMouseOver(e, 'unifiedSearch') }
@@ -1261,18 +1261,18 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 				</td>
 				: null
 				}
-				<td width='100%' className='tabRow'
+				<td key='trailingCell' width='100%' className='tabRow'
 					ref={ (element) => this.moduleTabRef(element, 'trailingblank') }
 					onMouseOver={ (e) => this.moduleTabMouseOver(e, 'trailingblank') }
 					onMouseOut={ (e) => this.moduleTabMouseOut(e, 'trailingblank') }
 				>
 					<img src={ this.themeURL + 'images/blank.gif' } style={ {borderWidth: '0px', height: '1px', width: '1px'} } />
 				</td>
-			</tr>
+			</tr></tbody>
 		</table>
 		<table cellSpacing={ 0 } cellPadding={ 0 } className='SixToolbarUser' style={ {borderCollapse: 'collapse'} }>
-			<tr>
-				<td valign='bottom' className='otherUserLeftBorder'>
+			<tbody><tr>
+				<td key='userCtxCell' valign='bottom' className='otherUserLeftBorder'>
 					<table id='ctlSixToolbar_tabToolbar_userContextMenu' className='tabToolbarFrame' cellSpacing={ 0 } cellPadding={ 0 } style={ {height: '100%'} }
 						ref={ (element) => this.moduleTabRef(element, 'userContextMenu') }
 						onMouseOver={ (e) => this.moduleTabMouseOver(e, 'userContextMenu') }
@@ -1293,7 +1293,7 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 					</table>
 				</td>
 				{ showQuickCreate
-				? <td valign='bottom' className='otherUserLeftBorder' width='32'>
+				? <td key='quickCreateCell' valign='bottom' className='otherUserLeftBorder' width='32'>
 					<table id='ctlSixToolbar_tabToolbar_quickCreate' className='tabToolbarFrame' cellSpacing={ 0 } cellPadding={ 0 } style={ {height: '100%'} }
 						ref={ (element) => this.moduleTabRef(element, 'quickCreate') }
 						onMouseOver={ (e) => this.moduleTabMouseOver(e, 'quickCreate') }
@@ -1310,7 +1310,7 @@ class ArcticTopNav extends React.Component<ITopNavProps, ITopNavState>
 				</td>
 				: null
 				}
-			</tr>
+			</tr></tbody>
 		</table>
 	</div>
 </div>

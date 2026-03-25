@@ -308,3 +308,28 @@ pre
 	display: block;
 }
 
+/* WCAG 2.4.7 — Visible focus indicator for keyboard navigation (Issue #16) */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus,
+a:focus,
+[tabindex]:focus
+{
+	outline: 2px solid #4A90D9;
+	outline-offset: 1px;
+	box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.3);
+}
+
+/* Use :focus-visible where supported to avoid showing focus ring on mouse clicks */
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible)
+{
+	outline: none;
+	box-shadow: none;
+}
+

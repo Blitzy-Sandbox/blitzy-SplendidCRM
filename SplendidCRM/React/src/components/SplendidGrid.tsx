@@ -1959,17 +1959,24 @@ class SplendidGrid extends React.Component<ISplendidGridProps, ISplendidGridStat
 
 	private _onNextPage = ({page, onPageChange, sizePerPage, totalSize}) =>
 	{
-		if ( page * sizePerPage < totalSize )
+		// Bypass the library's onPageChange callback and call our handler directly
+		// to avoid stale page state issues with react-bootstrap-table-next under React 19
+		const currentPage = this.state.activePage || page;
+		const pageSize = this.state.TOP || sizePerPage;
+		if ( currentPage * pageSize < totalSize )
 		{
-			onPageChange(page + 1);
+			this._onPageChange(currentPage + 1, pageSize);
 		}
 	}
 
 	private _onPrevPage = ({page, onPageChange}) =>
 	{
-		if ( page > 1 )
+		// Bypass the library's onPageChange callback and call our handler directly
+		// to avoid stale page state issues with react-bootstrap-table-next under React 19
+		const currentPage = this.state.activePage || page;
+		if ( currentPage > 1 )
 		{
-			onPageChange(page - 1);
+			this._onPageChange(currentPage - 1, this.state.TOP);
 		}
 	}
 
@@ -2282,7 +2289,7 @@ class SplendidGrid extends React.Component<ISplendidGridProps, ISplendidGridStat
 			{
 				styCheckbox.transform = 'scale(1.0)';
 			}
-			return React.createElement('input', { type: mode, checked, className, style: styCheckbox, ref: function ref(input: any)
+			return React.createElement('input', { type: mode, checked, className, style: styCheckbox, onChange: function onChange() {}, ref: function ref(input: any)
 			{
 				if ( input )
 					input.indeterminate = indeterminate;
@@ -2511,7 +2518,7 @@ class SplendidGrid extends React.Component<ISplendidGridProps, ISplendidGridStat
 										checked={ isPageSelected }
 										className='selection-input-4' 
 										style={ {transform: 'scale(1.5)', verticalAlign: 'text-top', marginLeft: '5px', marginRight: '10px'} }
-										onClick={ this._onPacificSelection }
+										onChange={ this._onPacificSelection }
 										ref={ (element) => this.refPacificSelection(element) }
 									/>
 									<span style={ {marginRight: '10px'} }>{ checkedCount > 0 ? lblSelectedLabel : null }</span>

@@ -203,7 +203,8 @@ export async function ListView_ExportModule(sMODULE_NAME: string, sSORT_FIELD: s
 	else
 	{
 		let sBody: string = JSON.stringify(obj);
-		let res: Response = await CreateSplendidRequest('Import/ExportModule.aspx', 'POST', 'application/octet-stream', sBody);
+		// Use the REST API endpoint instead of the legacy WebForms page (which doesn't exist in .NET 10)
+		let res: Response = await CreateSplendidRequest('Rest.svc/ExportModuleList', 'POST', 'application/octet-stream', sBody);
 
 		// https://stackoverflow.com/questions/16086162/handle-file-download-from-ajax-post
 		let filename   : string = '';

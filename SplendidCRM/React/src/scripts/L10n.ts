@@ -80,15 +80,27 @@ export default class L10n
 		try
 		{
 			var sTerm = SplendidCache.Terminology(sEntryName);
-			if ( sTerm == null )
+			// 03/25/2026 Fix.  SplendidCache.Terminology() returns the key itself (not null) when
+			// the entry is not found in the cache.  For list terms, this means it returns
+			// '.list_name.value' which is the dot-prefixed key format.  Detect this case by
+			// checking if the returned value equals the lookup key — if so, treat as not found.
+			if ( sTerm == null || sTerm === sEntryName )
 			{
 				if ( !Sql.IsEmptyString(sNAME) )
 				{
+					// Fallback: look up the display name from TERMINOLOGY_LIST_VALUES
+					// which preserves the {key: displayName} mapping from the backend
+					let sDisplayName: string = SplendidCache.TerminologyListDisplayName(sLIST_NAME, Sql.ToString(sNAME));
+					if ( sDisplayName !== Sql.ToString(sNAME) )
+					{
+						return sDisplayName;
+					}
 					if ( SplendidCache.IsInitialized )
 					{
 						//console.log('Term not found: ' + sEntryName);
 					}
-					return sEntryName;
+					// Return the raw name without the dot-prefix pattern
+					return Sql.ToString(sNAME);
 				}
 				else
 				{
