@@ -96,7 +96,7 @@ const SourceHeader: FC<ISourceHeaderProps> = memo(function SourceHeader(props: I
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SourceHeader' + ' collected', collect, dropCollect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DynamicLayoutComponents-Shared-SourceHeader'
 				style={ { ...style } }>
 				{ TITLE }

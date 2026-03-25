@@ -10,6 +10,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
+import type { JSX } from 'react';
 import { RouteComponentProps, withRouter }                  from '../Router5'                       ;
 import { FontAwesomeIcon }                                  from '@fortawesome/react-fontawesome'         ;
 import { observer }                                         from 'mobx-react'                             ;

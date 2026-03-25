@@ -72,7 +72,7 @@ const SourceTemplateColumn: FC<ISourceTemplateColumnProps> = memo(function Sourc
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SourceTemplateColumn' + ' collected', collect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				style={ { ...style } }>
 				{ TITLE }
 			</div>

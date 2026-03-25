@@ -95,7 +95,7 @@ const SourceBlank: FC<ISourceBlankProps> = memo(function SourceBlank(props: ISou
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SourceBlank' + ' collected', collect, dropCollect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DynamicLayoutComponents-Shared-SourceBlank'
 				style={ { ...style } }>
 				{ TITLE }

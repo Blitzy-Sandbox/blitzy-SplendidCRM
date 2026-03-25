@@ -72,7 +72,7 @@ const SourceRow: FC<ISourceRowProps> = memo(function SourceRow(props: ISourceRow
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SourceRow' + ' collected', collect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DynamicLayoutComponents-Shared-SourceRow'
 				style={ { ...style } }>
 				{ TITLE }

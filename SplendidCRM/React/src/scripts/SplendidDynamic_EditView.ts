@@ -10,6 +10,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
+import type { JSX } from 'react';
 import { FontAwesomeIcon }                   from '@fortawesome/react-fontawesome'      ;
 // 2. Store and Types. 
 import { EditComponent }                     from '../types/EditComponent'              ;
