@@ -1,5 +1,5 @@
 import L10n from '../../../../scripts/L10n';
-var assign = require( 'lodash/object/assign' );
+import assign from 'lodash/assign';
 
 /**********************************************************************************************************************
  * SplendidCRM is a Customer Relationship Management program created by SplendidCRM Software, Inc. 
