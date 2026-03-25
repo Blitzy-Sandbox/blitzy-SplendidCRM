@@ -85,6 +85,11 @@ class AdministrationView extends React.Component<IAdministrationViewProps, IAdmi
 				for (let i = 0; i < ADMIN_MENU.length; i++)
 				{
 					let category = ADMIN_MENU[i];
+					// 03/25/2026 Fix.  Guard against null/undefined MODULES property.
+					// When backend returns empty ADMIN_MENU or categories with null MODULES,
+					// accessing .length on null causes TypeError crash.
+					if ( !category || !category.MODULES || !Array.isArray(category.MODULES) )
+						continue;
 
 					for (let j = 0; j < category.MODULES.length; j++)
 					{
@@ -594,7 +599,8 @@ class AdministrationView extends React.Component<IAdministrationViewProps, IAdmi
 							<h3>{ adminPanel.TITLE }</h3>
 						</div>
 						<div className='tabDetailView2' style={ {width: '100%', display: 'flex', flexFlow: 'row wrap'} }>
-							{ adminPanel.MODULES.map((adminModule: AdminModule) => (
+							{ /* 03/25/2026 Fix.  Guard against null/undefined MODULES to prevent crash. */ }
+							{ (adminPanel.MODULES || []).map((adminModule: AdminModule) => (
 								<div style={ {width: '100%', display: 'flex', flexFlow: 'row wrap', flex: '1 0 50%'} }>
 									<div className='tabDetailViewDL2' style={ {width: '40%'} }>
 										{ adminModule.MODULE_NAME
@@ -614,7 +620,7 @@ class AdministrationView extends React.Component<IAdministrationViewProps, IAdmi
 									</div>
 								</div>))
 							}
-							{ adminPanel.MODULES.length % 2 == 1
+							{ (adminPanel.MODULES || []).length % 2 == 1
 							? <div style={ {width: '100%', display: 'flex', flexFlow: 'row wrap', flex: '1 0 50%'} }>
 								<div className='tabDetailViewDL2' style={ {width: '40%'} }></div>
 								<div className='tabDetailViewDF2' style={ {width: '60%'} }></div>

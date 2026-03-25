@@ -107,11 +107,14 @@ initConfig();
 const runtimeConfig = getConfig();
 if ( runtimeConfig.API_BASE_URL )
 {
-	sRemoteServer = runtimeConfig.API_BASE_URL;
-	if ( !sRemoteServer.endsWith('/') )
-	{
-		sRemoteServer += '/';
-	}
+	// 03/25/2026 Fix.  In the decoupled SPA architecture, RemoteServer is used to construct
+	// asset URLs (logo images, theme CSS, navigation links) — NOT API URLs.
+	// API communication is handled by SplendidRequest.ts using config.API_BASE_URL directly.
+	// Setting RemoteServer to '/' makes all asset URLs relative to the SPA origin,
+	// where Vite dev proxy (development) or Nginx (production) routes them to the backend.
+	// Using the full API_BASE_URL here would cause logo images, theme images, and
+	// navigation links to point directly at the backend (wrong origin for decoupled SPA).
+	sRemoteServer = '/';
 }
 else
 {

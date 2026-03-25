@@ -67,11 +67,8 @@ export default class Collapsable extends React.Component<ICollapsableProps, ICol
 						{this.props.name}
 					</h3>
 				</div>
-				<div style={ {overflow: (open ? 'visible' : 'hidden'), height: (open ? 'auto' : '0'), transition: 'height 0.3s ease'} }>
-					{ open
-					? this.props.children
-					: null
-					}
+				<div style={ {overflow: 'hidden', maxHeight: (open ? '5000px' : '0'), transition: 'max-height 0.3s ease-in-out'} }>
+					{ this.props.children }
 				</div>
 			</React.Fragment>
 		);

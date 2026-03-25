@@ -1975,8 +1975,11 @@ class SplendidGrid extends React.Component<ISplendidGridProps, ISplendidGridStat
 
 	private _renderPageTotal = (from, to, totalSize) =>
 	{
+		// 03/25/2026 Fix.  Prevent NaN display when totalSize is undefined or NaN.
+		let nTotal = (typeof totalSize === 'number' && !isNaN(totalSize)) ? totalSize : 0;
+		let nTo    = (typeof to === 'number' && !isNaN(to)) ? to : 0;
 		return (<span className='react-bootstrap-table-pagination-total'>
-			{ from } - { to } { L10n.Term('.LBL_LIST_OF') } { totalSize }</span>);
+			{ from } - { nTo } { L10n.Term('.LBL_LIST_OF') } { nTotal }</span>);
 	}
 
 	// 06/21/2025 Paul.  A customer needs external access. 

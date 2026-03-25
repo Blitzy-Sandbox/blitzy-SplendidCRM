@@ -119,6 +119,18 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
+      // Static theme assets (images, CSS) served from the backend's App_Themes directory.
+      // In the original same-origin architecture these were served directly by ASP.NET.
+      // In the decoupled SPA, Credentials.RemoteServer returns '/' so all theme URLs
+      // are relative — the Vite dev server proxies them to the backend.
+      '/App_Themes': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/Include': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
 

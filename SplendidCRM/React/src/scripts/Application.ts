@@ -28,6 +28,103 @@ const storeName: string = 'SplendidCRMReactClient';
 // 07/14/2021 Paul.  Don't cache on the mobile apps. 
 let enableReactStateCache: boolean = !window.cordova;
 
+// 03/25/2026 Fix.  The .NET 10 backend (Prompt 1) serializes with System.Text.Json which
+// can emit camelCase property names. The React frontend expects UPPER_CASE keys throughout
+// (CONFIG, TERMINOLOGY, MODULE_ACL_ACCESS, etc.). These helper functions normalize response
+// keys to the UPPER_CASE format the frontend relies on, enabling transparent compatibility
+// with both old (Newtonsoft UPPER_CASE) and new (System.Text.Json camelCase) backends.
+
+/**
+ * Converts a camelCase or PascalCase string to UPPER_SNAKE_CASE.
+ * Examples: 'moduleAclAccess' → 'MODULE_ACL_ACCESS', 'config' → 'CONFIG',
+ *           'tabMenu' → 'TAB_MENU', 'editviewsFields' → 'EDITVIEWS_FIELDS'
+ */
+function camelToUpperSnake(str: string): string
+{
+	if ( !str || str === str.toUpperCase() )
+	{
+		return str; // Already UPPER_CASE or empty
+	}
+	return str
+		.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+		.toUpperCase();
+}
+
+/**
+ * Normalizes the top-level keys of a GetReactLoginState response.
+ * The .NET 10 backend may return keys like 'loginConfig' instead of 'CONFIG'.
+ * This function maps known camelCase login-specific key names to the expected format.
+ */
+function normalizeLoginStateKeys(d: any): any
+{
+	if ( !d || typeof d !== 'object' )
+	{
+		return d;
+	}
+	// If expected UPPER_CASE keys already exist, no normalization needed
+	if ( d.CONFIG !== undefined || d.TERMINOLOGY !== undefined )
+	{
+		return d;
+	}
+	const loginKeyMap: Record<string, string> =
+	{
+		'config'               : 'CONFIG',
+		'loginConfig'          : 'CONFIG',
+		'terminology'          : 'TERMINOLOGY',
+		'loginTerminology'     : 'TERMINOLOGY',
+		'terminologyLists'     : 'TERMINOLOGY_LISTS',
+		'terminology_Lists'    : 'TERMINOLOGY_LISTS',
+		'loginTerminologyLists': 'TERMINOLOGY_LISTS',
+		'reactCustomViews'     : 'REACT_CUSTOM_VIEWS',
+		'react_Custom_Views'   : 'REACT_CUSTOM_VIEWS',
+		'authentication'       : 'AUTHENTICATION',
+		'singleSignOnSettings' : 'SingleSignOnSettings',
+	};
+	const normalized: any = {};
+	for ( const key of Object.keys(d) )
+	{
+		const mappedKey = loginKeyMap[key] || key;
+		normalized[mappedKey] = d[key];
+	}
+	return normalized;
+}
+
+/**
+ * Normalizes the top-level keys of a GetReactState (or Admin GetReactState) response.
+ * The .NET 10 backend may return camelCase keys instead of the UPPER_SNAKE_CASE format
+ * expected by all SplendidCache.Set*() methods. This function converts any camelCase
+ * keys to UPPER_SNAKE_CASE while preserving keys that are already in the expected format.
+ */
+function normalizeReactStateKeys(d: any): any
+{
+	if ( !d || typeof d !== 'object' )
+	{
+		return d;
+	}
+	// If well-known UPPER_CASE keys already exist, assume format is correct
+	if ( d.CONFIG !== undefined && d.MODULES !== undefined )
+	{
+		return d;
+	}
+	const normalized: any = {};
+	for ( const key of Object.keys(d) )
+	{
+		const upperKey = camelToUpperSnake(key);
+		normalized[upperKey] = d[key];
+	}
+	// Preserve special mixed-case keys that should not be converted
+	// (e.g., 'SessionStateTimeout' remains as-is for cache storage)
+	if ( d.SessionStateTimeout !== undefined )
+	{
+		normalized['SessionStateTimeout'] = d.SessionStateTimeout;
+	}
+	if ( d.sessionStateTimeout !== undefined )
+	{
+		normalized['SessionStateTimeout'] = d.sessionStateTimeout;
+	}
+	return normalized;
+}
+
 export async function Application_UpdateStoreLastDate()
 {
 	try
@@ -101,13 +198,20 @@ export async function Application_GetReactLoginState(): Promise<any>
 	//let dtEnd = new Date();
 	//let nSeconds = Math.round((dtEnd.getTime() - dtStart.getTime()) / 1000);
 	//console.log((new Date()).toISOString() + ' ' + 'Application_GetReactLoginState', json.d);
+	// 03/25/2026 Fix.  Normalize camelCase keys from .NET 10 backend to UPPER_CASE.
+	// The backend may return {loginConfig, loginTerminology, loginTerminologyLists}
+	// instead of {CONFIG, TERMINOLOGY, TERMINOLOGY_LISTS}.
+	json.d = normalizeLoginStateKeys(json.d);
 	// 07/12/2019 Paul.  Don't overwrite valid values. 
 	if ( jsonReactState == null )
 	{
 		// 02/17/2020 Paul.  Update the theme as soon as we have the default. 
-		Credentials.sUSER_THEME = json.d.CONFIG['default_theme'];
-		SplendidCache.SetCONFIG(json.d.CONFIG);
-		Credentials.sUSER_LANG = json.d.CONFIG['default_language'];
+		if ( json.d.CONFIG )
+		{
+			Credentials.sUSER_THEME = json.d.CONFIG['default_theme'];
+			SplendidCache.SetCONFIG(json.d.CONFIG);
+			Credentials.sUSER_LANG = json.d.CONFIG['default_language'];
+		}
 		SplendidCache.SetTERMINOLOGY(json.d.TERMINOLOGY);
 		// 12/10/2022 Paul.  Allow Login Terminology Lists to be customized. 
 		SplendidCache.SetTERMINOLOGY_LISTS        (json.d.TERMINOLOGY_LISTS        );
@@ -268,7 +372,9 @@ export async function Application_GetReactState(source): Promise<any>
 		console.error((new Date()).toISOString() + ' ' + 'Application_GetReactState missing data');
 		return;
 	}
-	else if ( json.d.TERMINOLOGY == null || json.d.TERMINOLOGY.length == 0 )
+	// 03/25/2026 Fix.  Normalize camelCase keys from .NET 10 backend to UPPER_CASE.
+	json.d = normalizeReactStateKeys(json.d);
+	if ( json.d.TERMINOLOGY == null || json.d.TERMINOLOGY.length == 0 )
 	{
 		console.warn((new Date()).toISOString() + ' ' + 'Application_GetReactState missing data', json.d.TERMINOLOGY);
 	}
@@ -290,8 +396,9 @@ export async function Application_GetReactState(source): Promise<any>
 			await db.put(storeName, responseText , 'GetReactState'           );
 			await db.put(storeName, now.getTime(), 'GetReactState.LastDate'  );
 			await db.put(storeName, false        , 'GetReactState.AdminState');
-			await db.put(storeName, json.d.USER_PROFILE.USER_SESSION, 'GetReactState.USER_SESSION'       );
-			await db.put(storeName, json.d.SessionStateTimeout      , 'GetReactState.SessionStateTimeout');
+			let userProfile = json.d.USER_PROFILE;
+			await db.put(storeName, userProfile ? userProfile.USER_SESSION : null, 'GetReactState.USER_SESSION'       );
+			await db.put(storeName, json.d.SessionStateTimeout                  , 'GetReactState.SessionStateTimeout');
 		}
 	}
 	catch(error)
@@ -522,7 +629,9 @@ export async function Admin_GetReactState(sCaller?: string): Promise<any>
 		console.error((new Date()).toISOString() + ' ' + 'Admin_GetReactState missing data', json);
 		return;
 	}
-	else if ( json.d.TERMINOLOGY == null || json.d.TERMINOLOGY.length == 0 )
+	// 03/25/2026 Fix.  Normalize camelCase keys from .NET 10 backend to UPPER_CASE.
+	json.d = normalizeReactStateKeys(json.d);
+	if ( json.d.TERMINOLOGY == null || json.d.TERMINOLOGY.length == 0 )
 	{
 		console.warn((new Date()).toISOString() + ' ' + 'Admin_GetReactState missing data', json.d.TERMINOLOGY);
 	}
@@ -544,8 +653,9 @@ export async function Admin_GetReactState(sCaller?: string): Promise<any>
 			await db.put(storeName, responseText , 'GetReactState'           );
 			await db.put(storeName, now.getTime(), 'GetReactState.LastDate'  );
 			await db.put(storeName, true         , 'GetReactState.AdminState');
-			await db.put(storeName, json.d.USER_PROFILE.USER_SESSION, 'GetReactState.USER_SESSION'       );
-			await db.put(storeName, json.d.SessionStateTimeout      , 'GetReactState.SessionStateTimeout');
+			let userProfile = json.d.USER_PROFILE;
+			await db.put(storeName, userProfile ? userProfile.USER_SESSION : null, 'GetReactState.USER_SESSION'       );
+			await db.put(storeName, json.d.SessionStateTimeout                  , 'GetReactState.SessionStateTimeout');
 		}
 	}
 	catch(error)

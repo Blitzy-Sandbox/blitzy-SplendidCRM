@@ -239,7 +239,19 @@ export async function Login(username: string, password: string): Promise<any>
 	});
 	let res = await CreateSplendidRequest('Rest.svc/Login', 'POST', 'application/json; charset=UTF-8', sBody);
 	let json = await GetSplendidResult(res);
-	if ( json.d.length == 36 && !StartsWith(json.d, 'https://') )
+	// 03/25/2026 Fix.  The .NET 10 backend may return an object {USER_ID: "guid", ...}
+	// instead of a plain GUID string.  Normalize to a string for backward-compatible handling.
+	let loginResult: any = json.d;
+	if ( loginResult && typeof loginResult === 'object' && !Array.isArray(loginResult) )
+	{
+		// Extract USER_ID (or user_id / userId for case-insensitive backend serialization).
+		const userId = loginResult.USER_ID || loginResult.user_id || loginResult.userId || loginResult.Id || '';
+		if ( userId )
+		{
+			loginResult = userId;
+		}
+	}
+	if ( typeof loginResult === 'string' && loginResult.length == 36 && !StartsWith(loginResult, 'https://') )
 	{
 		lastIsAuthenticated = 0;
 		// 05/13/2018 Paul.  We will likely want to move the location where we save the credentials. 
@@ -257,9 +269,9 @@ export async function Login(username: string, password: string): Promise<any>
 		return Credentials.sUSER_ID;
 	}
 	// 08/07/2025 Paul.  Add support for DuoUniversal. 
-	else if ( Crm_Config.ToBoolean('DuoUniversal.Enabled') && StartsWith(json.d, 'https://') )
+	else if ( Crm_Config.ToBoolean('DuoUniversal.Enabled') && typeof loginResult === 'string' && StartsWith(loginResult, 'https://') )
 	{
-		return json.d;
+		return loginResult;
 	}
 	else
 	{
@@ -279,10 +291,20 @@ export async function LoginDuoUniversal(code: string, state: string): Promise<an
 	});
 	let res = await CreateSplendidRequest('Rest.svc/LoginDuoUniversal', 'POST', 'application/json; charset=UTF-8', sBody);
 	let json = await GetSplendidResult(res);
-	if ( json.d.length == 36 )
+	// 03/25/2026 Fix.  Same object-vs-string normalization as Login().
+	let duoResult: any = json.d;
+	if ( duoResult && typeof duoResult === 'object' && !Array.isArray(duoResult) )
+	{
+		const userId = duoResult.USER_ID || duoResult.user_id || duoResult.userId || duoResult.Id || '';
+		if ( userId )
+		{
+			duoResult = userId;
+		}
+	}
+	if ( typeof duoResult === 'string' && duoResult.length == 36 )
 	{
 		lastIsAuthenticated = 0;
-		return json.d;
+		return duoResult;
 	}
 	else
 	{
@@ -429,7 +451,15 @@ export async function GetMyUserProfile(): Promise<any>
 {
 	let res = await CreateSplendidRequest('Rest.svc/GetMyUserProfile', 'GET');
 	let json = await GetSplendidResult(res);
-	json.d.__sql = json.__sql;
-	return json.d;
+	// 03/25/2026 Fix.  The .NET 10 backend returns the profile data as {d:{d:{...}}} instead of
+	// {d:{results:{...}}}.  Callers (Wizard.tsx, EditView.tsx, MyAccountView.tsx) all access
+	// d.results to get the user profile item.  Normalize the response so d.results is always populated.
+	let result = json.d || {};
+	if ( result.results === undefined && result.d !== undefined )
+	{
+		result.results = result.d;
+	}
+	result.__sql = json.__sql;
+	return result;
 }
 

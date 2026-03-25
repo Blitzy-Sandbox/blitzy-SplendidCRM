@@ -203,12 +203,14 @@ class CredentialsStore
 			}
 			else
 			{
-				// Fall back to runtime config API_BASE_URL if RemoteServer not explicitly set
-				const apiBaseUrl = getConfig().API_BASE_URL;
-				if ( apiBaseUrl )
-				{
-					this.sREMOTE_SERVER = apiBaseUrl.endsWith('/') ? apiBaseUrl : apiBaseUrl + '/';
-				}
+				// 03/25/2026 Fix.  In the decoupled SPA architecture, static assets
+				// (App_Themes images, Include/images, company logos) must be served from
+				// the SAME ORIGIN as the React application — NOT from the backend API.
+				// Using '/' ensures relative URLs that route through the Vite dev proxy
+				// in development, and through Nginx in production.
+				// API calls in SplendidRequest.ts use getConfig().API_BASE_URL directly
+				// (not RemoteServer), so this change does NOT affect API communication.
+				this.sREMOTE_SERVER = '/';
 			}
 		}
 		return this.sREMOTE_SERVER;

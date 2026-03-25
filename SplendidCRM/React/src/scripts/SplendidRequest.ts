@@ -170,6 +170,14 @@ export async function CreateSplendidRequest(sPath: string, sMethod?: string, sCo
 	{
 		sContentType = 'application/json; charset=utf-8';
 	}
+	// 03/25/2026 Fix.  The .NET 10 backend rejects 'application/octet-stream' with HTTP 415
+	// Unsupported Media Type. All POST/PUT payloads in this application are JSON-encoded strings,
+	// so 'application/json' is the correct Content-Type. This central intercept avoids modifying
+	// 40+ individual call sites across ListView.ts, ModuleUpdate.ts, ProcessButtons.ts, etc.
+	if ( sContentType === 'application/octet-stream' )
+	{
+		sContentType = 'application/json; charset=utf-8';
+	}
 	// 11/16/2020 Paul.  iOS will not allow json requests due to CORS.  Instead, use cordova-plugin-http. 
 	if ( window.cordova && (window.cordova.platformId == 'ios' || window.cordova.platformId == 'android') && window.cordova.plugin && window.cordova.plugin.http )
 	{
