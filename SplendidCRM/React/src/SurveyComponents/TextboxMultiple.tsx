@@ -12,7 +12,6 @@
 import * as React from 'react';
 import * as am4core                             from "@amcharts/amcharts4/core"     ;
 import * as am4charts                           from "@amcharts/amcharts4/charts"   ;
-import { Appear }                               from 'react-lifecycle-appear'       ;
 // 2. Store and Types. 
 import ISurveyQuestionProps                     from '../types/ISurveyQuestionProps';
 import SurveyQuestion                           from './SurveyQuestion'             ;
@@ -25,6 +24,16 @@ import { ListView_LoadTable }                   from '../scripts/ListView'      
 // 4. Components and Views. 
 import ErrorComponent                           from '../components/ErrorComponent' ;
 import ResultsPaginateResponses                 from './ResultsPaginateResponses'   ;
+
+function Appear({ onAppearOnce, children }: { onAppearOnce?: (el: HTMLDivElement) => void; children?: React.ReactNode }): React.JSX.Element {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (onAppearOnce && ref.current) {
+      onAppearOnce(ref.current);
+    }
+  }, []);
+  return <div ref={ref}>{children}</div>;
+}
 
 interface ITextboxMultipleState
 {
