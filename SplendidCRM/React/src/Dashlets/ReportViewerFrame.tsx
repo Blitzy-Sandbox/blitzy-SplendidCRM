@@ -12,7 +12,6 @@
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from '../Router5';
 import { FontAwesomeIcon }                 from '@fortawesome/react-fontawesome';
-import { Appear }                          from 'react-lifecycle-appear'        ;
 import { observer }                        from 'mobx-react'                    ;
 // 2. Store and Types. 
 import IDashletProps                       from '../types/IDashletProps'    ;
@@ -62,6 +61,7 @@ export default class ReportViewerFrame extends React.Component<IDashletProps, IR
 	componentDidMount()
 	{
 		this._isMounted = true;
+		this.setState({ dashletVisible: true });
 	}
 
 	componentWillUnmount()
@@ -90,7 +90,6 @@ export default class ReportViewerFrame extends React.Component<IDashletProps, IR
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
 					<div className="card-body DashletHeader">
 						<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
 						<span
@@ -103,7 +102,6 @@ export default class ReportViewerFrame extends React.Component<IDashletProps, IR
 							}
 						</span>
 					</div>
-				</Appear>
 				{ dashletVisible
 				? <div style={{ clear: 'both' }}>
 					<hr />
