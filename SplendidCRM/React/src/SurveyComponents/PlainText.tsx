@@ -10,7 +10,6 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import { Appear }                               from 'react-lifecycle-appear'       ;
 // 2. Store and Types. 
 import ISurveyQuestionProps                     from '../types/ISurveyQuestionProps';
 import SurveyQuestion                           from './SurveyQuestion'             ;
