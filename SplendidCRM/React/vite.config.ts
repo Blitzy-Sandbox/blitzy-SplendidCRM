@@ -101,6 +101,15 @@ export default defineConfig({
    */
   server: {
     port: 3000,
+    /**
+     * Security response headers for the Vite dev server.
+     * Improves dev/prod parity — production Nginx (Prompt 3) should set
+     * the same (or stricter) headers.
+     */
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+    },
     proxy: {
       '/Rest.svc': {
         target: 'http://localhost:5000',
@@ -147,7 +156,7 @@ export default defineConfig({
    */
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: 'hidden',
     commonjsOptions: {
       include: [/node_modules/, /ckeditor5-custom-build/],
     },
