@@ -263,7 +263,7 @@ npm run dev
 
 The Vite dev server:
 
-- Runs on **`http://localhost:5173`** (Vite's default port)
+- Runs on **`http://localhost:3000`** (configured in `vite.config.ts`)
 - Provides **Hot Module Replacement (HMR)** for instant updates without full page reloads
 - **Proxies API calls** to the ASP.NET Core backend at `http://localhost:5000`
 - Serves `public/config.json` for runtime configuration
@@ -278,6 +278,8 @@ The proxy rules configured in `vite.config.ts` route API requests to the backend
 | `/Administration/Rest.svc/**` | `http://localhost:5000` | Admin API — 65 endpoints |
 | `/hubs/**` | `http://localhost:5000` (WebSocket) | SignalR hub connections (`ws: true`) |
 | `/api/**` | `http://localhost:5000` | Health check and utility endpoints |
+| `/App_Themes/**` | `http://localhost:5000` | Theme CSS and assets |
+| `/Include/**` | `http://localhost:5000` | Include files and resources |
 
 > **Production Note:** In production, there is no proxy. The frontend reads `API_BASE_URL` from `/config.json` and makes direct cross-origin requests with `credentials: 'include'`. The backend must have CORS configured to allow the frontend origin.
 
@@ -422,7 +424,7 @@ Hub URLs are constructed at runtime:
 | API Communication | Same-origin (implicit relative URLs) | Cross-origin via `API_BASE_URL` from `/config.json` |
 | Build Output | Single `SteviaCRM.js` bundle | Chunked `dist/` with `index.html` entry point |
 | Entry Point | Webpack `index.html.ejs` template | Root `index.html` (Vite entry) |
-| Dev Server Port | 3000 (webpack-dev-server) | 5173 (Vite) |
+| Dev Server Port | 3000 (webpack-dev-server) | 3000 (Vite — maintained for familiarity) |
 | Dev Proxy Target | `http://localhost:80` (`/SplendidCRM/**`) | `http://localhost:5000` (`/Rest.svc`, `/hubs`, `/api`) |
 | Type Checking | In-build via `fork-ts-checker-webpack-plugin` | Separate step via `tsc --noEmit` |
 | Asset Handling | `file-loader`, `url-loader`, `svg-inline-loader` | Vite built-in asset handling |
@@ -557,7 +559,7 @@ MobX decorator support requires **both** of the following:
 
 - Ensure the ASP.NET Core backend is running on port 5000: `curl http://localhost:5000/api/health`
 - Verify the Vite dev server proxy is configured in `vite.config.ts` for `/Rest.svc`, `/Administration/Rest.svc`, `/hubs`, and `/api`
-- Check that you are accessing the app via `http://localhost:5173` (Vite dev server), not directly hitting the backend
+- Check that you are accessing the app via `http://localhost:3000` (Vite dev server), not directly hitting the backend
 
 ### 5. SignalR connection fails
 
