@@ -17,7 +17,7 @@
  *   - HTML template: HtmlWebpackPlugin + index.html.ejs → Vite HTML entry (index.html)
  *   - PWA manifest: WebpackPwaManifest → static public/manifest.json
  *   - Process polyfill: webpack.ProvidePlugin → Vite define
- *   - Externals: Webpack externals function → Rollup external config
+ *   - Externals: Webpack externals (xlsx/canvg/pdfmake) → bundled as auto-split chunks
  *   - Bundle output: Single SteviaCRM.js → Vite chunked ESM output
  */
 
@@ -151,8 +151,16 @@ export default defineConfig({
    *   - Output: Vite produces hashed, chunked ESM files instead of a single SteviaCRM.js
    *   - Minification: Vite minifies by default in production (esbuild), replacing TerserPlugin
    *   - Source maps: Enabled for production debugging (matching Webpack prod.js devtool: 'source-map')
-   *   - Externals: xlsx, canvg, pdfmake are externalized via Rollup (loaded via CDN/external scripts)
    *   - Manual chunks: vendor (react/react-dom/react-router) and mobx split for optimal caching
+   *
+   * Note on xlsx, canvg, and pdfmake:
+   *   The original Webpack config externalized these three modules (loaded via <script> tags).
+   *   In the Vite build they are NOT externalized — they are bundled as automatic code-split
+   *   chunks because they are imported as transitive dependencies of @amcharts/amcharts4.
+   *   Rollup's external filter cannot intercept transitive deep imports resolved internally
+   *   by amcharts. Vite's automatic code splitting already isolates them into separate
+   *   cacheable chunks (pdfmake, vfs_fonts, xlsx, canvg), which provides adequate caching
+   *   without requiring CDN script tags.
    */
   build: {
     outDir: 'dist',
@@ -161,16 +169,44 @@ export default defineConfig({
       include: [/node_modules/, /ckeditor5-custom-build/],
     },
     rollupOptions: {
-      external: ['xlsx', 'canvg', 'pdfmake'],
       output: {
-        globals: {
-          xlsx: 'XLSX',
-          canvg: 'canvg',
-          pdfmake: 'pdfMake',
-        },
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router'],
-          mobx: ['mobx', 'mobx-react'],
+        /**
+         * Function-based manualChunks for precise per-module chunk assignment.
+         *
+         * CRITICAL: react and react-dom MUST be checked BEFORE mobx. The mobx-react-lite
+         * package (a dependency of mobx-react) imports from react-dom. With the simpler
+         * object-based manualChunks format, Rollup may resolve react-dom into the mobx
+         * chunk when processing mobx-react-lite's dependency graph. The function format
+         * gives us per-module-ID control: every module whose resolved path contains
+         * 'react-dom' is assigned to 'vendor' regardless of which chunk imports it.
+         *
+         * Chunk strategy:
+         *   - vendor: react core, react-dom (all entry points including /client), react-router,
+         *             and scheduler (react-dom's internal dependency). These change infrequently
+         *             and benefit from long-lived browser cache.
+         *   - mobx:   mobx state management core, mobx-react bindings, mobx-react-lite,
+         *             and use-sync-external-store. Isolated for independent cache invalidation
+         *             when state management versions are upgraded.
+         */
+        manualChunks(id: string) {
+          // Vendor chunk: React core framework and routing — check FIRST
+          if (
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-router/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor';
+          }
+          // MobX chunk: state management — check AFTER react to avoid pulling react-dom
+          if (
+            id.includes('node_modules/mobx/') ||
+            id.includes('node_modules/mobx-react/') ||
+            id.includes('node_modules/mobx-react-lite/') ||
+            id.includes('node_modules/use-sync-external-store/')
+          ) {
+            return 'mobx';
+          }
         },
       },
     },
