@@ -85,7 +85,10 @@ export const withRouter = <Props extends RouteComponentProps<any>>(Component: Re
 		// Encountered this problem with BusinessProcessEditView DynamicPopupView. 
 		// 02/11/2024 Paul.  Non-page view should not include params as it will overwrite MODULE_NAME. 
 		let params  : any = null;
-		const sComponentName: string = Component.name;
+		// 03/26/2026 Fix.  Babel's legacy decorator transform appends a numeric suffix to class names
+		// (e.g., @observer class DynamicEditView → class DynamicEditView2).  Strip trailing digits
+		// so component-name checks (EndsWith 'View', exact-match 'DynamicEditView', etc.) work correctly.
+		const sComponentName: string = Component.name.replace(/\d+$/, '');
 		// 04/03/2024 Paul.  Must include all components that use query parameters. 
 		if ( EndsWith(sComponentName, 'View') || sComponentName == 'DashboardEditor' || sComponentName == 'UnifiedSearch' )
 		{

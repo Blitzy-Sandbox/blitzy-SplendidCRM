@@ -85,6 +85,42 @@
     "typescript": "5.8.3",
     "vite": "6.4.1"
   },
+  "overrides": {
+    "bpmn-js-properties-panel": {
+      "bpmn-js": "$bpmn-js",
+      "diagram-js": "$diagram-js"
+    },
+    "mobx-react-router": {
+      "react-router": "$react-router"
+    },
+    "react-autocomplete": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-big-calendar": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-bootstrap-table-next": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-bootstrap-table2-paginator": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-datetime": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-treeview": {
+      "react": "$react"
+    },
+    "fullcalendar-reactwrapper": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  },
   "cordova": {
     "platforms": [
       "android",

@@ -2345,9 +2345,7 @@ namespace SplendidCRM
 				cmd.CommandText =
 					"select *                                " + ControlChars.CrLf
 				  + "  from vwMODULES_TabMenu               " + ControlChars.CrLf
-				  + " where USER_ID = @USER_ID              " + ControlChars.CrLf
 				  + " order by TAB_ORDER                    " + ControlChars.CrLf;
-				Sql.AddParameter(cmd, "@USER_ID", gUSER_ID);
 				using DbDataAdapter da = NewDataAdapter();
 				((IDbDataAdapter)da).SelectCommand = cmd;
 				dt = new DataTable();
@@ -2377,14 +2375,15 @@ namespace SplendidCRM
 				cmd.CommandText =
 					"select *                                " + ControlChars.CrLf
 				  + "  from vwMODULES_TabMenu               " + ControlChars.CrLf
-				  + " order by USER_ID, TAB_ORDER           " + ControlChars.CrLf;
+				  + " order by TAB_ORDER                    " + ControlChars.CrLf;
 				using DbDataAdapter da = NewDataAdapter();
 				((IDbDataAdapter)da).SelectCommand = cmd;
 				var dtAll = new DataTable();
 				da.Fill(dtAll);
+				bool bHasUserId = dtAll.Columns.Contains("USER_ID");
 				foreach (DataRow row in dtAll.Rows)
 				{
-					Guid gUser = Sql.ToGuid(row["USER_ID"]);
+					Guid gUser = bHasUserId ? Sql.ToGuid(row["USER_ID"]) : Guid.Empty;
 					if (!dict.ContainsKey(gUser))
 						dict[gUser] = dtAll.Clone();
 					dict[gUser].ImportRow(row);

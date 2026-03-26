@@ -958,8 +958,9 @@ namespace SplendidCRM
 							Sql.AppendGuids(cmd, sbItems, arrITEMS, "ID");
 							cmd.CommandText += sbItems.ToString();
 						}
+						// Apply caller-supplied WHERE — convert OData filter expressions to parameterized SQL
 						if ( !Sql.IsEmptyString(sWHERE) )
-							cmd.CommandText += " and (" + sWHERE + ")\r\n";
+							ConvertODataFilter(sWHERE, cmd);
 						if ( arrFILTER_FIELDS != null && arrFILTER_FIELDS.Count > 0 )
 						{
 							for ( int i = 0; i + 1 < arrFILTER_FIELDS.Count; i += 2 )
@@ -991,11 +992,15 @@ namespace SplendidCRM
 							try { lTotalCount = Sql.ToLong(cmdCount.ExecuteScalar()); }
 							catch { lTotalCount = -1; }
 						}
-						// ORDER BY — must include "order by" prefix for SQL Server OFFSET/FETCH
-						string sORDERRawAdmin = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
-						string sORDERAdmin = sORDERRawAdmin.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
-							? " " + sORDERRawAdmin
-							: " order by " + sORDERRawAdmin;
+						// ORDER BY — Sql.PageResults defaults to "order by 1" when empty, which is safe for all admin views
+						// (some admin views like vwEDITVIEWS_FIELDS lack DATE_MODIFIED, so no hardcoded default)
+						string sORDERAdmin = String.Empty;
+						if ( !Sql.IsEmptyString(sORDER_BY) )
+						{
+							sORDERAdmin = sORDER_BY.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
+								? " " + sORDER_BY
+								: " order by " + sORDER_BY;
+						}
 						// Paginate — convert nSKIP (row offset) to 1-based page number for Sql.PageResults
 						int nPageNumberAdmin = (nTOP > 0 && nSKIP > 0) ? (nSKIP / nTOP) + 1 : 1;
 						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDERAdmin, nTOP, nPageNumberAdmin);

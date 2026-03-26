@@ -150,7 +150,8 @@ export async function AdminProcedure(sPROCEDURE_NAME: string, row: any): Promise
 	{
 		let sUrl = null;
 		sUrl = 'Administration/Rest.svc/AdminProcedure';
-		let sBody: string = JSON.stringify(row);
+		// 03/26/2026 Fix.  Include ProcedureName in body for .NET Core [FromBody] binding.
+		let sBody: string = JSON.stringify({ ...row, ProcedureName: sPROCEDURE_NAME });
 		let res = await CreateSplendidRequest(sUrl + '?ProcedureName=' + sPROCEDURE_NAME, 'POST', 'application/octet-stream', sBody);
 		let json = await GetSplendidResult(res);
 		json.d.__sql = json.__sql;
@@ -177,7 +178,8 @@ export async function ExecProcedure(sPROCEDURE_NAME: string, row: any): Promise<
 	{
 		let sUrl = null;
 		sUrl = 'Rest.svc/ExecProcedure';
-		let sBody: string = JSON.stringify(row);
+		// 03/26/2026 Fix.  Include ProcedureName in body for .NET Core [FromBody] binding.
+		let sBody: string = JSON.stringify({ ...row, ProcedureName: sPROCEDURE_NAME });
 		let res = await CreateSplendidRequest(sUrl + '?ProcedureName=' + sPROCEDURE_NAME, 'POST', 'application/octet-stream', sBody);
 		let json = await GetSplendidResult(res);
 		json.d.__sql = json.__sql;
@@ -201,7 +203,9 @@ export async function UpdateModule(sMODULE_NAME: string, row: any, sID: string, 
 	}
 	else
 	{
-		let sBody = JSON.stringify(row);
+		// 03/26/2026 Fix.  The .NET Core backend reads ModuleName from [FromBody] dict, not query string.
+		// Include ModuleName in the request body so the backend can find it.
+		let sBody = JSON.stringify({ ...row, ModuleName: sMODULE_NAME });
 		let sUrl = null;
 		if ( bADMIN_MODE )
 		{
@@ -336,7 +340,8 @@ export async function UpdateModuleTable(sTABLE_NAME: string, row: any, sID: stri
 	{
 		let sUrl = null;
 		sUrl = 'Rest.svc/UpdateModuleTable';
-		let sBody: string = JSON.stringify(row);
+		// 03/26/2026 Fix.  Include TableName in body for .NET Core [FromBody] binding.
+		let sBody: string = JSON.stringify({ ...row, TableName: sTABLE_NAME });
 		let res = await CreateSplendidRequest(sUrl + '?TableName=' + sTABLE_NAME, 'POST', 'application/octet-stream', sBody);
 		let json = await GetSplendidResult(res);
 		sID = json.d;
@@ -364,6 +369,8 @@ export async function InsertModuleStreamPost(sMODULE_NAME: string, row: any, sID
 	else
 	{
 		row['ID'] = sID;
+		// 03/26/2026 Fix.  Include ModuleName in body for .NET Core [FromBody] binding.
+		row['ModuleName'] = sMODULE_NAME;
 		let sBody: string = JSON.stringify(row);
 		let res = await CreateSplendidRequest('Rest.svc/InsertModuleStreamPost?ModuleName=' + sMODULE_NAME, 'POST', 'application/octet-stream', sBody);
 		let json = await GetSplendidResult(res);
@@ -755,6 +762,8 @@ export async function MassUpdateModule(sMODULE_NAME, row, arrID_LIST, bADMIN_MOD
 	else
 	{
 		row.ID_LIST = arrID_LIST;
+		// 03/26/2026 Fix.  Include ModuleName in body for .NET Core [FromBody] binding.
+		row['ModuleName'] = sMODULE_NAME;
 		let sBody = JSON.stringify(row);
 		let sUrl = null;
 		if ( bADMIN_MODE )

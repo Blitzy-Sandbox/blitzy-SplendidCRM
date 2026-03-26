@@ -1214,7 +1214,34 @@ export class SplendidCacheStore
 	// 05/12/2018 Paul.  React requires setters. 
 	SetTAB_MENU(obj)
 	{
-		this.TAB_MENU = obj;
+		// 03/26/2026 Paul.  Backend returns dict keyed by user GUID when view has USER_ID column,
+		// or keyed by empty GUID when it does not.  Normalize to flat array for frontend consumption.
+		if ( obj != null && !Array.isArray(obj) && typeof obj === 'object' )
+		{
+			let items: any[] = [];
+			let sUSER_ID: string = (this.UserID || '').toLowerCase();
+			// First try the current user's entries
+			if ( sUSER_ID && obj[sUSER_ID] )
+			{
+				items = obj[sUSER_ID];
+			}
+			else
+			{
+				// Fallback: merge all entries (handles Guid.Empty key scenario)
+				for ( let key in obj )
+				{
+					if ( Array.isArray(obj[key]) )
+					{
+						items = items.concat(obj[key]);
+					}
+				}
+			}
+			this.TAB_MENU = items;
+		}
+		else
+		{
+			this.TAB_MENU = obj;
+		}
 	}
 
 	SetMODULES(obj)

@@ -2801,7 +2801,7 @@ namespace SplendidCRM.Web.Controllers
 						{
 							if ( dtSYNC_TABLES != null && dtSYNC_TABLES.Rows.Count > 0 )
 							{
-								dt = _restUtil.GetAdminTable(HttpContext, TableName, nSKIP, nTOP, sFILTER, sORDER_BY, sGROUP_BY, arrSELECT, null, ref lTotalCount, null, AccessMode.list, sbDumpSQL);
+								dt = _restUtil.GetAdminTable(HttpContext, TableName, nSKIP, nTOP, sORDER_BY, sFILTER, sGROUP_BY, arrSELECT, null, ref lTotalCount, null, AccessMode.list, sbDumpSQL);
 							}
 							else
 							{
@@ -2821,13 +2821,19 @@ namespace SplendidCRM.Web.Controllers
 
 				var req = HttpContext.Request;
 				string sBaseURI = req.Scheme + "://" + req.Host.Value + req.PathBase.Value + "/Administration/Rest.svc/PostAdminTable";
-				Dictionary<string, object> dictResponse = _restUtil.ToJson(sBaseURI, TableName, dt, T10n);
-				dictResponse.Add("__total", lTotalCount);
+				// 06/2025 Paul.  Use RowsToDictionary directly to match PostModuleTable pattern.
+				// ToJson wraps in {d:{results:[...]}}, then wrapping again produced double-d: {d:{d:{results:[]},__total:N}}.
+				var rows = _restUtil.RowsToDictionary(sBaseURI, TableName, dt, T10n);
+				var innerDict = new Dictionary<string, object>
+				{
+					{ "results", rows },
+					{ "__total", lTotalCount }
+				};
 				if ( Sql.ToBoolean(_memoryCache.Get("CONFIG.show_sql")) )
 				{
-					dictResponse.Add("__sql", sbDumpSQL.ToString());
+					innerDict.Add("__sql", sbDumpSQL.ToString());
 				}
-				return JsonContent(new { d = dictResponse });
+				return JsonContent(new { d = innerDict });
 			}
 			catch (Exception ex)
 			{

@@ -37,6 +37,7 @@ export async function IsAuthenticated(source): Promise<any>
 {
 	if ( !Credentials.ValidateCredentials )
 	{
+//console.warn((new Date()).toISOString() + ' IsAuthenticated ValidateCredentials FAILED', source);
 		// 04/28/2019 Paul.  Ignore for now so we can test the request failure below. 
 		//throw new Error('Invalid connection information.');
 		return false;
@@ -329,12 +330,14 @@ export async function AuthenticatedMethod(props, source): Promise<number>
 {
 	if ( !Credentials.ValidateCredentials )
 	{
+//console.warn((new Date()).toISOString() + ' AuthenticatedMethod ValidateCredentials FAILED', 'sREMOTE_SERVER=' + JSON.stringify((Credentials as any).sREMOTE_SERVER), 'sAUTHENTICATION=' + JSON.stringify((Credentials as any).sAUTHENTICATION));
 		//throw new Error('Invalid connection information.');
 		return 0;
 	}
-	//console.log((new Date()).toISOString() + ' ' + 'AuthenticatedMethod', source, props.location.pathname + props.location.search);
+//console.log((new Date()).toISOString() + ' ' + 'AuthenticatedMethod', source, props.location.pathname + props.location.search);
 	// 06/23/2019 Paul.  IsAuthenticated will catch any errors and return simple true/false. 
 	let bAuthenticated: boolean = await IsAuthenticated('AuthenticatedMethod ' + source);
+//console.log((new Date()).toISOString() + ' AuthenticatedMethod bAuthenticated=' + bAuthenticated + ' IsInitialized=' + SplendidCache.IsInitialized);
 	if ( bAuthenticated )
 	{
 		if ( !SplendidCache.IsInitialized )
