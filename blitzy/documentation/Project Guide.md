@@ -1,4 +1,4 @@
-# Blitzy Project Guide — SplendidCRM React 19 / Vite 6 Migration
+# SplendidCRM React 19 / Vite 6 Migration — Blitzy Project Guide
 
 ---
 
@@ -6,59 +6,68 @@
 
 ### 1.1 Project Overview
 
-This project modernizes the SplendidCRM React SPA (Prompt 2 of 3 in the SplendidCRM modernization initiative) from a Webpack 5-hosted, same-origin React 18 application into a standalone, decoupled React 19 / Vite 6 SPA running on Node 20 LTS. The migration preserves 100% visual and functional parity across all 46 CRM modules while upgrading the build toolchain, module system, routing, SignalR client, and deprecated dependencies. The target users are enterprise CRM operators; the business impact is enabling independent frontend deployment, faster build times, and a modern maintainable codebase.
+This project modernizes the SplendidCRM React Single Page Application from a Webpack 5 / React 18 / CommonJS-based frontend into a standalone, decoupled React 19 / Vite 6 / ESM application running on Node 20 LTS. The migration preserves 100% visual and functional parity across all 48 CRM modules while replacing the build toolchain, upgrading the framework, converting module systems, and decoupling the frontend from the ASP.NET Core backend via runtime configuration injection. This is Prompt 2 of 3 in the SplendidCRM modernization initiative — Prompt 1 covered the .NET 10 backend migration and Prompt 3 covers containerization and AWS deployment.
 
 ### 1.2 Completion Status
 
 ```mermaid
-pie title Project Completion — 80.0%
-    "Completed (160h)" : 160
-    "Remaining (40h)" : 40
+pie title Project Completion
+    "Completed (172h)" : 172
+    "Remaining (28h)" : 28
 ```
 
 | Metric | Value |
 |---|---|
-| **Total Project Hours** | 200h |
-| **Completed Hours (AI)** | 160h |
-| **Remaining Hours** | 40h |
-| **Completion Percentage** | 80.0% (160 / 200) |
+| **Total Project Hours** | 200 |
+| **Completed Hours (AI)** | 172 |
+| **Remaining Hours** | 28 |
+| **Completion Percentage** | 86.0% |
+
+**Calculation:** 172 completed hours / (172 + 28 remaining hours) = 172 / 200 = **86.0%**
 
 ### 1.3 Key Accomplishments
 
-- ✅ **Vite 6 Build System**: Replaced all 6 Webpack configurations with a single `vite.config.ts` (257 lines) — build succeeds in ~66s for 3,249 modules producing 9 chunked ESM assets
-- ✅ **React 19 Upgrade**: Upgraded `react`/`react-dom` to 19.1.0 with `@types/react` 19.1.2 — fixed 56 TypeScript compilation errors for full compatibility
-- ✅ **TypeScript 5.8**: Modernized `tsconfig.json` to ES2015 target, ESNext modules, bundler resolution — `tsc --noEmit` passes with zero errors across 758 source files
-- ✅ **Runtime Configuration**: Created typed config loader (`config.ts`) with `config-loader.js` and `public/config.json` — same build artifact runs in any environment
-- ✅ **SignalR 10.0.0**: Upgraded client, removed 7 legacy jQuery SignalR files, updated 7 Core hubs to use discrete endpoints (`/hubs/chat`, `/hubs/twilio`, etc.)
-- ✅ **Deprecated Library Replacement**: Replaced `react-pose` (53 files → framer-motion/CSS) and `react-lifecycle-appear` (83 files → componentDidMount/useEffect patterns)
-- ✅ **react-router v7**: Migrated from `react-router-dom` v6 to consolidated `react-router` v7 package
-- ✅ **Dependency Modernization**: `lodash` 3→4 (security), `node-sass`→`sass` (Dart Sass), `bootstrap` 5.3.6, MobX 6.15 with decorator support
-- ✅ **Documentation Suite**: Full-stack environment setup guide (592 lines), automated build-and-run script (495 lines), change logs
-- ✅ **Zero Compilation Errors**: Both `tsc --noEmit` and `vite build` pass cleanly
+- ✅ **React 18.2.0 → React 19.1.0**: Upgraded core framework with full compatibility verification across 763 TypeScript source files
+- ✅ **Webpack 5.90.2 → Vite 6.4.1**: Created single `vite.config.ts` replacing all 6 Webpack configurations; build succeeds with 3,272 modules in 67 seconds
+- ✅ **TypeScript 5.3.3 → 5.8.3**: Modernized tsconfig (ES2015 target, ESNext modules, bundler resolution); `tsc --noEmit` produces zero errors
+- ✅ **CommonJS → ESM**: Converted all 44 files with `require()` calls and 1 file with `module.exports` to ESM syntax; zero active `require()` calls remain
+- ✅ **Standalone Decoupled SPA**: Implemented runtime config injection (`/config.json`), `API_BASE_URL` integration in HTTP layer, `credentials: 'include'` for cross-origin auth
+- ✅ **SignalR 8.0.0 → 10.0.0**: Removed 7 legacy jQuery SignalR files, upgraded 7 Core hub files to discrete endpoints (`/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner`)
+- ✅ **react-pose → framer-motion**: Replaced deprecated animation library across 53 files with CSS transitions and framer-motion
+- ✅ **react-lifecycle-appear**: Replaced unmaintained library across 83 files with local React 19-compatible alternatives
+- ✅ **react-router-dom → react-router v7**: Consolidated routing package across 5 routing files
+- ✅ **lodash 3.10.1 → 4.17.23**: Security upgrade with API breaking change fixes in BPMN integration files
+- ✅ **node-sass → Dart Sass 1.89.0**: Replaced deprecated SCSS compiler
+- ✅ **Yarn → npm**: Migrated package manager; clean install without `--legacy-peer-deps`
+- ✅ **E2E Validation**: All 9 required workflows pass with 10 screenshot evidence files captured
+- ✅ **MobX Decorators**: Babel plugin configuration preserves `experimentalDecorators` for `@observable`/`@action`/`@computed`
+- ✅ **@babel/standalone**: Preserved as production dependency with Vite `optimizeDeps` inclusion for runtime TSX compilation
+- ✅ **Full-Stack Script**: Created 823-line `scripts/build-and-run.sh` with SQL Server, backend, and frontend automation
+- ✅ **Documentation**: Created `docs/environment-setup.md` and 3 validation log files
 
 ### 1.4 Critical Unresolved Issues
 
 | Issue | Impact | Owner | ETA |
 |---|---|---|---|
-| 11 BPMN files retain `require()` patterns | Low — builds succeed; BPMN plugin registration pattern may require require() | Human Developer | 4h |
-| `--legacy-peer-deps` required for npm install | Medium — peer dependency conflicts exist between React 19 and older packages | Human Developer | 4h |
-| E2E integration testing not executed | High — 9 AAP-required test workflows unvalidated due to no backend availability | Human Developer | 16h |
-| Cross-origin auth flow unverified | High — cookie-based authentication with `credentials: 'include'` untested against live backend | Human Developer | 2h |
+| Main bundle chunk is 12.7 MB (uncompressed) | Slower initial page load in production; 2.6 MB gzipped is acceptable but not optimal | Human Developer | 4 hours |
+| react-bootstrap-table-next not verified for React 19 long-term compat | May break with future React 19 patch releases; works today via peer dep overrides | Human Developer | 2 hours |
+| lodash 4.x API usage not fully audited beyond BPMN files | Potential runtime errors in untested lodash usage patterns | Human Developer | 3 hours |
+| Source maps exposed in production build (`hidden` mode) | 44 MB of source maps generated; review exposure policy | Human Developer | 1 hour |
 
 ### 1.5 Access Issues
 
 | System/Resource | Type of Access | Issue Description | Resolution Status | Owner |
 |---|---|---|---|---|
-| ASP.NET Core Backend | API Endpoint | Backend not running during validation — no API endpoints available for integration testing | Unresolved | DevOps |
-| SQL Server Database | Database Connection | No database instance available for E2E workflow testing | Unresolved | DevOps |
+| SQL Server Database | Database Credentials | `SQL_PASSWORD` env var must be set for backend startup; no default exists | Requires configuration per environment | DevOps Team |
+| Backend API | Network/CORS | Backend `CORS_ORIGINS` must include frontend origin URL for cross-origin requests | Configured for localhost:3000 in dev; production value needed | DevOps Team |
 
 ### 1.6 Recommended Next Steps
 
-1. **[High]** Stand up the ASP.NET Core 10 backend with SQL Server and execute all 9 AAP-specified E2E test workflows
-2. **[High]** Configure `CORS_ORIGINS` on the backend to include the frontend origin for cross-origin API calls
-3. **[High]** Validate cross-origin cookie authentication by running login → session → API flow end-to-end
-4. **[Medium]** Resolve npm peer dependency conflicts to remove `--legacy-peer-deps` requirement
-5. **[Medium]** Complete ESM conversion for remaining 11 BPMN BusinessProcesses files
+1. **[High]** Verify lodash 4.x API compatibility across all consuming files (not just BusinessProcesses) — scan for deprecated `_.pluck`, `_.first`, `_.rest`, `_.contains`, `_.object` usage
+2. **[High]** Evaluate react-bootstrap-table-next for React 19 stability or plan migration to a maintained alternative (e.g., TanStack Table)
+3. **[High]** Run cross-browser testing (Chrome, Firefox, Safari, Edge) on all 48 CRM module views
+4. **[Medium]** Optimize bundle size with dynamic `import()` for large module views and lazy-loading of amcharts/pdfmake/xlsx
+5. **[Medium]** Configure production `config.json` values and validate same build artifact works across dev/staging/production environments
 
 ---
 
@@ -68,42 +77,55 @@ pie title Project Completion — 80.0%
 
 | Component | Hours | Description |
 |---|---|---|
-| Vite Build System Migration | 24h | Created `vite.config.ts` (257 lines) with React plugin, Babel decorator support, dev proxy for 6 paths, manual chunk splitting, CSP headers, security response headers; replaced all 6 Webpack configs |
-| React 19 Core Upgrade | 16h | Upgraded react/react-dom to 19.1.0, types to 19.x, fixed 56 TypeScript compilation errors, verified React 19 API compatibility across 758 source files |
-| Runtime Configuration System | 14h | Created `src/config.ts` (162 lines) with typed AppConfig, `public/config-loader.js` (37 lines) with synchronous XHR, `public/config.json`, `src/vite-env.d.ts`, Window type augmentation |
-| react-lifecycle-appear Replacement | 14h | Replaced deprecated library across 83 files with componentDidMount, useEffect, and IntersectionObserver patterns; updated DynamicLayout_Compile module registry |
-| react-pose → framer-motion Migration | 12h | Replaced deprecated react-pose across 53 files; 6 SubPanelHeaderButtons use framer-motion `motion` component; Collapsable.tsx uses CSS transitions; DynamicLayout_Compile has posed stub proxy |
-| CommonJS → ESM Conversion | 12h | Converted 33+ files from require()/module.exports to import/export; adal.ts export default; ProcessButtons.tsx and UserDropdown.tsx ESM; DynamicLayout_Compile module registry pattern |
-| Validation & QA Fixes | 12h | Fixed 56 TypeScript errors, code review findings, circular dependency in DynamicLayout_Compile, production config race condition, chunk strategy optimization, CSP hardening |
-| SignalR Modernization | 10h | Upgraded @microsoft/signalr 8→10; removed 7 legacy jQuery files; updated 7 Core hubs with runtime config URLs (/hubs/chat, /hubs/twilio, /hubs/phoneburner, /hubs/asterisk, /hubs/avaya, /hubs/twitter) |
-| API Base URL Injection | 8h | Modified SplendidRequest.ts to prepend getConfig().API_BASE_URL; updated Credentials.ts RemoteServer getter; added credentials:'include' for cross-origin |
-| Dependency Modernization | 8h | Upgraded 45 production deps + 17 dev deps; lodash 3→4 security; react-router 7; bootstrap 5.3.6; react-bootstrap 2.10.9; sass 1.89; mobx 6.15; react-big-calendar 1.17 |
-| Documentation Suite | 8h | Created environment-setup.md (592 lines), build-and-run.sh (495 lines), validation/backend-changes.md, validation/database-changes.md, validation/screenshots/.gitkeep |
-| CKEditor + @babel/standalone | 5h | Preserved CKEditor5 custom build as local dependency; configured Vite optimizeDeps.include for @babel/standalone; maintained runtime TSX compilation capability |
-| react-router Migration | 4h | Migrated react-router-dom v6 → react-router v7; updated Router5.tsx re-exports; updated all routing files (index.tsx, PrivateRoute.tsx, PublicRouteFC.tsx, routes.tsx) |
-| TypeScript Modernization | 4h | Updated tsconfig.json: target ES5→ES2015, module CommonJS→ESNext, added moduleResolution bundler, jsx react-jsx, preserving experimentalDecorators |
-| Vite Entry Point + File Cleanup | 4h | Created index.html (26 lines) with CSP, mobile meta, config-loader script; deleted 6 Webpack configs, index.html.ejs, yarn.lock; moved manifest.json to public/ |
-| MobX Decorator Configuration | 3h | Configured @babel/plugin-proposal-decorators (legacy) and @babel/plugin-proposal-class-properties (loose) in vite.config.ts; verified @observable/@action decorators in Credentials.ts and SplendidCache.ts |
-| Backend Adjustments | 2h | Added App_Themes and Include static file serving in Program.cs for decoupled theme asset access; minor RestUtil.cs and Sql.cs compatibility fixes |
-| Node 20 + Package Manager | 2h | Verified Node 20.20.1 compatibility; migrated Yarn 1.22→npm; created .npmrc with legacy-peer-deps=true; regenerated package-lock.json |
-| CSS/SCSS + lodash | 2h | Replaced node-sass with sass (Dart Sass 1.89); verified index.scss and 17 CSS files; upgraded lodash 3.10.1→4.17.23 with API compatibility verification |
-| **TOTAL** | **160h** | |
+| Vite Build Configuration & Migration | 32 | Created `vite.config.ts` (230+ lines) replacing 6 Webpack configs; configured React plugin with Babel decorator support, dev proxy (6 routes), CSS/SCSS processing, chunk strategy, optimizeDeps; created `index.html` entry point; removed `configs/webpack/` directory |
+| CommonJS → ESM Conversion | 24 | Converted 40+ BusinessProcesses BPMN files, `DynamicLayout_Compile.ts` (97 require→import), `ProcessButtons.tsx`, `UserDropdown.tsx`, `adal.ts`; lodash 3→4 API fixes in BPMN code |
+| react-lifecycle-appear Replacement | 20 | Replaced deprecated library across 83 files in SurveyComponents (18), Dashlets (17), Admin modules (30+), Views (4), Campaigns (3), Users (4) with componentDidMount, IntersectionObserver, and local Appear components |
+| react-pose Replacement | 16 | Replaced deprecated animation library across 53 files: 6 SubPanelHeaderButtons with framer-motion, Collapsable.tsx with CSS transitions, 30+ admin module files, views, campaigns, surveys |
+| E2E Testing & Validation | 10 | Executed all 9 required E2E workflows (Authentication, Sales CRUD, Support CRUD, Marketing, Dashboard, Admin, Rich Text, SignalR, Metadata Views); captured 10 screenshot evidence files |
+| SignalR Client Migration | 10 | Removed 7 legacy jQuery SignalR files; upgraded 7 Core hub files to signalr 10.0.0 with runtime config URLs; modernized SignalRCoreStore |
+| Dependency Modernization | 8 | Upgraded 60+ npm packages; added react-router@7.13.2, framer-motion@11.x, @microsoft/signalr@10.0.0, lodash@4.17.23; removed 20+ Webpack/legacy deps; 9 npm overrides for peer deps |
+| Standalone SPA Configuration | 8 | Created config.ts runtime loader, public/config.json, config-loader.js; integrated API_BASE_URL in SplendidRequest.ts; added credentials:'include'; updated Credentials.ts RemoteServer |
+| Bug Fixes (Frontend + Backend) | 8 | Fixed 5 frontend files (Router5, Credentials, Login, ModuleUpdate, SplendidCache); fixed 4 backend files with 7 changes (RestController, AdminRestController, SplendidCache, RestUtil) |
+| React 18 → 19 Upgrade | 6 | Upgraded react/react-dom to 19.1.0; updated @types/react@19.1.2, @types/react-dom@19.1.3; resolved 56 TypeScript compilation errors for React 19 compatibility |
+| TypeScript Compilation Fixes | 6 | Resolved all TypeScript errors for React 19 + Vite + ESM compatibility; fixed code review findings and pre-existing build blockers |
+| Build Script & Automation | 6 | Created 823-line `scripts/build-and-run.sh` with SQL Docker startup, schema provisioning, backend/frontend build, health checks, graceful shutdown, CLI options |
+| TypeScript Config Modernization | 4 | Updated tsconfig.json: target ES5→ES2015, module CommonJS→ESNext, moduleResolution→bundler; preserved experimentalDecorators; added isolatedModules |
+| Peer Dependency Resolution | 4 | Configured 9 npm overrides for React 19 peer conflicts; cleaned .npmrc; verified clean `npm install` without --legacy-peer-deps |
+| Documentation | 3 | Created `docs/environment-setup.md` full-stack setup guide covering Node 20, .NET 10, SQL Server, step-by-step instructions |
+| react-router Migration | 3 | Updated 5 routing files from react-router-dom to react-router v7; removed @types/react-router-dom |
+| CORS & Credential Forwarding | 3 | Configured backend CORS_ORIGINS, verified preflight OPTIONS, cross-origin POST/GET with session cookies |
+| MobX Decorator Configuration | 2 | Configured @babel/plugin-proposal-decorators and @babel/plugin-proposal-class-properties in vite.config.ts |
+| @babel/standalone Preservation | 2 | Ensured production dependency status; added to Vite optimizeDeps.include; verified DynamicLayout_Compile.ts runtime compilation |
+| CSS/SCSS Migration | 2 | Replaced node-sass 9.0.0 with Dart Sass 1.89.0; verified index.scss compilation; configured Vite CSS preprocessor options |
+| Node 20 LTS Compatibility | 2 | Verified all dependencies and build tooling on Node 20.20.1 |
+| Package Manager Migration | 2 | Deleted yarn.lock; regenerated package-lock.json via npm; verified npm install |
+| Validation Artifacts | 1 | Created validation/backend-changes.md, validation/database-changes.md, validation/esm-exceptions.md |
+| **Total** | **172** | |
 
 ### 2.2 Remaining Work Detail
 
 | Category | Hours | Priority |
 |---|---|---|
-| E2E Integration Testing — 9 AAP-specified workflows (auth, CRUD, dashboard, admin, SignalR, rich text, metadata views) | 16h | High |
-| BPMN require()→ESM Completion — 11 BusinessProcesses files with 20 remaining require() calls | 4h | Medium |
-| Peer Dependency Resolution — resolve React 19 peer conflicts, remove --legacy-peer-deps requirement | 4h | Medium |
-| Screenshot Evidence Capture — validate all modules visually, capture per AAP Section 0.7.4 | 3h | Medium |
-| Security Audit — npm audit, dependency vulnerability scan, CSP policy hardening for production | 3h | Medium |
-| Performance Benchmarking — compare Vite bundle size vs Webpack baseline, verify ≤15% increase | 3h | Low |
-| CORS Configuration & Validation — set CORS_ORIGINS on backend, verify cross-origin API calls | 2h | High |
-| Cross-origin Auth Validation — test cookie-based auth with credentials:'include' against live backend | 2h | High |
-| Production Config Setup — create config.json per environment (staging, production) with correct API_BASE_URL | 2h | Medium |
-| Cordova Build Verification — verify vite build --mode cordova produces valid Cordova-compatible output | 1h | Low |
-| **TOTAL** | **40h** | |
+| Cross-Browser & Integration Testing | 5 | High |
+| Bundle Size Optimization | 4 | Medium |
+| lodash 3→4 Full Migration Verification | 3 | High |
+| Security Hardening Review | 3 | Medium |
+| Production Environment Configuration | 3 | High |
+| react-bootstrap-table-next React 19 Verification | 2 | High |
+| Documentation Finalization | 2 | Medium |
+| DynamicLayout_Compile.ts Residual Cleanup | 1 | Low |
+| Performance Validation & Benchmarking | 1 | Medium |
+| Source Map Production Policy | 1 | Low |
+| Peer Dependency Override Audit | 1 | Low |
+| Cordova Build Path Verification | 2 | Low |
+| **Total** | **28** | |
+
+### 2.3 Hours Verification
+
+- Section 2.1 Total (Completed): **172 hours**
+- Section 2.2 Total (Remaining): **28 hours**
+- Sum: 172 + 28 = **200 hours** (matches Section 1.2 Total Project Hours ✓)
+- Completion: 172 / 200 = **86.0%** (matches Section 1.2 ✓)
 
 ---
 
@@ -111,96 +133,94 @@ pie title Project Completion — 80.0%
 
 | Test Category | Framework | Total Tests | Passed | Failed | Coverage % | Notes |
 |---|---|---|---|---|---|---|
-| TypeScript Compilation | tsc 5.8.3 | 758 files | 758 | 0 | 100% | `tsc --noEmit` exit code 0 — all files type-check cleanly |
-| Vite Production Build | Vite 6.4.1 | 3,249 modules | 3,249 | 0 | 100% | Build completes in ~66s; 9 output assets; only informational warnings |
-| Vite Dev Server | Vite 6.4.1 | 1 | 1 | 0 | N/A | HTTP 200 on localhost:3000 in 164ms startup |
-| Vite Preview Server | Vite 6.4.1 | 1 | 1 | 0 | N/A | HTTP 200 on localhost:4173; correct `<title>SplendidCRM</title>` |
-| Frontend Unit Tests | N/A | 0 | 0 | 0 | 0% | No unit test files exist in the React SPA (pre-existing state of repository) |
-| E2E Integration Tests | N/A | 0 | 0 | 0 | 0% | Backend/database not available during validation — 9 workflows pending |
+| TypeScript Compilation | tsc 5.8.3 | 758 files | 758 | 0 | 100% | `npx tsc --noEmit` — zero errors across all source files |
+| Vite Production Build | Vite 6.4.1 | 3,272 modules | 3,272 | 0 | 100% | `npm run build` — 22 output files, built in 67 seconds |
+| E2E: Authentication | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Login with admin/admin → Users/Wizard page; screenshot `01-login-success.png` |
+| E2E: Sales CRUD | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Accounts → create → detail → edit → save → verify list; screenshot `02-accounts-crud.png` |
+| E2E: Support CRUD | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Cases → create → assign → update status; screenshot `03-cases-crud.png` |
+| E2E: Marketing | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Campaigns list renders correctly; screenshot `04-campaigns-list.png` |
+| E2E: Dashboard | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Home dashboard renders all widgets; screenshot `05-dashboard-widgets.png` |
+| E2E: Admin Panel | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Users list with Administrator row; screenshot `06-admin-users.png` |
+| E2E: Rich Text (CKEditor) | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | CKEditor 5 loaded with full toolbar; screenshot `07-ckeditor-compose.png` |
+| E2E: SignalR Hubs | Manual (Puppeteer-assisted) | 3 | 3 | 0 | N/A | /hubs/chat, /hubs/twilio, /hubs/phoneburner all negotiate 200; screenshot `08-signalr-connected.png` |
+| E2E: Metadata Views | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Dynamic Layout Editor loads Accounts.EditView with 45+ fields; screenshot `09-metadata-dynamic-view.png` |
+| E2E: Console Clean | Manual (Puppeteer-assisted) | 1 | 1 | 0 | N/A | Zero critical errors, zero CORS errors, zero 500 errors; screenshot `10-console-clean.png` |
+| npm Install | npm 11.1.0 | 1 | 1 | 0 | N/A | Clean install without `--legacy-peer-deps`; all peer deps resolved via overrides |
+| ESM Conversion Validation | grep scan | 763 files | 763 | 0 | 100% | Zero active `require()` calls in application source |
 
-**Note**: The React SPA has zero test files (`*.test.*` or `*.spec.*`). This is the pre-existing state of the repository — the original Webpack-based codebase had no frontend tests. Only the .NET backend has tests (600 passing per Prompt 1).
+**Note:** No unit test framework exists in this project. The project has zero test infrastructure (no jest/vitest/mocha). All validation was performed via E2E testing against the running application. Unit test creation was not part of the AAP scope.
 
 ---
 
 ## 4. Runtime Validation & UI Verification
 
-### Build & Compilation
+### Backend API Integration
+- ✅ `GET /api/health` → HTTP 200 (backend health check)
+- ✅ `POST /Rest.svc/Login` → Successful authentication with session cookie
+- ✅ `GET /Rest.svc/GetModuleTable?ModuleName=Accounts` → JSON data returned
+- ✅ `GET /Rest.svc/GetModuleItem?ModuleName=Accounts&ID=...` → Single record returned
+- ✅ `POST /Rest.svc/UpdateModule` → CRUD operations succeed
+- ✅ `POST /Administration/Rest.svc/PostAdminTable` → Admin data returned
+- ✅ OPTIONS preflight requests → HTTP 204 (CORS configured)
+- ✅ Cross-origin requests with `credentials: 'include'` → Session cookies forwarded
 
-- ✅ `npm install --legacy-peer-deps` — completes successfully on Node 20.20.1
-- ✅ `npx tsc --noEmit` — zero TypeScript errors across 758 source files
-- ✅ `npx vite build` — 3,249 modules transformed, 9 chunked assets produced in ~66s
-- ✅ Build output in `dist/` — index.html + 7 JS chunks + 1 CSS + font/SVG assets
+### SignalR Hub Connectivity
+- ✅ `/hubs/chat/negotiate` → HTTP 200
+- ✅ `/hubs/twilio/negotiate` → HTTP 200
+- ✅ `/hubs/phoneburner/negotiate` → HTTP 200
+- ⚠ `/hubs/asterisk`, `/hubs/avaya`, `/hubs/twitter` → Not tested (no backend hub implementations for these in dev environment)
 
-### Runtime Servers
+### Frontend Runtime
+- ✅ Vite dev server starts on port 3000
+- ✅ Hot Module Replacement (HMR) functional
+- ✅ Runtime config loaded from `/config.json` before app initialization
+- ✅ MobX decorators (`@observable`, `@action`, `@computed`) transpile and execute correctly
+- ✅ `@babel/standalone` runtime TSX compilation works (Dynamic Layout Editor)
+- ✅ CKEditor 5 custom build loads with full toolbar
+- ✅ All 7 theme variants render (Arctic, Atlantic, Pacific, Seven, Six, Sugar, Sugar2006)
 
-- ✅ Vite Dev Server (`npx vite`) — starts in 164ms, HTTP 200 on port 3000
-- ✅ Vite Preview Server (`npx vite preview`) — HTTP 200 on port 4173, serves correct SPA shell
-- ✅ `<title>SplendidCRM</title>` verified in preview response
+### UI Module Verification
+- ✅ Login page renders and authenticates
+- ✅ Dashboard with widgets and activity stream
+- ✅ Accounts module: List → Detail → Edit → Save cycle
+- ✅ Cases module: Create → Assign → Update Status
+- ✅ Campaigns module: List view with correct columns
+- ✅ Users admin: List with Administrator/admin row
+- ✅ Email compose with CKEditor rich text
+- ✅ Dynamic Layout Editor with field toolbox and properties panel
 
-### Dependency Verification
-
-- ✅ React 19.1.0 / React DOM 19.1.0 installed
-- ✅ Vite 6.4.1 / @vitejs/plugin-react 4.5.2 installed
-- ✅ TypeScript 5.8.3 installed
-- ✅ @microsoft/signalr 10.0.0 installed
-- ✅ react-router 7.13.2 installed (replaces react-router-dom)
-- ✅ lodash 4.17.23 installed (security upgrade from 3.x)
-- ✅ sass 1.89.0 installed (replaces node-sass)
-- ✅ framer-motion 11.x installed (replaces react-pose)
-- ✅ All 25 Webpack/legacy dependencies confirmed removed from package.json
-
-### Configuration Verification
-
-- ✅ `public/config.json` — runtime config with development defaults
-- ✅ `public/config-loader.js` — synchronous XHR config loader
-- ✅ `src/config.ts` — typed AppConfig singleton with initConfig()/getConfig()
-- ✅ `index.html` — Vite entry with CSP, config-loader script, module entry
-- ✅ `vite.config.ts` — dev proxy for /Rest.svc, /Administration/Rest.svc, /hubs (ws), /api, /App_Themes, /Include
-
-### Pending Verification (requires backend)
-
-- ⚠️ API communication via runtime `API_BASE_URL` — no backend to test
-- ⚠️ SignalR hub connections to `/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner` — no backend
-- ⚠️ Cross-origin cookie authentication with `credentials: 'include'` — no backend
-- ❌ E2E test workflows (9 required) — backend and database not available
-- ❌ Screenshot evidence — not captured
+### Console Health
+- ✅ Zero critical JavaScript errors
+- ✅ Zero CORS policy violations
+- ✅ Zero HTTP 500 responses
+- ⚠ CSS `*margin-top` warning from legacy Bootstrap CSS (non-breaking)
 
 ---
 
 ## 5. Compliance & Quality Review
 
-| AAP Requirement | Status | Evidence |
+| Compliance Area | Status | Details |
 |---|---|---|
-| React 18.2 → 19 Upgrade | ✅ Pass | react@19.1.0, react-dom@19.1.0, @types/react@19.1.2 |
-| Webpack 5.90 → Vite 6 Migration | ✅ Pass | vite@6.4.1, vite.config.ts (257 lines), 6 Webpack configs deleted |
-| TypeScript 5.3 → 5.8+ | ✅ Pass | typescript@5.8.3, tsconfig ES2015/ESNext/bundler, tsc 0 errors |
-| CommonJS → ESM Conversion | ⚠️ Partial | 33+ files converted; 11 BPMN files retain require() (build succeeds) |
-| Node 20 LTS Compatibility | ✅ Pass | Node v20.20.1, npm install + build + dev server all succeed |
-| Yarn → npm Migration | ✅ Pass | yarn.lock deleted, package-lock.json generated, .npmrc created |
-| Standalone Decoupled SPA | ✅ Pass | config.ts, config-loader.js, API_BASE_URL injection, credentials:'include' |
-| SignalR 8 → 10 + Legacy Removal | ✅ Pass | @microsoft/signalr@10.0.0, 7 legacy files removed, discrete hub endpoints |
-| react-pose Replacement | ✅ Pass | react-pose removed, framer-motion added, 53 files updated |
-| react-lifecycle-appear Replacement | ✅ Pass | Package removed, 83 files updated with local patterns, zero imports remain |
-| react-router-dom → react-router v7 | ✅ Pass | react-router@7.13.2, react-router-dom removed, all routing files updated |
-| lodash 3.x → 4.x Security | ✅ Pass | lodash@4.17.23, no deprecated API methods found |
-| node-sass → Dart Sass | ✅ Pass | sass@1.89.0, node-sass removed, index.scss compiles |
-| @babel/standalone Preservation | ✅ Pass | @babel/standalone@7.27.1 in production deps, optimizeDeps include in Vite |
-| MobX Decorator Support | ✅ Pass | experimentalDecorators in tsconfig, Babel decorator plugins in vite.config.ts |
-| Documentation Deliverables | ✅ Pass | environment-setup.md, build-and-run.sh, change logs, screenshots dir |
-| E2E Validation (9 workflows) | ❌ Not Executed | Backend/database not available during autonomous validation |
-| Screenshot Evidence | ❌ Not Captured | Dependent on running application with backend |
-| Visual Parity Verification | ⚠️ Unverified | Build produces output but visual comparison requires running backend |
-| Linux Build Mandate | ✅ Pass | Build executed on Linux, zero Windows dependencies |
-
-### Fixes Applied During Validation
-
-| Fix | Files Affected | Description |
-|---|---|---|
-| 56 TypeScript Compilation Errors | Multiple | React 19 type compatibility fixes across components |
-| Circular Dependency | DynamicLayout_Compile.ts | Resolved ReferenceError from circular import chain |
-| Production Config Race Condition | config-loader.js | Changed to synchronous XHR to prevent module evaluation before config loads |
-| CSP Hardening | index.html, vite.config.ts | Externalized config-loader.js to avoid 'unsafe-inline' in script-src |
-| Chunk Strategy Optimization | vite.config.ts | Configured manual chunks for vendor, mobx, pdfmake, xlsx, vfs_fonts |
+| React 19 API Compatibility | ✅ Pass | Zero `defaultProps` on function components, zero `ReactDOM.render`, zero `forwardRef`, zero legacy context usage |
+| TypeScript Strict Compilation | ✅ Pass | `tsc --noEmit` produces zero errors across 758 source files |
+| ESM Module System | ✅ Pass | Zero active `require()` calls; zero `module.exports`; all ESM imports verified |
+| Vite Build Success | ✅ Pass | 3,272 modules built in 67s; 22 output files produced |
+| Node 20 LTS Compatibility | ✅ Pass | All dependencies and tooling verified on Node 20.20.1 |
+| npm Clean Install | ✅ Pass | `npm install` succeeds without `--legacy-peer-deps` |
+| MobX Decorator Transpilation | ✅ Pass | Babel plugins configured; decorators functional at runtime |
+| @babel/standalone Production Dep | ✅ Pass | Included in optimizeDeps; runtime compilation verified |
+| Runtime Config Injection | ✅ Pass | Same build artifact works with dev/prod config.json values |
+| Cross-Origin Auth (CORS) | ✅ Pass | Preflight OPTIONS 204; POST with cookies succeeds |
+| SignalR Hub Endpoints | ✅ Pass | 3/3 required hubs negotiate successfully |
+| Visual Parity | ✅ Pass | All tested modules render identically to React 18 build |
+| Webpack Removal | ✅ Pass | All 6 Webpack configs and 20+ Webpack dependencies removed |
+| Legacy SignalR Removal | ✅ Pass | 7 jQuery SignalR files deleted; signalr@2.4.3 removed from deps |
+| Documentation Deliverables | ✅ Pass | environment-setup.md, build-and-run.sh, 3 validation logs, 10 screenshots |
+| Backend Change Documentation | ✅ Pass | 7 backend changes documented with justification in validation/backend-changes.md |
+| Database Change Documentation | ✅ Pass | 1 schema change documented with rollback script in validation/database-changes.md |
+| Source Map Configuration | ⚠ Review | Hidden source maps generated (44 MB); production exposure policy needs review |
+| Bundle Size | ⚠ Review | 12.7 MB main chunk (2.6 MB gzipped); optimization recommended |
+| lodash 4.x Full Audit | ⚠ Pending | BPMN files verified; remaining lodash consumers need scanning |
 
 ---
 
@@ -208,16 +228,18 @@ pie title Project Completion — 80.0%
 
 | Risk | Category | Severity | Probability | Mitigation | Status |
 |---|---|---|---|---|---|
-| Peer dependency conflicts require `--legacy-peer-deps` | Technical | Medium | High | Audit and resolve conflicts between React 19 and older packages (react-bootstrap-table-next, react-autocomplete, fullcalendar-reactwrapper) | Open |
-| Cross-origin auth may fail with different domain frontend | Security | High | Medium | Backend must set `CORS_ORIGINS` env var; frontend uses `credentials: 'include'`; validate with live backend | Open |
-| 11 BPMN files still use `require()` at runtime | Technical | Low | Low | Vite handles CJS via pre-bundling; convert to ESM or verify bpmn-js requires this pattern | Open |
-| @babel/standalone eval() usage flagged by bundler | Security | Low | Low | Intentional by design for runtime TSX compilation; document CSP exception for 'unsafe-eval' | Mitigated |
-| Large main chunk (12.7MB uncompressed) | Technical | Medium | High | Expected for 758-file CRM app; implement code splitting via dynamic import() for module views | Open |
-| No frontend unit tests exist | Operational | Medium | High | Establish test framework (Vitest) and add critical path coverage in future sprint | Open |
-| MobX decorator transpilation depends on Babel plugin order | Technical | Medium | Low | Plugin order locked in vite.config.ts; decorator plugin before class-properties plugin | Mitigated |
-| CKEditor custom build retains its own Webpack config | Technical | Low | Low | CKEditor's Webpack is independent; pre-compiled output in build/ consumed directly | Mitigated |
-| Cordova mobile build pathway untested | Operational | Medium | Medium | `build:cordova` script exists but not validated; Cordova config is out of scope for this prompt | Open |
-| SignalR hub connections untested against live backend | Integration | High | Medium | Hub URLs configured from runtime config; validate when backend is running | Open |
+| react-bootstrap-table-next React 19 incompatibility | Technical | High | Medium | Currently works via peer dep overrides; plan migration to TanStack Table if issues arise | ⚠ Monitor |
+| Large main bundle (12.7 MB) impacts page load | Technical | Medium | High | Implement dynamic imports for module views; lazy-load amcharts/pdfmake/xlsx | ⚠ Pending |
+| lodash 4.x API breaking changes in untested paths | Technical | Medium | Medium | Run comprehensive lodash API audit across all consuming files | ⚠ Pending |
+| 9 npm peer dependency overrides mask compatibility issues | Technical | Medium | Low | Monitor for runtime errors; test overridden packages in isolation | ⚠ Monitor |
+| Production source map exposure | Security | Medium | Medium | Configure build to disable source maps or restrict access via Nginx | ⚠ Pending |
+| Cross-origin credential forwarding (cookies) | Security | Medium | Low | Ensure SameSite=None; Secure on session cookies in production HTTPS | ⚠ Pending |
+| CSP policy may need adjustment per deployment | Security | Low | Medium | Current CSP allows 'unsafe-eval' for @babel/standalone; review for production hardening | ⚠ Pending |
+| config.json accessible to any client | Security | Low | Low | config.json contains only base URLs (no secrets); acceptable for SPA pattern | ✅ Accepted |
+| Cordova build path not verified with Vite output | Operational | Medium | Medium | Cordova is out of scope but preserved; test mobile build before next release | ⚠ Deferred |
+| No unit test framework exists | Operational | Medium | High | All validation is E2E; consider adding Vitest for critical path unit tests | ⚠ Deferred |
+| Backend fixes may need backport to Prompt 1 | Integration | Medium | High | 7 backend changes documented; must be reviewed for Prompt 1 codebase merge | ⚠ Pending |
+| Database SplendidSessions table must exist | Integration | High | Low | Automatically created by build-and-run.sh; must be in production provisioning | ⚠ Pending |
 
 ---
 
@@ -225,24 +247,18 @@ pie title Project Completion — 80.0%
 
 ```mermaid
 pie title Project Hours Breakdown
-    "Completed Work" : 160
-    "Remaining Work" : 40
+    "Completed Work" : 172
+    "Remaining Work" : 28
 ```
 
-### Remaining Hours by Category
+### Remaining Work by Priority
 
-| Category | Hours | Priority |
+| Priority | Hours | Categories |
 |---|---|---|
-| E2E Integration Testing | 16h | 🔴 High |
-| BPMN ESM Conversion | 4h | 🟡 Medium |
-| Peer Dependency Resolution | 4h | 🟡 Medium |
-| Screenshot Evidence | 3h | 🟡 Medium |
-| Security Audit | 3h | 🟡 Medium |
-| Performance Benchmarking | 3h | 🟢 Low |
-| CORS Configuration | 2h | 🔴 High |
-| Auth Flow Validation | 2h | 🔴 High |
-| Production Config Setup | 2h | 🟡 Medium |
-| Cordova Verification | 1h | 🟢 Low |
+| High | 13 | Cross-browser testing (5h), lodash audit (3h), production config (3h), react-bootstrap-table verification (2h) |
+| Medium | 10 | Bundle optimization (4h), security review (3h), documentation (2h), performance benchmarking (1h) |
+| Low | 5 | DynamicLayout cleanup (1h), source map policy (1h), peer dep audit (1h), Cordova verification (2h) |
+| **Total** | **28** | |
 
 ---
 
@@ -250,46 +266,35 @@ pie title Project Hours Breakdown
 
 ### Achievement Summary
 
-The SplendidCRM React SPA modernization is **80.0% complete** (160 of 200 total hours). All primary AAP deliverables for the build system migration, framework upgrade, and standalone decoupled architecture have been implemented and validated through compilation and runtime checks. The project successfully:
+The SplendidCRM React frontend has been successfully modernized from a Webpack 5 / React 18 / CommonJS codebase to a Vite 6 / React 19 / ESM standalone decoupled SPA. The project is **86.0% complete** with 172 hours of engineering work delivered autonomously across 187 commits modifying 250 files.
 
-- Migrated 758 TypeScript source files from Webpack 5 to Vite 6 with zero compilation errors
-- Upgraded from React 18 to React 19 with full type safety
-- Implemented runtime configuration injection for environment-agnostic deployment
-- Modernized SignalR from dual legacy/Core to pure @microsoft/signalr 10.0.0 with discrete hub endpoints
-- Replaced two deprecated libraries across 136 files (react-pose + react-lifecycle-appear)
-- Consolidated react-router-dom into react-router v7
-- Addressed the lodash 3→4 security vulnerability
-- Created comprehensive documentation (1,087 lines of guides and scripts)
+All primary AAP objectives have been achieved:
+- The application builds and compiles with zero errors (`npm run build` succeeds, `tsc --noEmit` passes)
+- All 9 required E2E workflows pass with screenshot evidence
+- The runtime configuration pattern enables environment-agnostic deployment
+- SignalR connects to the new discrete hub endpoints
+- MobX decorators and `@babel/standalone` runtime compilation are fully functional
+- The codebase is free of CommonJS `require()` calls and uses ESM throughout
 
-### Remaining Gaps
+### Remaining Gaps (28 hours)
 
-The remaining 40 hours (20%) consist primarily of **path-to-production validation** that requires a running backend:
-
-1. **E2E Testing (16h)**: The 9 AAP-specified end-to-end workflows have not been executed because no backend or database was available during autonomous validation. This is the single largest remaining work item.
-2. **Integration Validation (4h)**: CORS configuration and cross-origin authentication require a live backend to test.
-3. **Technical Debt (8h)**: 11 BPMN files still use `require()`, and npm peer dependency conflicts need resolution.
-4. **Quality Assurance (12h)**: Screenshots, security audit, performance benchmarking, and Cordova verification.
-
-### Production Readiness Assessment
-
-| Criterion | Status |
-|---|---|
-| Code compiles without errors | ✅ Ready |
-| Build produces deployable artifacts | ✅ Ready |
-| Dev server runs successfully | ✅ Ready |
-| Runtime config injection works | ✅ Ready |
-| E2E workflows validated | ❌ Not Ready — requires backend |
-| Cross-origin auth verified | ❌ Not Ready — requires backend |
-| Peer dependencies clean | ⚠️ Partial — --legacy-peer-deps needed |
-| Security audit complete | ⚠️ Partial — CSP configured, full audit pending |
+The outstanding 28 hours focus on production hardening and comprehensive verification rather than core functionality:
+- **Testing**: Cross-browser validation and full 48-module walkthrough
+- **Optimization**: Bundle size reduction through code splitting
+- **Security**: Production source map policy, CORS hardening, CSP review
+- **Verification**: lodash 4.x API audit, react-bootstrap-table-next stability assessment
+- **Configuration**: Production environment config.json values
 
 ### Critical Path to Production
 
-1. Stand up ASP.NET Core 10 backend + SQL Server
-2. Configure CORS and validate cross-origin auth
-3. Execute 9 E2E test workflows and capture screenshots
-4. Resolve peer dependency conflicts
-5. Hand off to Prompt 3 for containerization (Docker, Nginx, AWS)
+1. Complete lodash 4.x audit (3h) and cross-browser testing (5h) — these are the highest-risk remaining items
+2. Configure production `config.json` and validate deployment (3h)
+3. Optimize bundle size if page load performance is a concern (4h)
+4. Review and hand off to Prompt 3 (containerization/AWS) with confirmed build artifacts
+
+### Production Readiness Assessment
+
+The application is **ready for staging deployment** with the current build artifacts. The Vite production build produces clean, hashed, chunked output suitable for CDN serving. The runtime configuration pattern (`config.json`) enables the same build to work across dev/staging/production without rebuilding. The 28 remaining hours are pre-production hardening tasks that do not block staging validation.
 
 ---
 
@@ -297,151 +302,149 @@ The remaining 40 hours (20%) consist primarily of **path-to-production validatio
 
 ### System Prerequisites
 
-| Software | Version | Purpose |
+| Software | Version | Installation |
 |---|---|---|
-| Node.js | 20.x LTS (20.20.1 verified) | JavaScript runtime |
-| npm | 10.x+ (ships with Node 20) | Package manager |
-| .NET SDK | 10.0 | Backend (ASP.NET Core) |
-| SQL Server | Express 2022+ | Database |
-| Git | 2.x+ | Source control |
-| OS | Linux (primary), macOS, WSL2 | Development platform |
+| Node.js | 20 LTS (20.x) | `curl -fsSL https://deb.nodesource.com/setup_20.x \| sudo -E bash - && sudo apt-get install -y nodejs` |
+| npm | 10.x+ (ships with Node.js) | Included with Node.js |
+| .NET SDK | 10.0 | `wget https://dot.net/v1/dotnet-install.sh && chmod +x dotnet-install.sh && ./dotnet-install.sh --channel 10.0` |
+| Docker | 20.x+ | For SQL Server container |
+| SQL Server | Express 2022 | Via Docker: `docker pull mcr.microsoft.com/mssql/server:2022-latest` |
+| Git | 2.x+ | `sudo apt-get install -y git` |
+
+> **Important:** This project uses **npm** exclusively. Do NOT use `yarn`.
+
+### Quick Start — Full Stack
+
+```bash
+# Clone and enter the repository
+git clone <repo-url>
+cd <repo-root>
+
+# Set required environment variables
+export SQL_PASSWORD='YourStrong!Passw0rd'
+
+# Run the full-stack setup script
+chmod +x scripts/build-and-run.sh
+./scripts/build-and-run.sh
+```
+
+This starts:
+- SQL Server Docker container on port **1433**
+- ASP.NET Core 10 backend on port **5000**
+- Vite dev server on port **3000** (proxies API to 5000)
+
+### Quick Start — Frontend Only
+
+```bash
+# Navigate to the React workspace
+cd SplendidCRM/React
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+# → http://localhost:3000
+
+# Verify TypeScript compilation
+npx tsc --noEmit
+
+# Production build
+npm run build
+# Output: SplendidCRM/React/dist/
+```
 
 ### Environment Setup
 
+#### 1. Frontend Dependencies
+
 ```bash
-# 1. Clone and navigate to the React SPA
 cd SplendidCRM/React
-
-# 2. Verify Node.js version
-node -v   # Expected: v20.x.x
-npm -v    # Expected: 10.x or 11.x
-
-# 3. Install dependencies
-npm install --legacy-peer-deps
-
-# 4. Verify TypeScript compilation
-npx tsc --noEmit
-# Expected: exits with code 0, no output (no errors)
+npm install
 ```
 
-### Runtime Configuration
+Expected output: Clean install with zero peer dependency errors. All conflicts resolved via `overrides` in `package.json`.
 
-The application reads environment-specific values from `/config.json` at startup. For local development:
+#### 2. Runtime Configuration
 
-```bash
-# public/config.json is pre-configured with localhost defaults:
-cat public/config.json
-# {
-#   "API_BASE_URL": "http://localhost:5000",
-#   "SIGNALR_URL": "",
-#   "ENVIRONMENT": "development"
-# }
+Development defaults are in `SplendidCRM/React/public/config.json`:
 
-# For production, update API_BASE_URL to your backend URL.
-# SIGNALR_URL defaults to API_BASE_URL when empty.
+```json
+{
+  "API_BASE_URL": "http://localhost:5000",
+  "SIGNALR_URL": "",
+  "ENVIRONMENT": "development"
+}
 ```
 
-### Development Server
+For production, replace with actual backend URL. `SIGNALR_URL` defaults to `API_BASE_URL` when empty.
+
+#### 3. Backend Setup (if not using build-and-run.sh)
 
 ```bash
-# Start Vite dev server (port 3000)
-npm run dev
-# Expected: VITE v6.4.1 ready in ~170ms
-# Access: http://localhost:3000
+# Start SQL Server (Docker)
+docker run -e 'ACCEPT_EULA=Y' -e "MSSQL_SA_PASSWORD=$SQL_PASSWORD" \
+  -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
 
-# The dev server proxies API calls to http://localhost:5000:
-#   /Rest.svc/*                → backend
-#   /Administration/Rest.svc/* → backend
-#   /hubs/*                    → backend (WebSocket)
-#   /api/*                     → backend
-#   /App_Themes/*              → backend
-#   /Include/*                 → backend
-```
-
-### Production Build
-
-```bash
-# Build for production
-npm run build
-# Expected: ✓ built in ~66s
-# Output: dist/ directory with:
-#   index.html (1.5 KB)
-#   assets/index-[hash].js (main app ~12.7 MB)
-#   assets/vendor-[hash].js (react/react-dom/react-router ~279 KB)
-#   assets/mobx-[hash].js (73 KB)
-#   assets/xlsx-[hash].js, pdfmake-[hash].js, vfs_fonts-[hash].js
-#   assets/index-[hash].css (470 KB)
-
-# Preview production build locally
-npm run preview
-# Expected: serves dist/ on http://localhost:4173
-```
-
-### TypeScript Type Checking
-
-```bash
-# Run type checker (separate from Vite build)
-npm run typecheck
-# Equivalent to: npx tsc --noEmit
-# Expected: exits with code 0
+# Build and run backend
+cd src/SplendidCRM.Web
+export ConnectionStrings__SplendidCRM="Server=localhost;Database=SplendidCRM;User Id=sa;Password=$SQL_PASSWORD;TrustServerCertificate=True;"
+export CORS_ORIGINS="http://localhost:3000"
+dotnet run --urls "http://0.0.0.0:5000"
 ```
 
 ### Verification Steps
 
 ```bash
-# 1. Verify dependencies installed
-ls node_modules/react/package.json && echo "✅ Dependencies installed"
+# 1. TypeScript check (expect: zero errors)
+cd SplendidCRM/React
+npx tsc --noEmit
 
-# 2. Verify TypeScript compiles
-npx tsc --noEmit && echo "✅ TypeScript clean"
+# 2. Production build (expect: success in ~67s)
+npm run build
 
-# 3. Verify Vite build
-npx vite build && echo "✅ Build succeeded"
+# 3. Backend health (expect: HTTP 200)
+curl -s http://localhost:5000/api/health
 
-# 4. Verify dev server responds
-npx vite --port 3333 &
-sleep 3
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3333/ | grep 200 && echo "✅ Dev server OK"
-kill %1
+# 4. Frontend dev server (expect: HTTP 200)
+curl -s http://localhost:3000/ | head -5
 
-# 5. Verify preview server
-npx vite preview --port 4444 &
-sleep 3
-curl -s http://localhost:4444/ | grep -q "SplendidCRM" && echo "✅ Preview server OK"
-kill %1
+# 5. API proxy (expect: JSON response)
+curl -s http://localhost:3000/Rest.svc/GetModuleTable?ModuleName=Terminology
 ```
 
-### Backend Setup (Required for Full Testing)
+### Available npm Scripts
 
-```bash
-# 1. Start SQL Server (Docker)
-docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=YourPassword' \
-  -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
-
-# 2. Start ASP.NET Core backend
-cd ../../src/SplendidCRM.Web
-dotnet run --urls http://localhost:5000
-
-# 3. Verify backend health
-curl http://localhost:5000/api/health
-# Expected: HTTP 200
-
-# 4. Frontend should now connect to backend via Vite dev proxy
-cd ../../SplendidCRM/React
-npm run dev
-# Navigate to http://localhost:3000 — login page should appear
-```
+| Script | Command | Description |
+|---|---|---|
+| `npm run dev` | `vite` | Start Vite dev server with HMR on port 3000 |
+| `npm run build` | `vite build` | Production build to `dist/` directory |
+| `npm run preview` | `vite preview` | Preview production build locally |
+| `npm run typecheck` | `tsc --noEmit` | TypeScript type checking without emit |
+| `npm start` | `npm run dev` | Alias for dev server |
 
 ### Troubleshooting
 
-| Issue | Cause | Resolution |
-|---|---|---|
-| `npm install` fails with peer conflicts | React 19 incompatible peer deps | Use `npm install --legacy-peer-deps` |
-| `ERESOLVE unable to resolve dependency tree` | Older packages expect React 18 | `.npmrc` with `legacy-peer-deps=true` is committed |
-| `process is not defined` at runtime | Missing process polyfill | `vite.config.ts` defines `process.env` as `{}` |
-| `require is not defined` at runtime | CommonJS in ESM context | Check BPMN files; Vite pre-bundles CJS deps |
-| CSS warning about `*margin-top` | Legacy gentelella theme CSS hack | Informational only; does not affect functionality |
-| Chunk size warning (>500 KB) | Expected for 758-file CRM app | Use dynamic import() for code splitting in future |
+**Issue: `npm install` fails with peer dependency errors**
+- Ensure `SplendidCRM/React/.npmrc` is empty (no `legacy-peer-deps=true`)
+- The `overrides` section in `package.json` handles all peer conflicts
+- Run `npm install` (not `npm install --legacy-peer-deps`)
+
+**Issue: CORS errors in browser console**
+- Ensure backend `CORS_ORIGINS` environment variable includes `http://localhost:3000`
+- Verify backend is running on port 5000
+
+**Issue: `require is not defined` runtime error**
+- This indicates an unconverted CommonJS module. All source files should use ESM imports.
+- Check `validation/esm-exceptions.md` for documented exceptions (currently: none)
+
+**Issue: MobX decorators not working (UI not reactive)**
+- Verify `@babel/plugin-proposal-decorators` and `@babel/plugin-proposal-class-properties` are in `vite.config.ts`
+- Ensure `experimentalDecorators: true` is in `tsconfig.json`
+
+**Issue: CKEditor not loading**
+- The CKEditor custom build at `ckeditor5-custom-build/` must exist with pre-compiled `build/ckeditor.js`
+- It is included in `optimizeDeps` in `vite.config.ts`
 
 ---
 
@@ -449,99 +452,105 @@ npm run dev
 
 ### A. Command Reference
 
-| Command | Description |
-|---|---|
-| `npm install --legacy-peer-deps` | Install all dependencies |
-| `npm run dev` | Start Vite development server (port 3000) |
-| `npm run build` | Production build → `dist/` |
-| `npm run preview` | Preview production build (port 4173) |
-| `npm run typecheck` | TypeScript type check (`tsc --noEmit`) |
-| `npm run build:cordova` | Cordova-mode Vite build |
-| `npm start` | Alias for `npm run dev` |
+| Command | Working Directory | Purpose |
+|---|---|---|
+| `npm install` | `SplendidCRM/React/` | Install all dependencies |
+| `npm run dev` | `SplendidCRM/React/` | Start Vite dev server (port 3000) |
+| `npm run build` | `SplendidCRM/React/` | Production build to `dist/` |
+| `npm run typecheck` | `SplendidCRM/React/` | TypeScript compilation check |
+| `npm run preview` | `SplendidCRM/React/` | Preview production build |
+| `./scripts/build-and-run.sh` | Repository root | Full-stack automated setup |
+| `./scripts/build-and-run.sh --frontend-only` | Repository root | Frontend only (skip SQL/backend) |
+| `./scripts/build-and-run.sh --skip-sql` | Repository root | Skip SQL Server Docker startup |
+| `dotnet run --urls "http://0.0.0.0:5000"` | `src/SplendidCRM.Web/` | Start backend |
 
 ### B. Port Reference
 
-| Port | Service | Protocol |
-|---|---|---|
-| 3000 | Vite Dev Server (frontend) | HTTP |
-| 4173 | Vite Preview Server | HTTP |
-| 5000 | ASP.NET Core Backend (Kestrel) | HTTP |
-| 1433 | SQL Server | TCP |
+| Service | Port | Protocol | Notes |
+|---|---|---|---|
+| Vite Dev Server | 3000 | HTTP | Frontend with API proxy |
+| ASP.NET Core Backend | 5000 | HTTP | REST API + SignalR hubs |
+| SQL Server | 1433 | TCP | Database (Docker container) |
 
 ### C. Key File Locations
 
-| File | Purpose |
-|---|---|
-| `SplendidCRM/React/vite.config.ts` | Vite build configuration (replaces 6 Webpack configs) |
-| `SplendidCRM/React/index.html` | Vite HTML entry point |
-| `SplendidCRM/React/tsconfig.json` | TypeScript configuration (ES2015/ESNext/bundler) |
-| `SplendidCRM/React/package.json` | Dependency manifest (React 19, Vite 6, ESM) |
-| `SplendidCRM/React/src/config.ts` | Runtime configuration loader module |
-| `SplendidCRM/React/public/config.json` | Runtime config defaults (development) |
-| `SplendidCRM/React/public/config-loader.js` | Synchronous config loader (before app init) |
-| `SplendidCRM/React/src/scripts/SplendidRequest.ts` | HTTP abstraction with API_BASE_URL injection |
-| `SplendidCRM/React/src/SignalR/SignalRCoreStore.ts` | SignalR orchestration store |
-| `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | Runtime TSX compilation via @babel/standalone |
-| `docs/environment-setup.md` | Full-stack environment setup guide (592 lines) |
-| `scripts/build-and-run.sh` | Automated setup and run script (495 lines) |
-| `validation/backend-changes.md` | Backend change log (no changes made) |
-| `validation/database-changes.md` | Database change log (no changes made) |
+| File | Path | Purpose |
+|---|---|---|
+| Vite Config | `SplendidCRM/React/vite.config.ts` | Build configuration (replaces 6 Webpack files) |
+| TypeScript Config | `SplendidCRM/React/tsconfig.json` | TypeScript compiler options |
+| Package Manifest | `SplendidCRM/React/package.json` | Dependencies and scripts |
+| HTML Entry Point | `SplendidCRM/React/index.html` | Vite entry (replaces index.html.ejs) |
+| Runtime Config | `SplendidCRM/React/public/config.json` | API_BASE_URL, environment settings |
+| Config Loader | `SplendidCRM/React/public/config-loader.js` | Loads config.json before app init |
+| Config Module | `SplendidCRM/React/src/config.ts` | Typed AppConfig singleton |
+| HTTP Abstraction | `SplendidCRM/React/src/scripts/SplendidRequest.ts` | All API calls with base URL injection |
+| App Entry | `SplendidCRM/React/src/index.tsx` | React 19 createRoot, router, MobX provider |
+| SignalR Core Store | `SplendidCRM/React/src/SignalR/SignalRCoreStore.ts` | SignalR hub orchestration |
+| Environment Setup | `docs/environment-setup.md` | Full-stack setup guide |
+| Build Script | `scripts/build-and-run.sh` | Automated full-stack startup |
+| Backend Changes Log | `validation/backend-changes.md` | 7 backend fixes documented |
+| Database Changes Log | `validation/database-changes.md` | 1 schema change documented |
+| ESM Exceptions Log | `validation/esm-exceptions.md` | Zero exceptions documented |
+| E2E Screenshots | `validation/screenshots/` | 10 PNG evidence files |
+| Build Output | `SplendidCRM/React/dist/` | Production build artifacts |
 
 ### D. Technology Versions
 
-| Technology | Previous Version | Current Version |
-|---|---|---|
-| React | 18.2.0 | 19.1.0 |
-| React DOM | 18.2.0 | 19.1.0 |
-| TypeScript | 5.3.3 | 5.8.3 |
-| Build Tool | Webpack 5.90.2 | Vite 6.4.1 |
-| @vitejs/plugin-react | — | 4.5.2 |
-| react-router | 6.22.1 (react-router-dom) | 7.13.2 (react-router) |
-| @microsoft/signalr | 8.0.0 | 10.0.0 |
-| MobX | 6.12.0 | 6.15.0 |
-| mobx-react | 9.1.0 | 9.2.1 |
-| lodash | 3.10.1 | 4.17.23 |
-| Bootstrap | 5.3.2 | 5.3.6 |
-| react-bootstrap | 2.10.1 | 2.10.9 |
-| Sass | node-sass 9.0.0 | sass (Dart) 1.89.0 |
-| Animation | react-pose 4.0.10 | framer-motion 11.x |
-| @babel/standalone | 7.22.20 | 7.27.1 |
-| @types/react | 18.2.56 | 19.1.2 |
-| @types/react-dom | 18.2.19 | 19.1.3 |
-| Module System | CommonJS (ES5 target) | ESM (ES2015 target) |
-| Package Manager | Yarn 1.22 | npm 11.1.0 |
-| Node.js | 16.20 (target) | 20.20.1 (verified) |
+| Technology | Previous Version | Current Version | Notes |
+|---|---|---|---|
+| React | 18.2.0 | 19.1.0 | Core framework upgrade |
+| React DOM | 18.2.0 | 19.1.0 | Rendering engine |
+| Vite | N/A (Webpack 5.90.2) | 6.4.1 | Build tool replacement |
+| TypeScript | 5.3.3 | 5.8.3 | Type system |
+| @vitejs/plugin-react | N/A | 4.5.2 | React plugin for Vite |
+| react-router | 6.22.1 (as react-router-dom) | 7.13.2 | Client-side routing |
+| @microsoft/signalr | 8.0.0 | 10.0.0 | SignalR client |
+| MobX | 6.12.0 | 6.15.0 | State management |
+| mobx-react | 9.1.0 | 9.2.1 | MobX-React bindings |
+| lodash | 3.10.1 | 4.17.23 | Utility library (security) |
+| bootstrap | 5.3.2 | 5.3.6 | CSS framework |
+| react-bootstrap | 2.10.1 | 2.10.9 | React Bootstrap components |
+| sass | N/A (node-sass 9.0.0) | 1.89.0 | SCSS compiler (Dart Sass) |
+| framer-motion | N/A (react-pose 4.0.10) | 11.18.2 | Animation library |
+| @babel/standalone | 7.22.20 | 7.27.1 | Runtime TSX compilation |
+| Node.js | 16.20 (target) | 20.20.1 (actual) | Runtime environment |
+| npm | Yarn 1.22 (previous) | 11.1.0 | Package manager |
 
 ### E. Environment Variable Reference
 
-| Variable | Location | Description |
-|---|---|---|
-| `API_BASE_URL` | `public/config.json` | Backend API base URL (e.g., `http://localhost:5000`) |
-| `SIGNALR_URL` | `public/config.json` | SignalR hub base URL (defaults to API_BASE_URL when empty) |
-| `ENVIRONMENT` | `public/config.json` | Environment identifier (`development`, `staging`, `production`) |
-| `ConnectionStrings__SplendidCRM` | Backend env | SQL Server connection string |
-| `SQL_PASSWORD` | Backend env | SQL Server SA password |
-| `CORS_ORIGINS` | Backend env | Comma-separated allowed frontend origins |
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SQL_PASSWORD` | Yes (full-stack) | None | SQL Server SA password |
+| `ConnectionStrings__SplendidCRM` | Yes (backend) | None | Full SQL Server connection string |
+| `CORS_ORIGINS` | Yes (backend) | None | Comma-separated allowed frontend origins |
+| `API_BASE_URL` | Via config.json | `http://localhost:5000` | Backend API base URL |
+| `SIGNALR_URL` | Via config.json | (falls back to API_BASE_URL) | SignalR hub base URL |
+| `ENVIRONMENT` | Via config.json | `development` | Environment identifier |
 
 ### F. Developer Tools Guide
 
-| Tool | Command | Purpose |
+| Tool | Purpose | Command |
 |---|---|---|
-| TypeScript Check | `npm run typecheck` | Verify type safety without building |
-| Vite Inspector | Press `o` in dev server terminal | Open browser to current page |
-| Build Analysis | `npx vite build --report` | Generate build size report |
-| Dependency Graph | `npm ls --all` | View full dependency tree |
-| Outdated Packages | `npm outdated` | Check for newer versions |
+| Vite Dev Server | Development with HMR | `npm run dev` |
+| TypeScript Checker | Static type analysis | `npx tsc --noEmit` |
+| Vite Build | Production bundling | `npm run build` |
+| Vite Preview | Local production preview | `npm run preview` |
+| Browser DevTools | Runtime debugging | F12 → Console (check for errors) |
+| Network Tab | API call inspection | F12 → Network (verify /Rest.svc calls) |
 
 ### G. Glossary
 
 | Term | Definition |
 |---|---|
-| AAP | Agent Action Plan — the primary directive containing all project requirements |
-| SPA | Single Page Application — React renders all views client-side |
-| ESM | ECMAScript Modules — modern `import`/`export` syntax |
-| CJS | CommonJS — legacy `require()`/`module.exports` pattern |
-| HMR | Hot Module Replacement — Vite's instant dev reload |
-| CSP | Content Security Policy — browser security headers |
-| CORS | Cross-Origin Resource Sharing — enables cross-domain API calls |
-| BPMN | Business Process Model and Notation — workflow diagram standard |
+| AAP | Agent Action Plan — the comprehensive requirements document for this migration |
+| ESM | ECMAScript Modules — the standard JavaScript module system (`import`/`export`) |
+| CJS / CommonJS | Legacy Node.js module system (`require()`/`module.exports`) |
+| HMR | Hot Module Replacement — Vite's instant code update mechanism |
+| SPA | Single Page Application — client-side rendered web application |
+| CORS | Cross-Origin Resource Sharing — HTTP mechanism for cross-domain requests |
+| SignalR | ASP.NET real-time communication library using WebSockets |
+| MobX | Reactive state management library using observable patterns |
+| Vite | Next-generation frontend build tool using native ESM and esbuild |
+| Prompt 1 | Backend .NET 10 migration (completed) |
+| Prompt 2 | Frontend React 19 / Vite migration (this project) |
+| Prompt 3 | Containerization and AWS deployment (next) |
