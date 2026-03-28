@@ -364,16 +364,21 @@ if [ "${FRONTEND_ONLY}" = false ] && [ "${SKIP_SQL}" = false ]; then
   success "SQL Server is ready and accepting connections."
 
   # ---- Schema Provisioning ----
-  # Check if SplendidCRM database already exists with expected objects
+  # Check if SplendidCRM database already exists with expected objects.
+  # We verify both table and view counts to guard against partial provisioning.
   DB_EXISTS=false
+  TABLE_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "${SA_PASSWORD}" -C \
+    -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'" \
+    -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
   VIEW_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
     -S localhost -U sa -P "${SA_PASSWORD}" -C \
     -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.VIEWS" \
     -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
 
-  if [ "${VIEW_COUNT}" -gt 300 ]; then
+  if [ "${TABLE_COUNT}" -gt 300 ] && [ "${VIEW_COUNT}" -gt 500 ]; then
     DB_EXISTS=true
-    success "SplendidCRM database exists with ${VIEW_COUNT} views. Skipping schema provisioning."
+    success "SplendidCRM database exists with ${TABLE_COUNT} tables and ${VIEW_COUNT} views. Skipping schema provisioning."
   fi
 
   if [ "${DB_EXISTS}" = false ]; then
@@ -388,22 +393,47 @@ if [ "${FRONTEND_ONLY}" = false ] && [ "${SKIP_SQL}" = false ]; then
     SQL_ARTIFACT_DIR="./dist/sql"
     mkdir -p "${SQL_ARTIFACT_DIR}"
 
+    # Regenerate Build.sql if it does not exist, is empty, or was generated
+    # by an older version of this script (prior to the suffix-ordered fix).
+    # The marker comment below is written at the top of every correctly
+    # generated Build.sql so we can detect stale files.
+    BUILD_SQL_MARKER="-- build-and-run.sh suffix-ordered v2"
+    NEEDS_REBUILD=false
     if [ ! -f "${SQL_ARTIFACT_DIR}/Build.sql" ] || [ ! -s "${SQL_ARTIFACT_DIR}/Build.sql" ]; then
+      NEEDS_REBUILD=true
+    elif ! head -1 "${SQL_ARTIFACT_DIR}/Build.sql" | grep -qF "${BUILD_SQL_MARKER}"; then
+      info "Detected Build.sql generated with old ordering. Regenerating..."
+      NEEDS_REBUILD=true
+    fi
+
+    if [ "${NEEDS_REBUILD}" = true ]; then
       info "Generating Build.sql from SQL Scripts Community/..."
 
-      > "${SQL_ARTIFACT_DIR}/Build.sql"
+      echo "${BUILD_SQL_MARKER}" > "${SQL_ARTIFACT_DIR}/Build.sql"
 
+      # Directory order matches the upstream Build.bat dependency chain.
+      # "Reports" is intentionally omitted — the community edition ships no
+      # Reports/ SQL directory, and its absence is harmless.
       SQL_DIRS=(
         "ProceduresDDL" "BaseTables" "Tables" "Functions"
         "ViewsDDL" "Views" "Procedures" "Triggers"
-        "Data" "Reports" "Terminology"
+        "Data" "Terminology"
       )
 
+      # CRITICAL: Within each directory the SQL files use a numeric suffix
+      # convention (e.g. ACCOUNTS.1.sql, ACCOUNTS_BUGS.2.sql) to encode
+      # dependency order. All *.0.sql files must execute before *.1.sql,
+      # all *.1.sql before *.2.sql, and so on up to *.9.sql.  A plain
+      # alphabetical sort would interleave suffixes (ACCOUNTS_BUGS.2.sql
+      # before BUGS.1.sql) causing foreign-key failures.  The nested loop
+      # below mirrors the Build.bat strategy of concatenating by suffix.
       for dir in "${SQL_DIRS[@]}"; do
         if [ -d "SQL Scripts Community/${dir}" ]; then
-          find "SQL Scripts Community/${dir}" -name "*.sql" -print0 \
-            | sort -z \
-            | xargs -r -0 cat >> "${SQL_ARTIFACT_DIR}/Build.sql"
+          for suffix in 0 1 2 3 4 5 6 7 8 9; do
+            find "SQL Scripts Community/${dir}" -name "*.${suffix}.sql" -print0 \
+              | sort -z \
+              | xargs -r -0 cat >> "${SQL_ARTIFACT_DIR}/Build.sql"
+          done
           echo "GO" >> "${SQL_ARTIFACT_DIR}/Build.sql"
         fi
       done
@@ -416,18 +446,38 @@ if [ "${FRONTEND_ONLY}" = false ] && [ "${SKIP_SQL}" = false ]; then
     # Execute Build.sql against SQL Server
     info "Executing Build.sql (this may take several minutes)..."
     ${DOCKER_CMD} cp "${SQL_ARTIFACT_DIR}/Build.sql" "${SQL_CONTAINER}:/tmp/Build.sql"
+    # Note: -b is intentionally omitted so that non-fatal dependency
+    # warnings (e.g. forward-referenced modules) do not abort the run.
     ${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
       -S localhost -U sa -P "${SA_PASSWORD}" -C \
       -d SplendidCRM \
       -i /tmp/Build.sql \
-      -b 2>&1 | tail -5 || warn "Some SQL statements produced warnings (non-fatal)."
+      2>&1 | tail -5 || warn "Some SQL statements produced warnings (non-fatal)."
 
-    # Verify provisioning
+    # Verify provisioning — check tables, views, stored procedures and functions
+    FINAL_TABLE_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+      -S localhost -U sa -P "${SA_PASSWORD}" -C \
+      -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'" \
+      -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
     FINAL_VIEW_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
       -S localhost -U sa -P "${SA_PASSWORD}" -C \
       -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.VIEWS" \
       -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
-    success "Schema provisioned: ${FINAL_VIEW_COUNT} views in SplendidCRM database."
+    FINAL_PROC_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+      -S localhost -U sa -P "${SA_PASSWORD}" -C \
+      -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'" \
+      -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
+    FINAL_FUNC_COUNT=$(${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+      -S localhost -U sa -P "${SA_PASSWORD}" -C \
+      -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM SplendidCRM.INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'" \
+      -h -1 -W 2>/dev/null | tr -d '[:space:]' || echo "0")
+    success "Schema provisioned: ${FINAL_TABLE_COUNT} tables, ${FINAL_VIEW_COUNT} views, ${FINAL_PROC_COUNT} procedures, ${FINAL_FUNC_COUNT} functions."
+
+    # Sanity-check: the community edition should produce at least 300 tables and 500 views.
+    if [ "${FINAL_TABLE_COUNT}" -lt 300 ] || [ "${FINAL_VIEW_COUNT}" -lt 500 ]; then
+      warn "Schema object counts are lower than expected. Some SQL scripts may have failed."
+      warn "Expected ≥300 tables and ≥500 views; got ${FINAL_TABLE_COUNT} tables and ${FINAL_VIEW_COUNT} views."
+    fi
   fi
 
   # Ensure SplendidSessions table exists (required for session management)
@@ -507,7 +557,12 @@ else
 fi
 
 # ---- npm run build (vite build) ----
-info "Building frontend with Vite..."
+# Guard against JavaScript heap-out-of-memory on constrained machines.
+# Vite + Rollup bundling the full 763-file SPA can peak above the default
+# Node.js heap limit.  Setting --max-old-space-size=4096 (4 GB) provides
+# comfortable headroom without requiring the caller to export NODE_OPTIONS.
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
+info "Building frontend with Vite (NODE_OPTIONS=${NODE_OPTIONS})..."
 if npm run build; then
   success "Frontend build complete. Output: ${FRONTEND_DIR}/dist/"
 else

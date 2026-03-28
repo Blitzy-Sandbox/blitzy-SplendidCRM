@@ -147,20 +147,43 @@ Download SQL Server Express 2022 from [Microsoft's download page](https://www.mi
 
 ### Database Initialization
 
-The database schema is created from SQL scripts in the repository:
+The database schema is created from SQL scripts in the repository. Each SQL file uses a numeric suffix convention (e.g. `ACCOUNTS.1.sql`, `ACCOUNTS_BUGS.2.sql`) to encode dependency order. All `*.0.sql` files must execute before `*.1.sql`, all `*.1.sql` before `*.2.sql`, and so on. A plain alphabetical sort would interleave these suffixes and cause foreign-key failures.
 
 ```bash
 # Create the combined Build.sql from individual script directories
 mkdir -p dist/sql
+> dist/sql/Build.sql
 
-# Concatenate scripts in dependency order
-for dir in ProceduresDDL BaseTables Tables Functions ViewsDDL Views Procedures Triggers Data Reports Terminology; do
-  find "SQL Scripts Community/$dir" -name "*.sql" -print0 | sort -z | xargs -r -0 cat >> dist/sql/Build.sql
-  echo "GO" >> dist/sql/Build.sql
+# Concatenate scripts in dependency order — by numeric suffix within each directory.
+# "Reports" is omitted; the community edition has no Reports/ SQL directory.
+for dir in ProceduresDDL BaseTables Tables Functions ViewsDDL Views Procedures Triggers Data Terminology; do
+  if [ -d "SQL Scripts Community/$dir" ]; then
+    for suffix in 0 1 2 3 4 5 6 7 8 9; do
+      find "SQL Scripts Community/$dir" -name "*.${suffix}.sql" -print0 | sort -z | xargs -r -0 cat >> dist/sql/Build.sql
+    done
+    echo "GO" >> dist/sql/Build.sql
+  fi
 done
 ```
 
-Then execute `dist/sql/Build.sql` against your SQL Server instance to create the `SplendidCRM` database and all schema objects.
+Create the database and execute the combined script:
+
+```bash
+# Create the SplendidCRM database (inside Docker container)
+docker exec splendid-sql /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P "YourStrong!Password" -C \
+  -Q "IF NOT EXISTS (SELECT * FROM sys.databases WHERE name='SplendidCRM') CREATE DATABASE SplendidCRM"
+
+# Copy and execute the schema script
+docker cp dist/sql/Build.sql splendid-sql:/tmp/Build.sql
+docker exec splendid-sql /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P "YourStrong!Password" -C \
+  -d SplendidCRM -i /tmp/Build.sql
+```
+
+After successful provisioning you should see approximately **413 tables**, **690 views**, **901 stored procedures**, and **80 functions** in the SplendidCRM database.
+
+> **Note:** The `build-and-run.sh` script automates this entire process, including dependency-ordered SQL generation and execution. Running the script is the recommended approach.
 
 ### Connection String
 
