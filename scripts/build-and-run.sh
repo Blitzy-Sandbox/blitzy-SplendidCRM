@@ -480,24 +480,44 @@ if [ "${FRONTEND_ONLY}" = false ] && [ "${SKIP_SQL}" = false ]; then
     fi
   fi
 
-  # Ensure SplendidSessions table exists (required for session management)
+  # Ensure SplendidSessions table exists with correct schema required by
+  # Microsoft.Extensions.Caching.SqlServer v10 (SESSION_PROVIDER=SqlServer).
+  # The package internally queries column "Id NVARCHAR(449)" — not "SessionId".
+  # If the table exists but was created with the wrong column name, drop and recreate.
   ${DOCKER_CMD} exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
     -S localhost -U sa -P "${SA_PASSWORD}" -C \
     -d SplendidCRM \
     -Q "
-      IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SplendidSessions')
+      -- Drop table if it exists with wrong schema (SessionId instead of Id)
+      IF EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME = 'SplendidSessions'
+      )
+      AND NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'SplendidSessions' AND COLUMN_NAME = 'Id'
+      )
+      BEGIN
+        DROP TABLE dbo.SplendidSessions;
+        PRINT 'Dropped SplendidSessions table with wrong schema (SessionId column).';
+      END
+
+      IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME = 'SplendidSessions'
+      )
       BEGIN
         CREATE TABLE dbo.SplendidSessions (
-          SessionId    NVARCHAR(88) NOT NULL PRIMARY KEY,
-          Value        VARBINARY(MAX) NOT NULL,
-          ExpiresAtTime DATETIMEOFFSET NOT NULL,
-          SlidingExpirationInSeconds BIGINT NULL,
-          AbsoluteExpiration DATETIMEOFFSET NULL
+          Id                         NVARCHAR(449)   NOT NULL PRIMARY KEY,
+          Value                      VARBINARY(MAX)  NOT NULL,
+          ExpiresAtTime              DATETIMEOFFSET  NOT NULL,
+          SlidingExpirationInSeconds BIGINT          NULL,
+          AbsoluteExpiration         DATETIMEOFFSET  NULL
         );
-        PRINT 'Created SplendidSessions table.';
+        PRINT 'Created SplendidSessions table with correct schema.';
       END
       ELSE
-        PRINT 'SplendidSessions table already exists.';
+        PRINT 'SplendidSessions table already exists with correct schema.';
     " 2>/dev/null || warn "SplendidSessions table check produced a warning."
 
   # Set connection string for the backend

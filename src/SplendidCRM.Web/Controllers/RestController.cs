@@ -2502,7 +2502,7 @@ namespace SplendidCRM.Web.Controllers
 				var result = new Dictionary<string, object>();
 				result["loginConfig"         ] = _splendidCache.GetLoginConfig();
 				// Use the login-module subset of terminology for the unauthenticated login screen
-				result["loginTerminology"    ] = GetAllTerminologyInternal(new List<string> { "Users", "Login", "Errors" }, false, bAllowAnonymous: true);
+				result["loginTerminology"    ] = GetAllTerminologyInternal(new List<string> { "Users", "Login", "Errors", "Administration", "Teams" }, false, bAllowAnonymous: true);
 				result["loginTerminologyLists"] = GetAllTerminologyListsInternal(false, bAllowAnonymous: true);
 				result["SingleSignOnSettings"] = GetSingleSignOnSettingsInternal();
 				bool bDUO_ENABLED = !Sql.IsEmptyString(_configuration["DUO_INTEGRATION_KEY"]);
