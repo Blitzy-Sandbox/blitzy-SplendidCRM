@@ -77,7 +77,7 @@ const SouceItem: FC<ISouceItemProps> = memo(function SouceItem(props: ISouceItem
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SouceItem' + ' collected', collect, dropCollect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DashboardComponents-SourceItem'
 				style={ { ...style, display: (isAppInUse ? 'none' : null) } }>
 				{ item.NAME }

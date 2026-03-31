@@ -10,7 +10,7 @@
 
 // 1. React and fabric. 
 import React from 'react';
-import { Outlet, useLocation }                from  'react-router-dom'                ;
+import { Outlet, useLocation }                from  'react-router'                     ;
 // 2. Store and Types. 
 // 3. Scripts. 
 // 4. Components and Views. 

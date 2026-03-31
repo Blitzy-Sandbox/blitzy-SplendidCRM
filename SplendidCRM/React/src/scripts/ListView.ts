@@ -50,8 +50,8 @@ export async function ListView_LoadTable(sTABLE_NAME: string, sSORT_FIELD: strin
 	let json = await GetSplendidResult(res);
 	// 10/04/2011 Paul.  ListView_LoadTable returns the rows. 
 	// 05/17/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -96,8 +96,8 @@ export async function ListView_LoadTablePaginated(sTABLE_NAME: string, sSORT_FIE
 	// 10/04/2011 Paul.  ListView_LoadTable returns the rows. 
 	// 04/21/2017 Paul.  We need to return the total when using nTOP. 
 	// 05/27/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -138,8 +138,8 @@ export async function ListView_LoadModule(sMODULE_NAME: string, sSORT_FIELD: str
 	// 04/21/2017 Paul.  We need to return the total when using nTOP. 
 	// 05/13/2018 Paul.  Instead of returning just the results, we will need to return everything to get the total. 
 	// 05/17/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -203,7 +203,8 @@ export async function ListView_ExportModule(sMODULE_NAME: string, sSORT_FIELD: s
 	else
 	{
 		let sBody: string = JSON.stringify(obj);
-		let res: Response = await CreateSplendidRequest('Import/ExportModule.aspx', 'POST', 'application/octet-stream', sBody);
+		// Use the REST API endpoint instead of the legacy WebForms page (which doesn't exist in .NET 10)
+		let res: Response = await CreateSplendidRequest('Rest.svc/ExportModuleList', 'POST', 'application/octet-stream', sBody);
 
 		// https://stackoverflow.com/questions/16086162/handle-file-download-from-ajax-post
 		let filename   : string = '';
@@ -288,8 +289,8 @@ export async function ListView_LoadModulePaginated(sMODULE_NAME: string, sSORT_F
 	// 04/21/2017 Paul.  We need to return the total when using nTOP. 
 	// 05/13/2018 Paul.  Instead of returning just the results, we will need to return everything to get the total. 
 	// 05/17/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -322,8 +323,8 @@ export async function ListView_LoadTableWithAggregate(sTABLE_NAME: string, sORDE
 	// 04/21/2017 Paul.  We need to return the total when using nTOP. 
 	// 05/13/2018 Paul.  Instead of returning just the results, we will need to return everything to get the total. 
 	// 05/17/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -373,8 +374,8 @@ export async function ListView_LoadStreamPaginated(sMODULE_NAME: string, gID: st
 	// 01/26/2020 Paul.  Make sure that an empty filter does not get sent as "null". 
 	let res = await CreateSplendidRequest('Rest.svc/GetModuleStream?ModuleName=' + sMODULE_NAME + (gID ? '&ID=' + gID : '') + '&$top=' + nTOP + '&$skip=' + nSKIP + '&$select=' + encodeURIComponent(sSELECT) + '&$filter=' + (Sql.IsEmptyString(sFILTER) ? '' : encodeURIComponent(sFILTER)), 'GET');
 	let json = await GetSplendidResult(res);
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 
@@ -396,8 +397,8 @@ export async function ListView_LoadActivitiesPaginated(sPARENT_TYPE: string, gPA
 	// 04/21/2017 Paul.  We need to return the total when using nTOP. 
 	// 05/13/2018 Paul.  Instead of returning just the results, we will need to return everything to get the total. 
 	// 05/17/2018 Paul.  Copy total to d to simplfy the return value. 
-	json.d.__total = json.__total;
-	json.d.__sql = json.__sql;
+	json.d.__total = json.__total ?? json.d.__total ?? 0;
+	json.d.__sql = json.__sql ?? json.d.__sql ?? null;
 	return (json.d);
 }
 

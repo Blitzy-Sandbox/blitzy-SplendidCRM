@@ -9,15 +9,14 @@
  */
 import L10n              from '../../../../../../scripts/L10n';
 
-var getBusinessObject       = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var is                      = require('bpmn-js/lib/util/ModelUtil').is;
-var elementHelper           = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var extensionElementsHelper = require('bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper');
-var cmdHelper               = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var utils                   = require('bpmn-js-properties-panel/lib/Utils');
-var assign                  = require('lodash/object/assign');
-var forEach                 = require('lodash/collection/forEach');
-var find                    = require('lodash/collection/find');
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
+import elementHelper           from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import extensionElementsHelper from 'bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper';
+import cmdHelper               from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import utils                   from 'bpmn-js-properties-panel/lib/Utils';
+import assign                  from 'lodash/assign';
+import forEach                 from 'lodash/forEach';
+import find                    from 'lodash/find';
 import fieldTableEntryFactory from './FieldTableEntryFactory';
 
 function generatePropertyId()

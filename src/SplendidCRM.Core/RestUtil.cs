@@ -525,7 +525,15 @@ namespace SplendidCRM
 				Match mStartsWith = Regex.Match(sTrimmed, @"^startswith\s*\(\s*(\w+)\s*,\s*'(.*)'\s*\)$", RegexOptions.IgnoreCase);
 				Match mEndsWith   = Regex.Match(sTrimmed, @"^endswith\s*\(\s*(\w+)\s*,\s*'(.*)'\s*\)$",   RegexOptions.IgnoreCase);
 				Match mCompar     = Regex.Match(sTrimmed, @"^(\w+)\s+(eq|ne|gt|ge|lt|le)\s+(.+)$",        RegexOptions.IgnoreCase);
-				if ( mContains.Success )
+				// Handle SQL-style "FIELD is null" and "FIELD is not null" expressions
+				Match mIsNull     = Regex.Match(sTrimmed, @"^(\w+)\s+is\s+(not\s+)?null$",                 RegexOptions.IgnoreCase);
+				if ( mIsNull.Success )
+				{
+					string sField  = mIsNull.Groups[1].Value;
+					bool   bIsNot  = mIsNull.Groups[2].Success && !String.IsNullOrWhiteSpace(mIsNull.Groups[2].Value);
+					sbFilter.Append(" and " + sField + (bIsNot ? " is not null" : " is null") + "\r\n");
+				}
+				else if ( mContains.Success )
 				{
 					string sField     = mContains.Groups[1].Value;
 					string sValue     = mContains.Groups[2].Value;
@@ -584,12 +592,23 @@ namespace SplendidCRM
 						oValue = (object)false;
 					else
 						oValue = sRawValue;
-					string sParamName = "@" + sField + "_cmp_" + (cmd.Parameters.Count + 1).ToString();
-					IDbDataParameter parCmp = cmd.CreateParameter();
-					parCmp.ParameterName = sParamName;
-					parCmp.Value = oValue ?? (object)DBNull.Value;
-					cmd.Parameters.Add(parCmp);
-					sbFilter.Append(" and " + sField + " " + sSqlOp + " " + sParamName + "\r\n");
+					// Handle "eq null" / "ne null" using IS NULL / IS NOT NULL (cannot use parameterized comparison with NULL in SQL)
+					if ( oValue == DBNull.Value )
+					{
+						if ( sOp == "ne" )
+							sbFilter.Append(" and " + sField + " is not null\r\n");
+						else
+							sbFilter.Append(" and " + sField + " is null\r\n");
+					}
+					else
+					{
+						string sParamName = "@" + sField + "_cmp_" + (cmd.Parameters.Count + 1).ToString();
+						IDbDataParameter parCmp = cmd.CreateParameter();
+						parCmp.ParameterName = sParamName;
+						parCmp.Value = oValue ?? (object)DBNull.Value;
+						cmd.Parameters.Add(parCmp);
+						sbFilter.Append(" and " + sField + " " + sSqlOp + " " + sParamName + "\r\n");
+					}
 				}
 			}
 			if ( sbFilter.Length > 0 )
@@ -775,9 +794,9 @@ namespace SplendidCRM
 							Sql.AppendGuids(cmd, sbItems, arrITEMS, "ID");
 							cmd.CommandText += sbItems.ToString();
 						}
-						// Apply caller-supplied WHERE
+						// Apply caller-supplied WHERE — convert OData filter expressions to parameterized SQL
 						if ( !Sql.IsEmptyString(sWHERE) )
-							cmd.CommandText += " and (" + sWHERE + ")\r\n";
+							ConvertODataFilter(sWHERE, cmd);
 						// Apply $filter (OData) — arrFILTER_FIELDS contains alternating field/value pairs
 						if ( arrFILTER_FIELDS != null && arrFILTER_FIELDS.Count > 0 )
 						{
@@ -939,8 +958,9 @@ namespace SplendidCRM
 							Sql.AppendGuids(cmd, sbItems, arrITEMS, "ID");
 							cmd.CommandText += sbItems.ToString();
 						}
+						// Apply caller-supplied WHERE — convert OData filter expressions to parameterized SQL
 						if ( !Sql.IsEmptyString(sWHERE) )
-							cmd.CommandText += " and (" + sWHERE + ")\r\n";
+							ConvertODataFilter(sWHERE, cmd);
 						if ( arrFILTER_FIELDS != null && arrFILTER_FIELDS.Count > 0 )
 						{
 							for ( int i = 0; i + 1 < arrFILTER_FIELDS.Count; i += 2 )
@@ -972,11 +992,15 @@ namespace SplendidCRM
 							try { lTotalCount = Sql.ToLong(cmdCount.ExecuteScalar()); }
 							catch { lTotalCount = -1; }
 						}
-						// ORDER BY — must include "order by" prefix for SQL Server OFFSET/FETCH
-						string sORDERRawAdmin = Sql.IsEmptyString(sORDER_BY) ? "DATE_MODIFIED desc" : sORDER_BY;
-						string sORDERAdmin = sORDERRawAdmin.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
-							? " " + sORDERRawAdmin
-							: " order by " + sORDERRawAdmin;
+						// ORDER BY — Sql.PageResults defaults to "order by 1" when empty, which is safe for all admin views
+						// (some admin views like vwEDITVIEWS_FIELDS lack DATE_MODIFIED, so no hardcoded default)
+						string sORDERAdmin = String.Empty;
+						if ( !Sql.IsEmptyString(sORDER_BY) )
+						{
+							sORDERAdmin = sORDER_BY.TrimStart().StartsWith("order by", StringComparison.OrdinalIgnoreCase)
+								? " " + sORDER_BY
+								: " order by " + sORDER_BY;
+						}
 						// Paginate — convert nSKIP (row offset) to 1-based page number for Sql.PageResults
 						int nPageNumberAdmin = (nTOP > 0 && nSKIP > 0) ? (nSKIP / nTOP) + 1 : 1;
 						string sSQLPaged = Sql.PageResults(cmd, cmd.CommandText, sORDERAdmin, nTOP, nPageNumberAdmin);

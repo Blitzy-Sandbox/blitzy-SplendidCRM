@@ -12,7 +12,6 @@
 import * as React from 'react';
 import moment from 'moment';
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome';
-import { Appear }                                   from 'react-lifecycle-appear'        ;
 // 2. Store and Types. 
 import ACL_FIELD_ACCESS                             from '../types/ACL_FIELD_ACCESS'     ;
 import IDashletProps                                from '../types/IDashletProps'        ;
@@ -96,6 +95,7 @@ export default class MyActivities extends React.Component<IDashletProps, IMyActi
 
 	componentDidMount()
 	{
+		this.setState({ dashletVisible: true });
 	}
 
 	private GetThroughDate = (THROUGH: string) =>
@@ -591,7 +591,6 @@ export default class MyActivities extends React.Component<IDashletProps, IMyActi
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
 					<div className="card-body DashletHeader" style={ {display: 'flex'} }>
 						<h3 style={ {flexGrow: 1, float: 'left'} }>
 							{ L10n.Term(TITLE) }
@@ -641,7 +640,6 @@ export default class MyActivities extends React.Component<IDashletProps, IMyActi
 							</span>
 						</span>
 					</div>
-				</Appear>
 				{ dashletVisible
 				? <div style={ {clear: 'both'} }>
 					<hr />

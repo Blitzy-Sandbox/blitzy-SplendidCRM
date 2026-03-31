@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>SplendidCRM</title>
+	<meta charset="utf-8" />
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https: http: ws: wss:; form-action 'self'; frame-ancestors 'none';" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui, viewport-fit=cover" />
+	<meta name="format-detection" content="telephone=no" />
+	<meta name="msapplication-tap-highlight" content="no" />
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+	<link rel="shortcut icon" href="/favicon.ico" type="image/ico" />
+	<link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+</head>
+<body>
+	<div id="root" style="height: 100%"></div>
+
+	<script src="cordova.js"></script>
+
+	<!-- Runtime config loader — externalised to avoid 'unsafe-inline' in CSP script-src -->
+	<script src="/config-loader.js"></script>
+
+	<script type="module" src="/src/index.tsx"></script>
+</body>
+</html>

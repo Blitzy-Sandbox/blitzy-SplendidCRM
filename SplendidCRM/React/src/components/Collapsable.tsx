@@ -11,32 +11,7 @@
 // 1. React and fabric. 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import posed from 'react-pose';
 
-const Toggle = posed.i(
-{
-	pressable: true,
-	open:
-	{
-		rotate: '180deg',
-	},
-	closed:
-	{
-		rotate: '0deg'
-	}
-});
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ICollapsableProps
 {
@@ -86,18 +61,15 @@ export default class Collapsable extends React.Component<ICollapsableProps, ICol
 			<React.Fragment>
 				<div className='h3Row' style={ {fontSize: '1.5em'} }>
 					<h3>
-						<Toggle onClick={ this.toggle } pose={ open ? 'open' : 'closed' } style={ {marginRight: '0.5em', cursor: 'pointer'} }>
+						<i onClick={ this.toggle } style={ {marginRight: '0.5em', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.3s ease', transform: open ? 'rotate(180deg)' : 'rotate(0deg)'} }>
 							<FontAwesomeIcon icon={ open ? 'chevron-up' : 'chevron-down' } />
-						</Toggle>
+						</i>
 						{this.props.name}
 					</h3>
 				</div>
-				<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
-					{ open
-					? this.props.children
-					: null
-					}
-				</Content>
+				<div style={ {overflow: 'hidden', maxHeight: (open ? '5000px' : '0'), transition: 'max-height 0.3s ease-in-out'} }>
+					{ this.props.children }
+				</div>
 			</React.Fragment>
 		);
 	}

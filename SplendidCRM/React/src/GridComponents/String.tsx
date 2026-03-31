@@ -134,7 +134,9 @@ export default class String extends React.PureComponent<IStringProps, IStringSta
 					}
 					// 05/28/2018 Paul.  HTML entities will not get escaped in React.  Do a couple of them manually. 
 					DATA_VALUE = row[DATA_FIELD]
-					if ( typeof(DATA_VALUE) == 'string' && DATA_VALUE.substr(0, 7) == '\\/Date(' )
+					// 03/25/2026 Fix.  The .NET 10 backend returns dates as unescaped '/Date(...)/' strings
+					// in addition to the escaped '\\/Date(...)' format.  Detect both patterns.
+					if ( typeof(DATA_VALUE) == 'string' && (DATA_VALUE.substr(0, 7) == '\\/Date(' || DATA_VALUE.substr(0, 6) == '/Date(') )
 					{
 						// 08/18/2019 Paul.  We only get here if DATA_FORMAT is null, so in that case we use full date time. 
 						DATA_VALUE = FromJsonDate(DATA_VALUE, Security.USER_DATE_FORMAT() + ' ' + Security.USER_TIME_FORMAT());

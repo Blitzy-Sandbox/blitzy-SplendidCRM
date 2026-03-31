@@ -167,7 +167,7 @@ const DraggableRow: FC<IDraggableRowProps> = memo(function DraggableRow(props: I
 	//console.log((new Date()).toISOString() + ' ' + 'DraggableRow' + ' collected', collect, dropCollect);
 	const opacity = collect.isDragging ? 0 : 1;
 	return (
-			<tr ref={ (node) => connectDragSource(connectDropTarget(node)) }
+			<tr ref={ (node) => { connectDragSource(connectDropTarget(node)); } }
 				style={ { ...style, opacity } }>
 				{ children }
 			</tr>

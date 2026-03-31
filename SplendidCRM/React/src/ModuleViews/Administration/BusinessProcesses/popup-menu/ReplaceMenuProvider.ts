@@ -1,11 +1,9 @@
-var is                = require('bpmn-js/lib/util/ModelUtil').is;
-var isEventSubProcess = require('bpmn-js/lib/util/DiUtil'   ).isEventSubProcess;
-var getBusinessObject = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var isExpanded        = require('bpmn-js/lib/util/DiUtil'   ).isExpanded;
-var isDifferentType   = require('bpmn-js/lib/features/popup-menu/util/TypeUtil').isDifferentType;
-var forEach           = require('lodash/collection/forEach' );
-var filter            = require('lodash/collection/filter'  );
-var replaceOptions    = require('../replace/ReplaceOptions' );
+import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import { isEventSubProcess, isExpanded } from 'bpmn-js/lib/util/DiUtil';
+import { isDifferentType } from 'bpmn-js/lib/features/popup-menu/util/TypeUtil';
+import forEach from 'lodash/forEach';
+import filter from 'lodash/filter';
+import * as replaceOptions from '../replace/ReplaceOptions';
 
 /**********************************************************************************************************************
  * SplendidCRM is a Customer Relationship Management program created by SplendidCRM Software, Inc. 

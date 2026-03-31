@@ -1,22 +1,33 @@
-var find                 = require('lodash/collection/find'                         );
-var any                  = require('lodash/collection/any'                          );
-var every                = require('lodash/collection/every'                        );
-var filter               = require('lodash/collection/filter'                       );
-var forEach              = require('lodash/collection/forEach'                      );
+import find from 'lodash/find';
+import some from 'lodash/some';
+import every from 'lodash/every';
+import filter from 'lodash/filter';
+import forEach from 'lodash/forEach';
 // 03/02/2022 Paul.  Must switch to from instead of require to support diagram-js >= 1.0. 
 import inherits          from 'inherits';
 //var inherits             = require('inherits'                                       );
-var getParents           = require('bpmn-js/lib/features/modeling/util/ModelingUtil').getParents;
-var is                   = require('bpmn-js/lib/util/ModelUtil'                     ).is;
-var isAny                = require('bpmn-js/lib/features/modeling/util/ModelingUtil').isAny;
-var getBusinessObject    = require('bpmn-js/lib/util/ModelUtil'                     ).getBusinessObject;
-var isExpanded           = require('bpmn-js/lib/util/DiUtil'                        ).isExpanded;
-var isEventSubProcess    = require('bpmn-js/lib/util/DiUtil'                        ).isEventSubProcess;
-var isInterrupting       = require('bpmn-js/lib/util/DiUtil'                        ).isInterrupting;
+import { isAny } from 'bpmn-js/lib/features/modeling/util/ModelingUtil';
+
+// Local getParents implementation: walks the parent chain and collects all ancestor elements.
+// bpmn-js 1.3.3 exports getParent (singular) which returns a single typed parent.
+// The original SplendidCRM code expects getParents (plural) returning an array of all ancestors.
+function getParents(element: any): any[]
+{
+	const parents: any[] = [];
+	let current = element;
+	while ( current && current.parent )
+	{
+		current = current.parent;
+		parents.push(current);
+	}
+	return parents;
+}
+import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import { isExpanded, isEventSubProcess, isInterrupting } from 'bpmn-js/lib/util/DiUtil';
 // 03/02/2022 Paul.  Must switch to from instead of require to support diagram-js >= 1.0. 
 import RuleProvider      from 'diagram-js/lib/features/rules/RuleProvider'     ;
 //var RuleProvider         = require('diagram-js/lib/features/rules/RuleProvider'     );
-var isBoundaryAttachment = require('bpmn-js/lib/features/snapping/BpmnSnappingUtil' ).getBoundaryAttachment;
+import { getBoundaryAttachment as isBoundaryAttachment } from 'bpmn-js/lib/features/snapping/BpmnSnappingUtil';
 
 /**********************************************************************************************************************
  * SplendidCRM is a Customer Relationship Management program created by SplendidCRM Software, Inc. 
@@ -412,7 +423,7 @@ function canPaste(tree, target)
 	}
 	if ( is(target, 'bpmn:Process') )
 	{
-		participants = any(topLevel, function(e)
+		participants = some(topLevel, function(e)
 		{
 			return e.type === 'bpmn:Participant';
 		});
@@ -572,12 +583,12 @@ function canReplace(elements, target, position)
 function canMove(elements, target, position?)
 {
 	// do not move selection containing boundary events
-	if ( any(elements, isBoundaryEvent) )
+	if ( some(elements, isBoundaryEvent) )
 	{
 		return false;
 	}
 	// do not move selection containing lanes
-	if ( any(elements, isLane) )
+	if ( some(elements, isLane) )
 	{
 		return false;
 	}

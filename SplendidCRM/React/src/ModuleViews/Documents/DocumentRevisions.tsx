@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                  from 'react-pose'                          ;
 import { RouteComponentProps, withRouter }    from '../Router5'                    ;
 import { observer }                           from 'mobx-react'                          ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'      ;
-import { Appear }                             from 'react-lifecycle-appear'              ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP               from '../../types/DETAILVIEWS_RELATIONSHIP';
 import RELATIONSHIPS                          from '../../types/RELATIONSHIPS'           ;
@@ -37,18 +35,6 @@ import SearchView                             from '../../views/SearchView'     
 import DynamicPopupView                       from '../../views/DynamicPopupView'       ;
 import EditView                               from '../../views/EditView'               ;
 import SubPanelButtonsFactory                 from '../../ThemeComponents/SubPanelButtonsFactory';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ISubPanelViewProps extends RouteComponentProps<any>
 {
@@ -251,6 +237,11 @@ class DocumentsDocumentRevisions extends React.Component<ISubPanelViewProps, ISu
 				if ( Credentials.ADMIN_MODE )
 				{
 					Credentials.SetADMIN_MODE(false);
+				}
+				// 07/30/2021 Paul.  Load when the panel appears.
+				if ( this._isMounted )
+				{
+					this.setState({ subPanelVisible: true });
 				}
 			}
 			else
@@ -691,13 +682,13 @@ class DocumentsDocumentRevisions extends React.Component<ISubPanelViewProps, ISu
 						multiSelect={ multiSelect }
 						ClearDisabled={ true }
 					/>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<React.Fragment>
 						{ headerButtons
 						? React.createElement(headerButtons, { MODULE_NAME, ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: GRID_NAME, row: item, Page_Command: this.Page_Command, showButtons: !showInlineEdit, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</React.Fragment>
+					<div style={ {overflow: (open ? 'visible' : 'hidden'), height: (open ? 'auto' : '0'), transition: 'height 0.3s ease'} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							<div style={ cssSearch }>
@@ -807,7 +798,7 @@ class DocumentsDocumentRevisions extends React.Component<ISubPanelViewProps, ISu
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}

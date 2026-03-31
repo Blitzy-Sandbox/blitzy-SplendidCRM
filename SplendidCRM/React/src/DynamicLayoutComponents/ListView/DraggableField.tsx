@@ -160,7 +160,7 @@ const DraggableField: FC<IDraggableFieldProps> = memo(function DraggableField(pr
 
 	const opacity = isDragging ? 1 : 1;
 	return (
-			<div ref={ (node) => connectDragSource(connectDropTarget(node)) }
+			<div ref={ (node) => { connectDragSource(connectDropTarget(node)); } }
 				draggable
 				className='grab'
 				style={{ ...style, opacity, backgroundColor: (id == draggingId ? 'grey' : 'lightgrey'), flexBasis: `${100 / rowTotal}%` }}>

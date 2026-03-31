@@ -10,12 +10,11 @@
 import Sql  from '../../../../../scripts/Sql' ;
 import L10n from '../../../../../scripts/L10n';
 
-var is                = require('bpmn-js/lib/util/ModelUtil').is;
-var getBusinessObject = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var isAny             = require('bpmn-js/lib/features/modeling/util/ModelingUtil').isAny;
-var cmdHelper         = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var elementHelper     = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var entryFactory      = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
+import { is, getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import { isAny } from 'bpmn-js/lib/features/modeling/util/ModelingUtil';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import elementHelper from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import entryFactory from 'bpmn-js-properties-panel/lib/factory/EntryFactory';
 
 var CONDITIONAL_SOURCES =
 [

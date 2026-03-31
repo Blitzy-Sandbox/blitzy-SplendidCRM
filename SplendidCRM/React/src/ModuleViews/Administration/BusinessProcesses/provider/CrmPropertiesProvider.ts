@@ -10,22 +10,22 @@
 import Sql  from '../../../../scripts/Sql' ;
 import L10n from '../../../../scripts/L10n';
 
-var inherits = require('inherits');
-var PropertiesActivator = require('bpmn-js-properties-panel/lib/PropertiesActivator');
+import inherits from 'inherits';
+import PropertiesActivator from 'bpmn-js-properties-panel/lib/PropertiesActivator';
 
 // Require all properties you need from existing providers.
 // In this case all available bpmn relevant properties without camunda extensions.
 //var processProps       = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/ProcessProps'      );
-var eventProps         = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/EventProps'          );
-var linkProps          = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/LinkProps'           );
-var documentationProps = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/DocumentationProps'  );
-var idProps            = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/IdProps'             );
-var nameProps          = require('bpmn-js-properties-panel/lib/provider/bpmn/parts/NameProps'           );
+import eventProps from 'bpmn-js-properties-panel/lib/provider/bpmn/parts/EventProps';
+import linkProps from 'bpmn-js-properties-panel/lib/provider/bpmn/parts/LinkProps';
+import documentationProps from 'bpmn-js-properties-panel/lib/provider/bpmn/parts/DocumentationProps';
+import idProps from 'bpmn-js-properties-panel/lib/provider/bpmn/parts/IdProps';
+import nameProps from 'bpmn-js-properties-panel/lib/provider/bpmn/parts/NameProps';
 //var sequenceFlowProps  = require('bpmn-js-properties-panel/lib/provider/camunda/parts/SequenceFlowProps');
 
 // Require your custom property entries.
 import crmProcessProps           from'./parts/CrmProcessProps'               ;
-import crmProcessVariables       from'./parts/CrmProcessVariables'           ;
+import crmProcessVariables       from'./parts/crmProcessVariables'           ;
 import crmStartEventProps        from'./parts/CrmStartEventProps'            ;
 import crmTimerStartEventProps   from'./parts/CrmTimerStartEventProps'       ;
 import crmModuleFilterProps      from'./parts/CrmModuleFilterProps'          ;

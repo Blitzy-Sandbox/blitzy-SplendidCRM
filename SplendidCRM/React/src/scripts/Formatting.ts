@@ -57,12 +57,16 @@ export function formatDate(dtValue, sFormat)
 // 01/20/2021 Paul.  FromJsonDate is used to parse and to format, but we need to treat them separately, so use another paramter. 
 export function FromJsonDate(DATA_VALUE, sFormat?, sParseFormat?)
 {
-	if ( typeof(DATA_VALUE) == 'string' && DATA_VALUE.substr(0, 7) == '\\/Date(' )
+	// Handle both escaped JSON date format \/Date(...)\/  and unescaped /Date(...)/
+	if ( typeof(DATA_VALUE) == 'string' && (DATA_VALUE.substr(0, 7) == '\\/Date(' || DATA_VALUE.substr(0, 6) == '/Date(') )
 	{
-		//alert(DATA_VALUE.substr(DATA_VALUE.length - 3, 3) + ' = ' + ')\\/');
-		if ( DATA_VALUE.substr(DATA_VALUE.length - 3, 3) == ')\\/' )
+		const bEscaped = DATA_VALUE.substr(0, 7) == '\\/Date(';
+		const nPrefixLen = bEscaped ? 7 : 6;
+		const nSuffixLen = bEscaped ? 3 : 2;
+		const sSuffix    = bEscaped ? ')\\/' : ')/';
+		if ( DATA_VALUE.substr(DATA_VALUE.length - nSuffixLen, nSuffixLen) == sSuffix )
 		{
-			DATA_VALUE = DATA_VALUE.substr(7, DATA_VALUE.length - 7 - 3);
+			DATA_VALUE = DATA_VALUE.substr(nPrefixLen, DATA_VALUE.length - nPrefixLen - nSuffixLen);
 			var utcTime = parseInt(DATA_VALUE);
 			var dt = new Date(utcTime);
 			// 08/28/2014 Paul.  SyncRest will return all dates as UTC and we store all dates as UTC in SQLite. 

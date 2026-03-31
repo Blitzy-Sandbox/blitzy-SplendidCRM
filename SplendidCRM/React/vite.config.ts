@@ -1,0 +1,257 @@
+/*
+ * SplendidCRM React 19 / Vite 6.x Build Configuration
+ *
+ * This single configuration file replaces ALL 6 Webpack configuration files:
+ *   1. configs/webpack/common.js   — Shared loaders, plugins, externals
+ *   2. configs/webpack/dev_local.js — Dev server proxy to localhost
+ *   3. configs/webpack/dev_remote.js — Dev server proxy to remote server
+ *   4. configs/webpack/prod.js      — Production build (unminified)
+ *   5. configs/webpack/prod_minimize.js — Production build (minified)
+ *   6. configs/webpack/mobile.js    — Cordova mobile build
+ *
+ * Key architectural changes from Webpack:
+ *   - TypeScript transpilation: ts-loader + thread-loader → Vite's native esbuild
+ *   - CSS processing: style-loader/css-loader/postcss-loader/sass-loader → Vite built-in
+ *   - Asset handling: file-loader/url-loader/svg-inline-loader → Vite built-in
+ *   - Type checking: ForkTsCheckerWebpackPlugin → separate `tsc --noEmit` script
+ *   - HTML template: HtmlWebpackPlugin + index.html.ejs → Vite HTML entry (index.html)
+ *   - PWA manifest: WebpackPwaManifest → static public/manifest.json
+ *   - Process polyfill: webpack.ProvidePlugin → Vite define
+ *   - Externals: Webpack externals (xlsx/canvg/pdfmake) → bundled as auto-split chunks
+ *   - Bundle output: Single SteviaCRM.js → Vite chunked ESM output
+ */
+
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  /*
+   * Root directory for the Vite project.
+   * Resolves to the SplendidCRM/React/ directory where index.html lives.
+   */
+  root: path.resolve(__dirname),
+
+  /*
+   * Plugins configuration.
+   *
+   * @vitejs/plugin-react provides:
+   *   - Fast Refresh (replaces Webpack HMR + react-hot-loader)
+   *   - JSX/TSX transformation
+   *   - Babel integration for decorator transpilation
+   *
+   * CRITICAL: The Babel plugin configuration for MobX decorators is NON-NEGOTIABLE.
+   * Without @babel/plugin-proposal-decorators (legacy: true) and
+   * @babel/plugin-proposal-class-properties (loose: true), ALL MobX decorators
+   * (@observable, @action, @computed) in 7+ files including Credentials.ts will
+   * SILENTLY FAIL at runtime — properties won't be observable and the UI won't
+   * react to state changes.
+   */
+  plugins: [
+    react({
+      babel: {
+        plugins: [
+          ['@babel/plugin-proposal-decorators', { legacy: true }],
+          ['@babel/plugin-proposal-class-properties', { loose: true }],
+        ],
+      },
+    }),
+  ],
+
+  /*
+   * Module resolution configuration.
+   * Matches the original Webpack resolve.extensions from common.js.
+   * Vite resolves .ts and .tsx by default, but we explicitly list all extensions
+   * to maintain exact parity with the Webpack configuration.
+   */
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+  },
+
+  /*
+   * Global constant definitions — replaces webpack.ProvidePlugin and webpack.DefinePlugin.
+   *
+   * The original Webpack config used:
+   *   new webpack.ProvidePlugin({ process: 'process/browser' })
+   *   new webpack.DefinePlugin({ 'process.env.PATH': JSON.stringify(env.PATH) })
+   *
+   * In Vite, `define` replaces compile-time constants. Setting 'process.env' to '{}'
+   * prevents "process is not defined" runtime errors when code references process.env
+   * (e.g., process.env.PATH in index.tsx). The empty object ensures that property
+   * access like process.env.ANYTHING evaluates to undefined rather than throwing.
+   */
+  define: {
+    'process.env': '{}',
+  },
+
+  /*
+   * Development server configuration.
+   * Replaces configs/webpack/dev_local.js (port 3000, proxy to backend).
+   *
+   * The original Webpack dev server proxied /SplendidCRM/** → http://localhost:80.
+   * The modernized backend runs ASP.NET Core on Kestrel at port 5000 with new
+   * URL patterns (no /SplendidCRM prefix). Four proxy paths cover all backend
+   * communication:
+   *   - /Rest.svc — 152 REST API endpoints
+   *   - /Administration/Rest.svc — 65 admin API endpoints
+   *   - /hubs — SignalR WebSocket hubs (chat, twilio, phoneburner)
+   *   - /api — Health check and other API endpoints
+   *
+   * Port 3000 is maintained for developer familiarity (Webpack dev server used 3000).
+   */
+  server: {
+    port: 3000,
+    /**
+     * Security response headers for the Vite dev server.
+     * Improves dev/prod parity — production Nginx (Prompt 3) should set
+     * the same (or stricter) headers.
+     */
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+    },
+    proxy: {
+      '/Rest.svc': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/Administration/Rest.svc': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/hubs': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        ws: true, // CRITICAL: WebSocket upgrade support for SignalR hub connections
+      },
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      // Static theme assets (images, CSS) served from the backend's App_Themes directory.
+      // In the original same-origin architecture these were served directly by ASP.NET.
+      // In the decoupled SPA, Credentials.RemoteServer returns '/' so all theme URLs
+      // are relative — the Vite dev server proxies them to the backend.
+      '/App_Themes': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/Include': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
+
+  /*
+   * Production build configuration.
+   * Replaces configs/webpack/prod.js and prod_minimize.js.
+   *
+   * Key differences from Webpack:
+   *   - Output: Vite produces hashed, chunked ESM files instead of a single SteviaCRM.js
+   *   - Minification: Vite minifies by default in production (esbuild), replacing TerserPlugin
+   *   - Source maps: Enabled for production debugging (matching Webpack prod.js devtool: 'source-map')
+   *   - Manual chunks: vendor (react/react-dom/react-router) and mobx split for optimal caching
+   *
+   * Note on xlsx, canvg, and pdfmake:
+   *   The original Webpack config externalized these three modules (loaded via <script> tags).
+   *   In the Vite build they are NOT externalized — they are bundled as automatic code-split
+   *   chunks because they are imported as transitive dependencies of @amcharts/amcharts4.
+   *   Rollup's external filter cannot intercept transitive deep imports resolved internally
+   *   by amcharts. Vite's automatic code splitting already isolates them into separate
+   *   cacheable chunks (pdfmake, vfs_fonts, xlsx, canvg), which provides adequate caching
+   *   without requiring CDN script tags.
+   */
+  build: {
+    outDir: 'dist',
+    sourcemap: 'hidden',
+    commonjsOptions: {
+      include: [/node_modules/, /ckeditor5-custom-build/],
+    },
+    rollupOptions: {
+      output: {
+        /**
+         * Function-based manualChunks for precise per-module chunk assignment.
+         *
+         * CRITICAL: react and react-dom MUST be checked BEFORE mobx. The mobx-react-lite
+         * package (a dependency of mobx-react) imports from react-dom. With the simpler
+         * object-based manualChunks format, Rollup may resolve react-dom into the mobx
+         * chunk when processing mobx-react-lite's dependency graph. The function format
+         * gives us per-module-ID control: every module whose resolved path contains
+         * 'react-dom' is assigned to 'vendor' regardless of which chunk imports it.
+         *
+         * Chunk strategy:
+         *   - vendor: react core, react-dom (all entry points including /client), react-router,
+         *             and scheduler (react-dom's internal dependency). These change infrequently
+         *             and benefit from long-lived browser cache.
+         *   - mobx:   mobx state management core, mobx-react bindings, mobx-react-lite,
+         *             and use-sync-external-store. Isolated for independent cache invalidation
+         *             when state management versions are upgraded.
+         */
+        manualChunks(id: string) {
+          // Vendor chunk: React core framework and routing — check FIRST
+          if (
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-router/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor';
+          }
+          // MobX chunk: state management — check AFTER react to avoid pulling react-dom
+          if (
+            id.includes('node_modules/mobx/') ||
+            id.includes('node_modules/mobx-react/') ||
+            id.includes('node_modules/mobx-react-lite/') ||
+            id.includes('node_modules/use-sync-external-store/')
+          ) {
+            return 'mobx';
+          }
+        },
+      },
+    },
+  },
+
+  /*
+   * Dependency pre-bundling configuration.
+   *
+   * CRITICAL: @babel/standalone MUST be explicitly included in optimizeDeps.
+   * This package is a PRODUCTION dependency used by DynamicLayout_Compile.ts for
+   * runtime in-browser TSX compilation of metadata-driven UI components. Without
+   * explicit inclusion:
+   *   - Vite's dependency optimizer might skip or tree-shake it
+   *   - The runtime compilation system will fail, breaking all dynamic layout rendering
+   *   - The Module Builder and Dynamic Layout Editor will not function
+   *
+   * Vite automatically detects and pre-bundles most CJS dependencies. The include
+   * directive forces pre-bundling for packages that might otherwise be missed.
+   */
+  optimizeDeps: {
+    include: ['@babel/standalone', 'ckeditor5-custom-build'],
+  },
+
+  /*
+   * CSS configuration — replaces the entire Webpack CSS loader chain.
+   *
+   * Original Webpack chain:
+   *   CSS:  style-loader → css-loader (importLoaders: 1) → postcss-loader
+   *   SCSS: style-loader → css-loader → postcss-loader (autoprefixer) → sass-loader
+   *
+   * Vite handles all of this natively:
+   *   - CSS imports are processed automatically
+   *   - PostCSS configuration is read from postcss.config.js if present
+   *   - SCSS/Sass files are compiled using the `sass` package (Dart Sass)
+   *     which replaces the deprecated node-sass 9.0.0
+   *   - Only 1 SCSS file (index.scss) and 17 CSS files exist in the project
+   *
+   * The scss preprocessorOptions block is kept for forward compatibility with
+   * Dart Sass configuration (e.g., additionalData, silenceDeprecations).
+   */
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler',
+      },
+    },
+  },
+});

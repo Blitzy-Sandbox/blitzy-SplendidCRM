@@ -10,7 +10,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed from 'react-pose';
+import { motion } from 'framer-motion';
 import { FontAwesomeIcon }                   from '@fortawesome/react-fontawesome' ;
 // 2. Store and Types. 
 // 3. Scripts. 
@@ -23,19 +23,6 @@ import { isMobileDevice, isMobileLandscape, screenWidth, screenHeight } from '..
 // 4. Components and Views. 
 import DynamicButtons                        from '../../components/DynamicButtons';
 import { ISubPanelHeaderButtonsProps, SubPanelHeaderButtons} from '../../types/SubPanelHeaderButtons';
-
-const Toggle = posed.i(
-{
-	pressable: true,
-	open:
-	{
-		rotate: '180deg',
-	},
-	closed:
-	{
-		rotate: '0deg'
-	}
-});
 
 export default class SixSubPanelHeaderButtons extends SubPanelHeaderButtons
 {
@@ -208,9 +195,9 @@ export default class SixSubPanelHeaderButtons extends SubPanelHeaderButtons
 					<table className={ !open ? 'h3Row h3RowDisabled' : 'h3Row' } cellPadding={ 0 } cellSpacing={ 1 } style={ {width: '100%'} }>
 						<tr>
 							<td style={ {verticalAlign: 'center', textAlign: 'left', paddingTop: 3, width: '30px'} }>
-								<Toggle onClick={ this.toggle } pose={ open ? 'open' : 'closed' } style={ {marginRight: '0.5em', cursor: 'pointer'} }>
+								<motion.i onClick={ this.toggle } animate={{ rotate: open ? 180 : 0 }} transition={{ type: 'tween' }} style={ {marginRight: '0.5em', cursor: 'pointer'} }>
 									<FontAwesomeIcon icon={ open ? 'angle-double-up' : 'angle-double-down' } size='lg' />
-								</Toggle>
+								</motion.i>
 							</td>
 							<td style={ {width: '99%'} }>
 								<h3><span style={ {paddingLeft: '10px'} }>{ sMODULE_TITLE }</span></h3>

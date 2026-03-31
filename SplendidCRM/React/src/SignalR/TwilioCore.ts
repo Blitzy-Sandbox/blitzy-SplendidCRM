@@ -13,6 +13,7 @@ import * as H         from 'history'                 ;
 import * as signalR   from "@microsoft/signalr"      ;
 // 2. Store and Types. 
 // 3. Scripts. 
+import { getConfig }  from '../config'                ;
 import Sql            from '../scripts/Sql'          ;
 import { Crm_Config } from '../scripts/Crm'          ;
 
@@ -106,7 +107,7 @@ export class TwilioServerCore
 export function TwilioCreateHub(history: H.History, sUSER_PHONE_MOBILE: string, sUSER_SMS_OPT_IN: string): TwilioServerCore
 {
 	const hub: signalR.HubConnection = new signalR.HubConnectionBuilder()
-		.withUrl("/signalr_twiliohub")
+		.withUrl((getConfig().SIGNALR_URL || getConfig().API_BASE_URL) + '/hubs/twilio')
 		//.configureLogging(signalR.LogLevel.Debug)  // https://learn.microsoft.com/en-us/aspnet/core/signalr/diagnostics?view=aspnetcore-5.0
 		.withAutomaticReconnect()
 		.build();

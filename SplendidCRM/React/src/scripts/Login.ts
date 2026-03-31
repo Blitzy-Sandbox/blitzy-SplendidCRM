@@ -20,7 +20,7 @@ import AuthenticationContext                        from './adal'               
 import { bMOBILE_CLIENT }                           from './SplendidInitUI'       ;
 import { SplendidUI_Init }                          from './SplendidInitUI'       ;
 import { CreateSplendidRequest, GetSplendidResult } from './SplendidRequest'      ;
-import SignalRStore                                 from '../SignalR/SignalRStore';
+import SignalRCoreStore                             from '../SignalR/SignalRCoreStore';
 import { jsonReactState, Application_ClearStore, Application_UpdateStoreLastDate, Application_GetReactLoginState } from './Application'          ;
 import { Crm_Config }                               from './Crm'                  ;
 import { StartsWith }                               from './utility'              ;
@@ -37,6 +37,7 @@ export async function IsAuthenticated(source): Promise<any>
 {
 	if ( !Credentials.ValidateCredentials )
 	{
+//console.warn((new Date()).toISOString() + ' IsAuthenticated ValidateCredentials FAILED', source);
 		// 04/28/2019 Paul.  Ignore for now so we can test the request failure below. 
 		//throw new Error('Invalid connection information.');
 		return false;
@@ -150,7 +151,7 @@ export async function Logout(): Promise<any>
 		try
 		{
 			// 09/19/2020 Paul.  Provide events to start/stop SignalR. 
-			SignalRStore.Shutdown();
+			SignalRCoreStore.Shutdown();
 			let res = await CreateSplendidRequest('Rest.svc/Logout');
 			let json = await GetSplendidResult(res);
 			//console.log((new Date()).toISOString() + ' ' + 'Logout complete', json);
@@ -210,7 +211,7 @@ export async function Impersonate(row: any): Promise<any>
 		//Logout();
 		try
 		{
-			SignalRStore.Shutdown();
+			SignalRCoreStore.Shutdown();
 		}
 		catch(error)
 		{
@@ -239,7 +240,19 @@ export async function Login(username: string, password: string): Promise<any>
 	});
 	let res = await CreateSplendidRequest('Rest.svc/Login', 'POST', 'application/json; charset=UTF-8', sBody);
 	let json = await GetSplendidResult(res);
-	if ( json.d.length == 36 && !StartsWith(json.d, 'https://') )
+	// 03/25/2026 Fix.  The .NET 10 backend may return an object {USER_ID: "guid", ...}
+	// instead of a plain GUID string.  Normalize to a string for backward-compatible handling.
+	let loginResult: any = json.d;
+	if ( loginResult && typeof loginResult === 'object' && !Array.isArray(loginResult) )
+	{
+		// Extract USER_ID (or user_id / userId for case-insensitive backend serialization).
+		const userId = loginResult.USER_ID || loginResult.user_id || loginResult.userId || loginResult.Id || '';
+		if ( userId )
+		{
+			loginResult = userId;
+		}
+	}
+	if ( typeof loginResult === 'string' && loginResult.length == 36 && !StartsWith(loginResult, 'https://') )
 	{
 		lastIsAuthenticated = 0;
 		// 05/13/2018 Paul.  We will likely want to move the location where we save the credentials. 
@@ -257,9 +270,9 @@ export async function Login(username: string, password: string): Promise<any>
 		return Credentials.sUSER_ID;
 	}
 	// 08/07/2025 Paul.  Add support for DuoUniversal. 
-	else if ( Crm_Config.ToBoolean('DuoUniversal.Enabled') && StartsWith(json.d, 'https://') )
+	else if ( Crm_Config.ToBoolean('DuoUniversal.Enabled') && typeof loginResult === 'string' && StartsWith(loginResult, 'https://') )
 	{
-		return json.d;
+		return loginResult;
 	}
 	else
 	{
@@ -279,10 +292,20 @@ export async function LoginDuoUniversal(code: string, state: string): Promise<an
 	});
 	let res = await CreateSplendidRequest('Rest.svc/LoginDuoUniversal', 'POST', 'application/json; charset=UTF-8', sBody);
 	let json = await GetSplendidResult(res);
-	if ( json.d.length == 36 )
+	// 03/25/2026 Fix.  Same object-vs-string normalization as Login().
+	let duoResult: any = json.d;
+	if ( duoResult && typeof duoResult === 'object' && !Array.isArray(duoResult) )
+	{
+		const userId = duoResult.USER_ID || duoResult.user_id || duoResult.userId || duoResult.Id || '';
+		if ( userId )
+		{
+			duoResult = userId;
+		}
+	}
+	if ( typeof duoResult === 'string' && duoResult.length == 36 )
 	{
 		lastIsAuthenticated = 0;
-		return json.d;
+		return duoResult;
 	}
 	else
 	{
@@ -307,12 +330,14 @@ export async function AuthenticatedMethod(props, source): Promise<number>
 {
 	if ( !Credentials.ValidateCredentials )
 	{
+//console.warn((new Date()).toISOString() + ' AuthenticatedMethod ValidateCredentials FAILED', 'sREMOTE_SERVER=' + JSON.stringify((Credentials as any).sREMOTE_SERVER), 'sAUTHENTICATION=' + JSON.stringify((Credentials as any).sAUTHENTICATION));
 		//throw new Error('Invalid connection information.');
 		return 0;
 	}
-	//console.log((new Date()).toISOString() + ' ' + 'AuthenticatedMethod', source, props.location.pathname + props.location.search);
+//console.log((new Date()).toISOString() + ' ' + 'AuthenticatedMethod', source, props.location.pathname + props.location.search);
 	// 06/23/2019 Paul.  IsAuthenticated will catch any errors and return simple true/false. 
 	let bAuthenticated: boolean = await IsAuthenticated('AuthenticatedMethod ' + source);
+//console.log((new Date()).toISOString() + ' AuthenticatedMethod bAuthenticated=' + bAuthenticated + ' IsInitialized=' + SplendidCache.IsInitialized);
 	if ( bAuthenticated )
 	{
 		if ( !SplendidCache.IsInitialized )
@@ -429,7 +454,15 @@ export async function GetMyUserProfile(): Promise<any>
 {
 	let res = await CreateSplendidRequest('Rest.svc/GetMyUserProfile', 'GET');
 	let json = await GetSplendidResult(res);
-	json.d.__sql = json.__sql;
-	return json.d;
+	// 03/25/2026 Fix.  The .NET 10 backend returns the profile data as {d:{d:{...}}} instead of
+	// {d:{results:{...}}}.  Callers (Wizard.tsx, EditView.tsx, MyAccountView.tsx) all access
+	// d.results to get the user profile item.  Normalize the response so d.results is always populated.
+	let result = json.d || {};
+	if ( result.results === undefined && result.d !== undefined )
+	{
+		result.results = result.d;
+	}
+	result.__sql = json.__sql;
+	return result;
 }
 

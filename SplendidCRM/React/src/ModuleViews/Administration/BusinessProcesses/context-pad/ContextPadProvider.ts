@@ -1,11 +1,10 @@
-var assign            = require('lodash/object/assign'                           );
-var forEach           = require('lodash/collection/forEach'                      );
-var isArray           = require('lodash/lang/isArray'                            );
-var is                = require('bpmn-js/lib/util/ModelUtil'                     ).is;
-var isExpanded        = require('bpmn-js/lib/util/DiUtil'                        ).isExpanded;
-var isAny             = require('bpmn-js/lib/features/modeling/util/ModelingUtil').isAny;
-var getChildLanes     = require('bpmn-js/lib/features/modeling/util/LaneUtil'    ).getChildLanes;
-var isEventSubProcess = require('bpmn-js/lib/util/DiUtil'                        ).isEventSubProcess;
+import assign from 'lodash/assign';
+import forEach from 'lodash/forEach';
+import isArray from 'lodash/isArray';
+import { is } from 'bpmn-js/lib/util/ModelUtil';
+import { isExpanded, isEventSubProcess } from 'bpmn-js/lib/util/DiUtil';
+import { isAny } from 'bpmn-js/lib/features/modeling/util/ModelingUtil';
+import { getChildLanes } from 'bpmn-js/lib/features/modeling/util/LaneUtil';
 
 /**********************************************************************************************************************
  * SplendidCRM is a Customer Relationship Management program created by SplendidCRM Software, Inc. 

@@ -52,7 +52,7 @@ const DraggableRemove: FC<IDraggableRemoveProps> = memo(function DraggableRemove
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'DraggableRemove' + ' collected', collect, dropCollect);
 	return (
-			<div ref={ (node) => connectDropTarget(node) }
+			<div ref={ (node) => { connectDropTarget(node); } }
 				style={{ padding: '1em 0', display: 'inline-block' }}>
 				<FontAwesomeIcon icon='trash-alt' size='4x' />
 			</div>

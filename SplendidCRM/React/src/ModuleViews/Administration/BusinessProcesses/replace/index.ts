@@ -1,11 +1,13 @@
 import BpmnReplace from './BpmnReplace';
+import replaceModule from 'diagram-js/lib/features/replace';
+import selectionModule from 'diagram-js/lib/features/selection';
 
 let def: any =
 {
 	__depends__:
 	[
-		require('diagram-js/lib/features/replace'),
-		require('diagram-js/lib/features/selection')
+		replaceModule,
+		selectionModule
 	],
 	bpmnReplace: [ 'type', BpmnReplace ]
 };

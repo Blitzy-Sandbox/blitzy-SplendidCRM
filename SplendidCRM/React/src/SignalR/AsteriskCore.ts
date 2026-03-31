@@ -11,6 +11,7 @@
 // 1. React and fabric. 
 import * as H         from 'history'                 ;
 import * as signalR   from "@microsoft/signalr"      ;
+import { getConfig }  from '../config'                ;
 // 2. Store and Types. 
 // 3. Scripts. 
 import Sql            from '../scripts/Sql'          ;
@@ -145,7 +146,7 @@ export class AsteriskServerCore
 export function AsteriskCreateHub(history: H.History, sUSER_EXTENSION: string): AsteriskServerCore
 {
 	const hub: signalR.HubConnection = new signalR.HubConnectionBuilder()
-		.withUrl("/signalr_asteriskhub")
+		.withUrl((getConfig().SIGNALR_URL || getConfig().API_BASE_URL) + '/hubs/asterisk')
 		//.configureLogging(signalR.LogLevel.Debug)  // https://learn.microsoft.com/en-us/aspnet/core/signalr/diagnostics?view=aspnetcore-5.0
 		.withAutomaticReconnect()
 		.build();

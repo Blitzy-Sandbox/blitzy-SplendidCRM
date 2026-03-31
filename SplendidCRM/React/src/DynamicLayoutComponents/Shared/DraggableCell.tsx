@@ -100,7 +100,7 @@ const DraggableCell: FC<IDraggableCellProps> = memo(function DraggableCell(props
 	//console.log((new Date()).toISOString() + ' ' + 'DraggableCell' + ' collected', collect, dropCollect);
 
 	return (
-			<td ref={ (node) => connectDropTarget(node) }
+			<td ref={ (node) => { connectDropTarget(node); } }
 				style={{ width, border: '1px dashed grey' }}>
 				{ children }
 			</td>

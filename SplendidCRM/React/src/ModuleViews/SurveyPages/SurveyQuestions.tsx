@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                        from 'react-pose'                          ;
 import { RouteComponentProps, withRouter }          from '../Router5'                    ;
 import { observer }                                 from 'mobx-react'                          ;
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome'      ;
-import { Appear }                                   from 'react-lifecycle-appear'              ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP                     from '../../types/DETAILVIEWS_RELATIONSHIP';
 import { SubPanelHeaderButtons }                    from '../../types/SubPanelHeaderButtons'   ;
@@ -39,17 +37,60 @@ import SubPanelButtonsFactory                       from '../../ThemeComponents/
 import SurveyQuestionFactory                        from '../../SurveyComponents'              ;
 import DraggableRow                                 from '../Administration/Dropdown/DraggableRow';
 
-const Content = posed.div(
+// Lightweight replacement for react-lifecycle-appear
+class Appear extends React.Component<{ onAppearOnce?: (entry?: any) => void; children?: React.ReactNode }, {}>
 {
-	open:
+	private ref = React.createRef<HTMLDivElement>();
+	private hasFired = false;
+	private observer: IntersectionObserver | null = null;
+
+	componentDidMount()
 	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
+		if ( this.ref.current && this.props.onAppearOnce )
+		{
+			this.observer = new IntersectionObserver((entries) =>
+			{
+				if ( !this.hasFired && entries[0]?.isIntersecting )
+				{
+					this.hasFired = true;
+					this.props.onAppearOnce(entries[0]);
+					if ( this.observer )
+					{
+						this.observer.disconnect();
+					}
+				}
+			}, { threshold: 0 });
+			this.observer.observe(this.ref.current);
+		}
 	}
-});
+
+	componentWillUnmount()
+	{
+		if ( this.observer )
+		{
+			this.observer.disconnect();
+		}
+	}
+
+	render()
+	{
+		return <div ref={ this.ref }>{ this.props.children }</div>;
+	}
+}
+
+// Lightweight CSS-transition replacement for react-pose Content animation
+const Content: React.FC<{ pose: 'open' | 'closed'; style?: React.CSSProperties; children?: React.ReactNode }> = ({ pose, style, children }) =>
+{
+	const isOpen = pose === 'open';
+	const combinedStyle: React.CSSProperties =
+	{
+		...style,
+		height       : isOpen ? '100%' : '0',
+		overflow     : isOpen ? 'visible' : 'hidden',
+		transition   : 'height 0.3s ease',
+	};
+	return <div style={ combinedStyle }>{ children }</div>;
+};
 
 interface ISurveyQuestionsProps extends RouteComponentProps<any>
 {

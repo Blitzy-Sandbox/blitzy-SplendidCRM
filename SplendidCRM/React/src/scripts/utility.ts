@@ -608,20 +608,13 @@ export function UpdateApplicationTheme()
 		}
 		else
 		{
-			for ( let i = 0; i < arrLinks.length; i++ )
-			{
-				let sLink: string = arrLinks[i].href;
-				if ( sLink.indexOf('/App_Themes/') >= 0 )
-				{
-					let arrLinkParts: string[] = sLink.split('/');
-					if ( arrLinkParts.length >= 3 && arrLinkParts[arrLinkParts.length - 3] == 'App_Themes' )
-					{
-						arrLinkParts[arrLinkParts.length - 2] = SplendidCache.UserTheme;
-						//arrLinks[i].href = arrLinkParts.join('/');
-						arrThemeStyles.push(arrLinkParts.join('/'));
-					}
-				}
-			}
+			// 03/27/2026 Fix.  In the decoupled SPA architecture, index.html has no
+			// pre-rendered <link> tags for App_Themes (the old ASP.NET server rendered them).
+			// Build the theme URLs from scratch, same as the mobile path above.
+			let sThemeUrl: string = Credentials.RemoteServer + 'App_Themes/' + SplendidCache.UserTheme + '/';
+			arrThemeStyles.push(sThemeUrl + 'style.css'              );
+			arrThemeStyles.push(sThemeUrl + 'styleActivityStream.css');
+			arrThemeStyles.push(sThemeUrl + 'styleModuleHeader.css'  );
 		}
 		// 09/14/2019 Paul.  Remove in a separate loop. 
 		for ( let i = arrLinks.length - 1; i >= 0 ; i-- )

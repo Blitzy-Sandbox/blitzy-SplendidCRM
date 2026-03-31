@@ -142,7 +142,7 @@ const DraggableItem: FC<IDraggableItemProps> = memo(function DraggableItem(props
 		}
 	}
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab'
 				style={{ ...style, opacity, flexBasis: `${100 / rowTotal}%` }}
 				id={ 'ctlDynamicLayout_' + id }

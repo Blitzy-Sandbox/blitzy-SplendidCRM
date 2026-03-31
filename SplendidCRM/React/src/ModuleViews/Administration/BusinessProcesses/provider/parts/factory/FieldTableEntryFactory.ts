@@ -7,16 +7,16 @@
  * the Appropriate Legal Notices must display the following words on all interactive user interfaces: 
  * "Copyright (C) 2005-2022 SplendidCRM Software, Inc. All rights reserved."
  */
-var cmdHelper  = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
 // 03/01/2022 Paul.  Updated packaging for min-dom. 
-var minDom     = require('min-dom');
+import * as minDom from 'min-dom';
 var domQuery   = minDom.query  ;
 var domAttr    = minDom.attr   ;
 var domClosest = minDom.closest;
 var domify     = minDom.domify ;
-var filter     = require('lodash/collection/filter');
-var forEach    = require('lodash/collection/forEach');
-var keys       = require('lodash/object/keys');
+import filter from 'lodash/filter';
+import forEach from 'lodash/forEach';
+import keys from 'lodash/keys';
 
 //var TABLE_ROW_DIV_SNIPPET = '<div class="bpp-field-wrapper bpp-table-row">';
 //var DELETE_ROW_BUTTON_SNIPPET = '<button class="clear" data-action="deleteElement">' +

@@ -13,7 +13,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import { useLocation, useNavigate, useParams, useMatches } from  'react-router-dom';
+import { useLocation, useNavigate, useParams, useMatches } from  'react-router';
 // 2. Store and Types. 
 // 3. Scripts. 
 import { StartsWith, EndsWith }                            from './scripts/utility';
@@ -53,7 +53,7 @@ export class SplendidHistory
 	public push(to: string)
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.push', to);
-		this.navigate(to, { relative: 'route', replace: false, unstable_flushSync: true, unstable_viewTransition: true });
+		this.navigate(to, { relative: 'route', replace: false, flushSync: true, viewTransition: true });
 		let url = window.splendidBaseUrl + to;
 		if ( EndsWith(window.splendidBaseUrl, '/') && StartsWith(to, '/') )
 		{
@@ -65,7 +65,7 @@ export class SplendidHistory
 	public replace(to: string)
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.replace', to);
-		this.navigate(to, { relative: 'route', replace: true, unstable_flushSync: true, unstable_viewTransition: true });
+		this.navigate(to, { relative: 'route', replace: true, flushSync: true, viewTransition: true });
 		let url = window.splendidBaseUrl + to;
 		if ( EndsWith(window.splendidBaseUrl, '/') && StartsWith(to, '/') )
 		{
@@ -85,7 +85,10 @@ export const withRouter = <Props extends RouteComponentProps<any>>(Component: Re
 		// Encountered this problem with BusinessProcessEditView DynamicPopupView. 
 		// 02/11/2024 Paul.  Non-page view should not include params as it will overwrite MODULE_NAME. 
 		let params  : any = null;
-		const sComponentName: string = Component.name;
+		// 03/26/2026 Fix.  Babel's legacy decorator transform appends a numeric suffix to class names
+		// (e.g., @observer class DynamicEditView → class DynamicEditView2).  Strip trailing digits
+		// so component-name checks (EndsWith 'View', exact-match 'DynamicEditView', etc.) work correctly.
+		const sComponentName: string = Component.name.replace(/\d+$/, '');
 		// 04/03/2024 Paul.  Must include all components that use query parameters. 
 		if ( EndsWith(sComponentName, 'View') || sComponentName == 'DashboardEditor' || sComponentName == 'UnifiedSearch' )
 		{
@@ -150,4 +153,4 @@ export const withRouter = <Props extends RouteComponentProps<any>>(Component: Re
 	};
 };
 
-export { Link, Route, Navigate } from  'react-router-dom';
+export { Link, Route, Navigate } from  'react-router';

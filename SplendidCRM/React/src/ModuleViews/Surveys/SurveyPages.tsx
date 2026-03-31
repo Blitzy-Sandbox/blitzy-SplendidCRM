@@ -10,12 +10,10 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                        from 'react-pose'                          ;
 import { RouteComponentProps, withRouter }          from '../Router5'                    ;
 import { Modal }                                    from 'react-bootstrap'                     ;
 import { observer }                                 from 'mobx-react'                          ;
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome'      ;
-import { Appear }                                   from 'react-lifecycle-appear'              ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP                     from '../../types/DETAILVIEWS_RELATIONSHIP';
 import { SubPanelHeaderButtons }                    from '../../types/SubPanelHeaderButtons'   ;
@@ -39,18 +37,6 @@ import EditView                                     from '../../views/EditView' 
 import SubPanelButtonsFactory                       from '../../ThemeComponents/SubPanelButtonsFactory';
 import SurveyQuestionFactory                        from '../../SurveyComponents'              ;
 import DraggableRow                                 from '../Administration/Dropdown/DraggableRow';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ISurveyPagesProps extends RouteComponentProps<any>
 {
@@ -720,13 +706,13 @@ class SurveyPages extends React.Component<ISurveyPagesProps, ISurveyPagesState>
 							<button className='button' onClick={ this._onClosePageChange }>{ L10n.Term('.LBL_CLOSE_BUTTON_LABEL') }</button>
 						</Modal.Footer>
 					</Modal>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<div ref={ (el) => { if (el && !this.state.subPanelVisible) { this.setState({ subPanelVisible: true }); } } }>
 						{ headerButtons
 						? React.createElement(headerButtons, { MODULE_NAME, ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: GRID_NAME, row: item, Page_Command: this.Page_Command, showButtons: !showInlineEdit, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, onLayoutLoaded: this._onButtonsLoaded, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</div>
+					<div style={ {overflow: (open ? 'visible' : 'hidden'), height: open ? 'auto' : '0', transition: 'height 0.3s ease'} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							{ showInlineEdit
@@ -915,7 +901,7 @@ class SurveyPages extends React.Component<ISurveyPagesProps, ISurveyPagesState>
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}

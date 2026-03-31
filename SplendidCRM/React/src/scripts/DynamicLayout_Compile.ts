@@ -8,132 +8,148 @@
  * "Copyright (C) 2005-2022 SplendidCRM Software, Inc. All rights reserved."
  */
 
-// 1. React and fabric. 
-//Types and interfaces need to be imported, everything else can be required.
-const React                                  = require('react'                                );
-const { Modal }                              = require('react-bootstrap'                      );
+// 1. React and third-party libraries.
+import React from 'react';
+import { Modal } from 'react-bootstrap';
 // 09/19/2024 Paul.  To use XMLParser in dynamic control, must use root. 
-const XMLParser                              = require('fast-xml-parser'                      );
-const qs                                     = require('query-string'                         ).default;
-const posed                                  = require('react-pose'                           ).default;
-const Babel                                  = require('@babel/standalone'                    );
-const { SplendidHistory, RouteComponentProps, withRouter, Link, Route, Navigate }    = require('../Router5');
-const am4core                                = require('@amcharts/amcharts4/core'             );
-const am4charts                              = require('@amcharts/amcharts4/charts'           );
-const { observer }                           = require('mobx-react'                           );
-const mobx                                   = require('mobx'                                 );
-const BootstrapTable                         = require('react-bootstrap-table-next'           );
-const { FontAwesomeIcon }                    = require('@fortawesome/react-fontawesome'       );
-const moment                                 = require('moment'                               );
-const { Appear }                             = require('react-lifecycle-appear'               );
-const { RouterStore }                        = require('mobx-react-router'                    );
-// 2. Types
-const ACL_ACCESS                             = require('../types/ACL_ACCESS'                  ).default;
-const ACL_FIELD_ACCESS                       = require('../types/ACL_FIELD_ACCESS'            ).default;
-const DYNAMIC_BUTTON                         = require('../types/DYNAMIC_BUTTON'              ).default;
-const DETAILVIEWS_RELATIONSHIP               = require('../types/DETAILVIEWS_RELATIONSHIP'    ).default;
-const MODULE                                 = require('../types/MODULE'                      ).default;
-const RELATIONSHIPS                          = require('../types/RELATIONSHIPS'               ).default;
-const SINGLE_SIGN_ON                         = require('../types/SINGLE_SIGN_ON'              ).default;
-const DASHBOARDS_PANELS                      = require('../types/DASHBOARDS_PANELS'           ).default;
-const SHORTCUT                               = require('../types/SHORTCUT'                    ).default;
-const TAB_MENU                               = require('../types/TAB_MENU'                    ).default;
-const IDashletProps                          = require('../types/IDashletProps'               ).default;
-const IOrdersLineItemsEditorProps            = require('../types/IOrdersLineItemsEditorProps' ).default;
-const IOrdersLineItemsEditorState            = require('../types/IOrdersLineItemsEditorState' ).default;
-const OrdersLineItemsEditor                  = require('../types/OrdersLineItemsEditor'       ).default;
-const { IEditComponentProps, EditComponent } = require('../types/EditComponent'               );
-const { IDetailViewProps, IDetailComponentProps, IDetailComponentState, DetailComponent } = require('../types/DetailComponent');
-const { HeaderButtons }                      = require('../types/HeaderButtons'               );
-// 3. Scripts
-const Sql                                    = require('../scripts/Sql'                       ).default;
-const L10n                                   = require('../scripts/L10n'                      ).default;
-// 10/16/2021 Paul.  Add support for user currency. 
-const C10n                                   = require('../scripts/C10n'                      ).default;
-const Security                               = require('../scripts/Security'                  ).default;
-const { Crm_Config, Crm_Modules, Crm_Teams, Crm_Users } = require('../scripts/Crm');
-const { FromJsonDate, ToJsonDate, formatDate, formatCurrency, formatNumber } = require('../scripts/Formatting');
-const Credentials                            = require('../scripts/Credentials'               ).default;
-const SplendidCache                          = require('../scripts/SplendidCache'             ).default;
-const SplendidDynamic                        = require('../scripts/SplendidDynamic'           ).default;
-const SplendidDynamic_DetailView             = require('../scripts/SplendidDynamic_DetailView').default;
-const { sPLATFORM_LAYOUT }                   = require('../scripts/SplendidInitUI'            );
-// 11/28/2021 Paul.  UpdateRelatedList is needed to allow customize of popups. 
-const { UpdateModule, DeleteModuleItem, DeleteModuleRecurrences, MassDeleteModule, MassUpdateModule, MassSync, MassUnsync, ArchiveMoveData, ArchiveRecoverData, UpdateSavedSearch, DeleteRelatedItem, UpdateRelatedItem, UpdateRelatedList, AdminProcedure, ExecProcedure } = require('../scripts/ModuleUpdate');
-const { CreateSplendidRequest, GetSplendidResult                                              } = require('../scripts/SplendidRequest');
-const { DetailView_LoadItem, DetailView_LoadLayout, DetailView_LoadPersonalInfo, DetailView_RemoveField, DetailView_HideField, DetailView_FindField, DetailView_GetTabList, DetailView_ActivateTab} = require('../scripts/DetailView'     );
-// 11/25/2020 Paul.  EditView_UpdateREPEAT_TYPE is used in Calls/Meetings EditView. 
-const { EditView_LoadItem, EditView_LoadLayout, EditView_ConvertItem, EditView_RemoveField, EditView_InitItem, EditView_FindField, EditView_HideField, EditView_UpdateREPEAT_TYPE, EditView_GetTabList, EditView_ActivateTab } = require('../scripts/EditView'       );
-const { Application_GetReactLoginState }     = require('../scripts/Application'               );
-const { AppName, AppVersion }                = require('../AppVersion'                        );
-const { AuthenticatedMethod, IsAuthenticated, LoginRedirect, GetUserProfile, GetMyUserProfile, GetUserID, Login, ForgotPassword } = require('../scripts/Login'          );
-const { Right, Left, StartsWith, EndsWith, Trim, uuidFast, isEmptyObject, isTouchDevice, base64ArrayBuffer, isMobile, screenWidth, screenHeight } = require('../scripts/utility'        );
-const { NormalizeDescription, XssFilter                                                       } = require('../scripts/EmailUtils'     );
-const { ListView_LoadTable, ListView_LoadModule, ListView_LoadLayout, ListView_LoadModulePaginated, ListView_LoadTablePaginated, ListView_LoadTableWithAggregate } = require('../scripts/ListView');
-const { ConvertEditViewFieldToDetailViewField                                                 } = require('../scripts/ConvertLayoutField');
-const { GetInviteesActivities }              = require('../scripts/CalendarView'                  );
-const { DynamicButtons_LoadLayout }          = require('../scripts/DynamicButtons'                );
+import XMLParser from 'fast-xml-parser';
+import qs from 'query-string';
+import Babel from '@babel/standalone';
+import { SplendidHistory, withRouter, Link, Route, Navigate } from '../Router5';
+import type { RouteComponentProps } from '../Router5';
+import * as am4core from '@amcharts/amcharts4/core';
+import * as am4charts from '@amcharts/amcharts4/charts';
+import { observer } from 'mobx-react';
+import * as mobx from 'mobx';
+import BootstrapTable from 'react-bootstrap-table-next';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import moment from 'moment';
+import { RouterStore } from 'mobx-react-router';
 
-const { jsonReactState, Application_GetReactState, Admin_GetReactState, Application_ClearStore, Application_UpdateStoreLastDate} = require('../scripts/Application'                   );
+// Stubs for removed packages — provide no-op implementations for backward compatibility
+// with @babel/standalone compiled TSX that may still reference these modules.
+// react-pose: deprecated animation library replaced in the codebase migration.
+const posed: any = new Proxy({}, {
+	get: (_: any, tag: string) => (_config: any) => {
+		return (props: any) => React.createElement(tag as any, null, props?.children);
+	}
+});
+// react-lifecycle-appear: unmaintained lifecycle hook library replaced in migration.
+const Appear: any = (props: any) => props?.children || null;
+
+// 2. Types — value imports (classes that exist at runtime)
+import ACL_ACCESS from '../types/ACL_ACCESS';
+import ACL_FIELD_ACCESS from '../types/ACL_FIELD_ACCESS';
+import OrdersLineItemsEditor from '../types/OrdersLineItemsEditor';
+import { EditComponent } from '../types/EditComponent';
+import { DetailComponent } from '../types/DetailComponent';
+import { HeaderButtons } from '../types/HeaderButtons';
+// 2b. Types — type-only imports (interfaces erased at runtime)
+import type DYNAMIC_BUTTON from '../types/DYNAMIC_BUTTON';
+import type DETAILVIEWS_RELATIONSHIP from '../types/DETAILVIEWS_RELATIONSHIP';
+import type MODULE from '../types/MODULE';
+import type RELATIONSHIPS from '../types/RELATIONSHIPS';
+import type SINGLE_SIGN_ON from '../types/SINGLE_SIGN_ON';
+import type DASHBOARDS_PANELS from '../types/DASHBOARDS_PANELS';
+import type SHORTCUT from '../types/SHORTCUT';
+import type TAB_MENU from '../types/TAB_MENU';
+import type IDashletProps from '../types/IDashletProps';
+import type IOrdersLineItemsEditorProps from '../types/IOrdersLineItemsEditorProps';
+import type IOrdersLineItemsEditorState from '../types/IOrdersLineItemsEditorState';
+import type { IEditComponentProps } from '../types/EditComponent';
+import type { IDetailViewProps, IDetailComponentProps, IDetailComponentState } from '../types/DetailComponent';
+
+// 3. Scripts
+import Sql from '../scripts/Sql';
+import L10n from '../scripts/L10n';
+// 10/16/2021 Paul.  Add support for user currency. 
+import C10n from '../scripts/C10n';
+import Security from '../scripts/Security';
+import { Crm_Config, Crm_Modules, Crm_Teams, Crm_Users } from '../scripts/Crm';
+import { FromJsonDate, ToJsonDate, formatDate, formatCurrency, formatNumber } from '../scripts/Formatting';
+import Credentials from '../scripts/Credentials';
+import SplendidCache from '../scripts/SplendidCache';
+import SplendidDynamic from '../scripts/SplendidDynamic';
+import SplendidDynamic_DetailView from '../scripts/SplendidDynamic_DetailView';
+import { sPLATFORM_LAYOUT } from '../scripts/SplendidInitUI';
+// 11/28/2021 Paul.  UpdateRelatedList is needed to allow customize of popups. 
+import { UpdateModule, DeleteModuleItem, DeleteModuleRecurrences, MassDeleteModule, MassUpdateModule, MassSync, MassUnsync, ArchiveMoveData, ArchiveRecoverData, UpdateSavedSearch, DeleteRelatedItem, UpdateRelatedItem, UpdateRelatedList, AdminProcedure, ExecProcedure } from '../scripts/ModuleUpdate';
+import { CreateSplendidRequest, GetSplendidResult } from '../scripts/SplendidRequest';
+import { DetailView_LoadItem, DetailView_LoadLayout, DetailView_LoadPersonalInfo, DetailView_RemoveField, DetailView_HideField, DetailView_FindField, DetailView_GetTabList, DetailView_ActivateTab } from '../scripts/DetailView';
+// 11/25/2020 Paul.  EditView_UpdateREPEAT_TYPE is used in Calls/Meetings EditView. 
+import { EditView_LoadItem, EditView_LoadLayout, EditView_ConvertItem, EditView_RemoveField, EditView_InitItem, EditView_FindField, EditView_HideField, EditView_UpdateREPEAT_TYPE, EditView_GetTabList, EditView_ActivateTab } from '../scripts/EditView';
+import { Application_GetReactLoginState, jsonReactState, Application_GetReactState, Admin_GetReactState, Application_ClearStore, Application_UpdateStoreLastDate } from '../scripts/Application';
+import { AppName, AppVersion } from '../AppVersion';
+import { AuthenticatedMethod, IsAuthenticated, LoginRedirect, GetUserProfile, GetMyUserProfile, GetUserID, Login, ForgotPassword } from '../scripts/Login';
+import { Right, Left, StartsWith, EndsWith, Trim, uuidFast, isEmptyObject, isTouchDevice, base64ArrayBuffer, isMobileDevice, screenWidth, screenHeight } from '../scripts/utility';
+import { NormalizeDescription, XssFilter } from '../scripts/EmailUtils';
+import { ListView_LoadTable, ListView_LoadModule, ListView_LoadLayout, ListView_LoadModulePaginated, ListView_LoadTablePaginated, ListView_LoadTableWithAggregate } from '../scripts/ListView';
+import { ConvertEditViewFieldToDetailViewField } from '../scripts/ConvertLayoutField';
+import { GetInviteesActivities } from '../scripts/CalendarView';
+import { DynamicButtons_LoadLayout } from '../scripts/DynamicButtons';
+
 // 4. Components and Views. 
-const DumpSQL                                = require('../components/DumpSQL'                    ).default;
-const SearchView                             = require('../views/SearchView'                      ).default;
+import DumpSQL from '../components/DumpSQL';
+import SearchView from '../views/SearchView';
 // 08/11/2021 Paul.  Allow custom popups from custom layouts. 
-const DynamicPopupView                       = require('../views/DynamicPopupView'                ).default;
-const EditView                               = require('../views/EditView'                        ).default;
-const ListView                               = require('../views/ListView'                        ).default;
-const DetailView                             = require('../views/DetailView'                      ).default;
-const DynamicButtons                         = require('../components/DynamicButtons'             ).default;
-const ModuleHeader                           = require('../components/ModuleHeader'               ).default;
-const ProcessButtons                         = require('../components/ProcessButtons'             ).default;
-const ErrorComponent                         = require('../components/ErrorComponent'             ).default;
-const Collapsable                            = require('../components/Collapsable'                ).default;
-const DetailViewLineItems                    = require('../views/DetailViewLineItems'             ).default;
-const DetailViewRelationships                = require('../views/DetailViewRelationships'         ).default;
-const SplendidGrid                           = require('../components/SplendidGrid'               ).default;
-const SchedulingGrid                         = require('../components/SchedulingGrid'             ).default;
-const ListHeader                             = require('../components/ListHeader'                 ).default;
-const SearchTabs                             = require('../components/SearchTabs'                 ).default;
-const ExportHeader                           = require('../components/ExportHeader'               ).default;
-const PreviewDashboard                       = require('../views/PreviewDashboard'                ).default;
-const MassUpdate                             = require('../views/MassUpdate'                      ).default;
-const DynamicMassUpdate                      = require('../views/DynamicMassUpdate'               ).default;
+import DynamicPopupView from '../views/DynamicPopupView';
+import EditView from '../views/EditView';
+import ListView from '../views/ListView';
+import DetailView from '../views/DetailView';
+import DynamicButtons from '../components/DynamicButtons';
+import ModuleHeader from '../components/ModuleHeader';
+import ProcessButtons from '../components/ProcessButtons';
+import ErrorComponent from '../components/ErrorComponent';
+import Collapsable from '../components/Collapsable';
+import DetailViewLineItems from '../views/DetailViewLineItems';
+import DetailViewRelationships from '../views/DetailViewRelationships';
+import SplendidGrid from '../components/SplendidGrid';
+import SchedulingGrid from '../components/SchedulingGrid';
+import ListHeader from '../components/ListHeader';
+import SearchTabs from '../components/SearchTabs';
+import ExportHeader from '../components/ExportHeader';
+import PreviewDashboard from '../views/PreviewDashboard';
+import MassUpdate from '../views/MassUpdate';
+import DynamicMassUpdate from '../views/DynamicMassUpdate';
 // 08/30/2022 Paul.  A customer needs to have DynamicDetailView for a custom DetailView. 
-const DynamicDetailView                      = require('../views/DynamicDetailView'               ).default;
+import DynamicDetailView from '../views/DynamicDetailView';
 // 07/10/2019 Paul.  Cannot use DynamicEditView as it causes any file that includes SearchView, PopupView to fail to load in DynamicLayout, including SplendidDynamic_EditView. 
 // 02/03/2024 Paul.  DynamicEditView seems to be cause SplendidDynamic_EditView to fail again. 
-const DynamicEditView                        = require('../views/DynamicEditView'                 ).default;
-const DynamicListView                        = require('../views/DynamicListView'                 ).default;
-const AuditView                              = require('../views/AuditView'                       ).default;
-const HeaderButtonsFactory                   = require('../ThemeComponents/HeaderButtonsFactory'  ).default;
-const SubPanelButtonsFactory                 = require('../ThemeComponents/SubPanelButtonsFactory').default;
-const EditViewLineItems                      = require('../views/EditViewLineItems'               ).default;
+import DynamicEditView from '../views/DynamicEditView';
+import DynamicListView from '../views/DynamicListView';
+import AuditView from '../views/AuditView';
+import HeaderButtonsFactory from '../ThemeComponents/HeaderButtonsFactory';
+import SubPanelButtonsFactory from '../ThemeComponents/SubPanelButtonsFactory';
+import EditViewLineItems from '../views/EditViewLineItems';
 // 02/10/2022 Paul.  AcocuntsDetailViewJS uses ActivitiesPopupView and PersonalInfoView, so we must export these views. 
-const ActivitiesPopupView                    = require('../views/ActivitiesPopupView'             ).default;
-const PersonalInfoView                       = require('../views/PersonalInfoView'                ).default;
+import ActivitiesPopupView from '../views/ActivitiesPopupView';
+import PersonalInfoView from '../views/PersonalInfoView';
 // 04/13/2022 Paul.  Add LayoutTabs to Pacific theme. 
-const LayoutTabs                             = require('../components/LayoutTabs'                 ).default;
+import LayoutTabs from '../components/LayoutTabs';
 // 10/01/2022 Paul.  Base dashlets should have been added long ago.  They are needed when making custom from base. 
-const BaseMyDashlet                          = require('../Dashlets/BaseMyDashlet'                ).default;
-const BaseMyFavoriteDashlet                  = require('../Dashlets/BaseMyFavoriteDashlet'        ).default;
-const BaseMyTeamDashlet                      = require('../Dashlets/BaseMyTeamDashlet'            ).default;
+import BaseMyDashlet from '../Dashlets/BaseMyDashlet';
+import BaseMyFavoriteDashlet from '../Dashlets/BaseMyFavoriteDashlet';
+import BaseMyTeamDashlet from '../Dashlets/BaseMyTeamDashlet';
 
 // 02/04/2024 Paul.  Some modules need fixing.  Don't know why. 
-//const AuthenticationContext                  = require('../scripts/adal'                          ).default;
-//const SplendidDynamic_EditView               = require('../scripts/SplendidDynamic_EditView'      ).default;
-//const PopupView                              = require('../views/PopupView'                       ).default;
-//const ModuleViewFactory                      = require('../ModuleViews'                           ).default;
-//const { DynamicLayout_Module }               = require('../scripts/DynamicLayout'                 );
-import * as All_AuthenticationContext        from '../scripts/adal'                    ;
-import * as All_PopupView                    from '../views/PopupView'                 ;
-import * as All_SplendidDynamic_EditView     from '../scripts/SplendidDynamic_EditView';
-import * as All_ModuleViewFactory            from '../ModuleViews'                     ;
-import * as All_DynamicLayout_Module         from '../scripts/DynamicLayout'           ;
-let AuthenticationContext                    = All_AuthenticationContext.default            ;
-let PopupView                                = All_PopupView.default                        ;
-let SplendidDynamic_EditView                 = All_SplendidDynamic_EditView.default         ;
-let ModuleViewFactory                        = All_ModuleViewFactory.default                ;
-let DynamicLayout_Module                     = All_DynamicLayout_Module.DynamicLayout_Module;
+// These modules have circular dependency issues and are imported via namespace to allow FixNulledModules() recovery.
+// ESM Migration Note: In Vite/ESM, accessing .default on an uninitialized circular import
+// triggers the ES Module Temporal Dead Zone — a fatal ReferenceError that cannot be caught.
+// Unlike CommonJS (where circular imports return undefined and FixNulledModules recovers),
+// ESM requires deferring property access to function-call time when all modules are initialized.
+// The namespace imports (import * as All_X) are safe — they create a live binding object
+// that exists immediately. Only the property access (.default) must be deferred.
+import * as All_AuthenticationContext    from '../scripts/adal'                    ;
+import * as All_PopupView                from '../views/PopupView'                 ;
+import * as All_SplendidDynamic_EditView from '../scripts/SplendidDynamic_EditView';
+import * as All_ModuleViewFactory        from '../ModuleViews'                     ;
+import * as All_DynamicLayout_Module     from '../scripts/DynamicLayout'           ;
+// Deferred initialization: set to null now, resolved by FixNulledModules() at first use.
+let AuthenticationContext               : any = null;
+let PopupView                           : any = null;
+let SplendidDynamic_EditView            : any = null;
+let ModuleViewFactory                   : any = null;
+let DynamicLayout_Module                : any = null;
 
 // 02/04/2024 Paul.  Modules being null is back. 
 const allModules: any[] =
@@ -194,8 +210,10 @@ function FixNulledModules()
 	if ( AuthenticationContext == null || AuthenticationContext === undefined )
 	{
 		const m = allModules.find(x => x.Name == 'AuthenticationContext');
-		m.Module              = All_AuthenticationContext.default.AuthenticationContext;
-		AuthenticationContext = All_AuthenticationContext.default.AuthenticationContext;
+		// adal.ts exports the constructor directly as default export.
+		const resolved       = All_AuthenticationContext.default;
+		m.Module              = resolved;
+		AuthenticationContext = resolved;
 		console.log((new Date()).toISOString() + ' ' + 'DynamicLayout_Compile.FixNulledModules: AuthenticationContext Restored');
 	}
 	if ( PopupView == null || PopupView === undefined )
@@ -239,6 +257,140 @@ function DumpRequiredModules()
 	}
 }
 
+// Module registry for @babel/standalone compiled components.
+// @babel/standalone with es2015 preset outputs require() calls via _interopRequireDefault / _interopRequireWildcard.
+// This provides a global require function that resolves against our ESM-imported modules.
+// Internal TypeScript modules include __esModule: true so Babel's _interopRequireDefault returns them as-is.
+const moduleRegistry: Record<string, any> =
+{
+	// Third-party libraries (CJS-like — returned directly; Babel's interop wraps them automatically)
+	'react'                                      : React,
+	'fast-xml-parser'                            : XMLParser,
+	'@babel/standalone'                          : Babel,
+	'@amcharts/amcharts4/core'                   : am4core,
+	'@amcharts/amcharts4/charts'                 : am4charts,
+	'mobx'                                       : mobx,
+	'react-bootstrap-table-next'                 : BootstrapTable,
+	'moment'                                     : moment,
+	// Third-party libraries with ESM named/default exports
+	'react-bootstrap'                            : { __esModule: true, Modal },
+	'query-string'                               : { __esModule: true, default: qs },
+	'react-pose'                                 : { __esModule: true, default: posed },
+	'mobx-react'                                 : { __esModule: true, observer },
+	'@fortawesome/react-fontawesome'             : { __esModule: true, FontAwesomeIcon },
+	'react-lifecycle-appear'                     : { __esModule: true, Appear },
+	'mobx-react-router'                          : { __esModule: true, RouterStore },
+	// Router (RouteComponentProps is a type-only interface — not included as a runtime value)
+	'../Router5'                                 : { __esModule: true, SplendidHistory, withRouter, Link, Route, Navigate },
+	// Types — classes (exist at runtime)
+	'../types/ACL_ACCESS'                        : { __esModule: true, default: ACL_ACCESS },
+	'../types/ACL_FIELD_ACCESS'                  : { __esModule: true, default: ACL_FIELD_ACCESS },
+	'../types/OrdersLineItemsEditor'             : { __esModule: true, default: OrdersLineItemsEditor },
+	// Types — interfaces (erased at compile time; stubs provide module shape for require() resolution)
+	'../types/DYNAMIC_BUTTON'                    : { __esModule: true },
+	'../types/DETAILVIEWS_RELATIONSHIP'          : { __esModule: true },
+	'../types/MODULE'                            : { __esModule: true },
+	'../types/RELATIONSHIPS'                     : { __esModule: true },
+	'../types/SINGLE_SIGN_ON'                    : { __esModule: true },
+	'../types/DASHBOARDS_PANELS'                 : { __esModule: true },
+	'../types/SHORTCUT'                          : { __esModule: true },
+	'../types/TAB_MENU'                          : { __esModule: true },
+	'../types/IDashletProps'                     : { __esModule: true },
+	'../types/IOrdersLineItemsEditorProps'       : { __esModule: true },
+	'../types/IOrdersLineItemsEditorState'       : { __esModule: true },
+	// Types — mixed (classes + interfaces; only class values included)
+	'../types/EditComponent'                     : { __esModule: true, EditComponent },
+	'../types/DetailComponent'                   : { __esModule: true, DetailComponent },
+	'../types/HeaderButtons'                     : { __esModule: true, HeaderButtons },
+	// Scripts — default exports
+	'../scripts/Sql'                             : { __esModule: true, default: Sql },
+	'../scripts/L10n'                            : { __esModule: true, default: L10n },
+	'../scripts/C10n'                            : { __esModule: true, default: C10n },
+	'../scripts/Security'                        : { __esModule: true, default: Security },
+	'../scripts/Credentials'                     : { __esModule: true, default: Credentials },
+	'../scripts/SplendidCache'                   : { __esModule: true, default: SplendidCache },
+	'../scripts/SplendidDynamic'                 : { __esModule: true, default: SplendidDynamic },
+	'../scripts/SplendidDynamic_DetailView'      : { __esModule: true, default: SplendidDynamic_DetailView },
+	// Scripts — named exports
+	'../scripts/Crm'                             : { __esModule: true, Crm_Config, Crm_Modules, Crm_Teams, Crm_Users },
+	'../scripts/Formatting'                      : { __esModule: true, FromJsonDate, ToJsonDate, formatDate, formatCurrency, formatNumber },
+	'../scripts/SplendidInitUI'                  : { __esModule: true, sPLATFORM_LAYOUT },
+	'../scripts/ModuleUpdate'                    : { __esModule: true, UpdateModule, DeleteModuleItem, DeleteModuleRecurrences, MassDeleteModule, MassUpdateModule, MassSync, MassUnsync, ArchiveMoveData, ArchiveRecoverData, UpdateSavedSearch, DeleteRelatedItem, UpdateRelatedItem, UpdateRelatedList, AdminProcedure, ExecProcedure },
+	'../scripts/SplendidRequest'                 : { __esModule: true, CreateSplendidRequest, GetSplendidResult },
+	'../scripts/DetailView'                      : { __esModule: true, DetailView_LoadItem, DetailView_LoadLayout, DetailView_LoadPersonalInfo, DetailView_RemoveField, DetailView_HideField, DetailView_FindField, DetailView_GetTabList, DetailView_ActivateTab },
+	'../scripts/EditView'                        : { __esModule: true, EditView_LoadItem, EditView_LoadLayout, EditView_ConvertItem, EditView_RemoveField, EditView_InitItem, EditView_FindField, EditView_HideField, EditView_UpdateREPEAT_TYPE, EditView_GetTabList, EditView_ActivateTab },
+	'../scripts/Application'                     : { __esModule: true, jsonReactState, Application_GetReactState, Admin_GetReactState, Application_ClearStore, Application_UpdateStoreLastDate, Application_GetReactLoginState },
+	'../AppVersion'                              : { __esModule: true, AppName, AppVersion },
+	'../scripts/Login'                           : { __esModule: true, AuthenticatedMethod, IsAuthenticated, LoginRedirect, GetUserProfile, GetMyUserProfile, GetUserID, Login, ForgotPassword },
+	'../scripts/utility'                         : { __esModule: true, Right, Left, StartsWith, EndsWith, Trim, uuidFast, isEmptyObject, isTouchDevice, base64ArrayBuffer, isMobile: isMobileDevice, isMobileDevice, screenWidth, screenHeight },
+	'../scripts/EmailUtils'                      : { __esModule: true, NormalizeDescription, XssFilter },
+	'../scripts/ListView'                        : { __esModule: true, ListView_LoadTable, ListView_LoadModule, ListView_LoadLayout, ListView_LoadModulePaginated, ListView_LoadTablePaginated, ListView_LoadTableWithAggregate },
+	'../scripts/ConvertLayoutField'              : { __esModule: true, ConvertEditViewFieldToDetailViewField },
+	'../scripts/CalendarView'                    : { __esModule: true, GetInviteesActivities },
+	'../scripts/DynamicButtons'                  : { __esModule: true, DynamicButtons_LoadLayout },
+	// Components and Views — default exports
+	'../components/DumpSQL'                      : { __esModule: true, default: DumpSQL },
+	'../views/SearchView'                        : { __esModule: true, default: SearchView },
+	'../views/DynamicPopupView'                  : { __esModule: true, default: DynamicPopupView },
+	'../views/EditView'                          : { __esModule: true, default: EditView },
+	'../views/ListView'                          : { __esModule: true, default: ListView },
+	'../views/DetailView'                        : { __esModule: true, default: DetailView },
+	'../components/DynamicButtons'               : { __esModule: true, default: DynamicButtons },
+	'../components/ModuleHeader'                 : { __esModule: true, default: ModuleHeader },
+	'../components/ProcessButtons'               : { __esModule: true, default: ProcessButtons },
+	'../components/ErrorComponent'               : { __esModule: true, default: ErrorComponent },
+	'../components/Collapsable'                  : { __esModule: true, default: Collapsable },
+	'../views/DetailViewLineItems'               : { __esModule: true, default: DetailViewLineItems },
+	'../views/DetailViewRelationships'           : { __esModule: true, default: DetailViewRelationships },
+	'../components/SplendidGrid'                 : { __esModule: true, default: SplendidGrid },
+	'../components/SchedulingGrid'               : { __esModule: true, default: SchedulingGrid },
+	'../components/ListHeader'                   : { __esModule: true, default: ListHeader },
+	'../components/SearchTabs'                   : { __esModule: true, default: SearchTabs },
+	'../components/ExportHeader'                 : { __esModule: true, default: ExportHeader },
+	'../views/PreviewDashboard'                  : { __esModule: true, default: PreviewDashboard },
+	'../views/MassUpdate'                        : { __esModule: true, default: MassUpdate },
+	'../views/DynamicMassUpdate'                 : { __esModule: true, default: DynamicMassUpdate },
+	'../views/DynamicDetailView'                 : { __esModule: true, default: DynamicDetailView },
+	'../views/DynamicEditView'                   : { __esModule: true, default: DynamicEditView },
+	'../views/DynamicListView'                   : { __esModule: true, default: DynamicListView },
+	'../views/AuditView'                         : { __esModule: true, default: AuditView },
+	'../ThemeComponents/HeaderButtonsFactory'     : { __esModule: true, default: HeaderButtonsFactory },
+	'../ThemeComponents/SubPanelButtonsFactory'   : { __esModule: true, default: SubPanelButtonsFactory },
+	'../views/EditViewLineItems'                 : { __esModule: true, default: EditViewLineItems },
+	'../views/ActivitiesPopupView'               : { __esModule: true, default: ActivitiesPopupView },
+	'../views/PersonalInfoView'                  : { __esModule: true, default: PersonalInfoView },
+	'../components/LayoutTabs'                   : { __esModule: true, default: LayoutTabs },
+	'../Dashlets/BaseMyDashlet'                  : { __esModule: true, default: BaseMyDashlet },
+	'../Dashlets/BaseMyFavoriteDashlet'          : { __esModule: true, default: BaseMyFavoriteDashlet },
+	'../Dashlets/BaseMyTeamDashlet'              : { __esModule: true, default: BaseMyTeamDashlet },
+};
+
+// Global require shim for @babel/standalone compiled components.
+// @babel/standalone with es2015 preset outputs require() calls in compiled code.
+// The 5 circular dependency modules are resolved from namespace imports directly.
+// By the time require() is called (during DynamicLayout_Compile execution, after all
+// module evaluation is complete), the namespace bindings are fully initialized.
+(window as any).require = function(name: string)
+{
+	// Dynamic resolution for circular dependency modules — reads from namespace imports
+	// which are live ESM bindings, fully resolved by the time this function is called.
+	switch ( name )
+	{
+		case '../scripts/adal'                    : return { __esModule: true, default: All_AuthenticationContext.default            };
+		case '../views/PopupView'                 : return { __esModule: true, default: All_PopupView.default                       };
+		case '../scripts/SplendidDynamic_EditView': return { __esModule: true, default: All_SplendidDynamic_EditView.default        };
+		case '../ModuleViews'                     : return { __esModule: true, default: All_ModuleViewFactory.default               };
+		case '../scripts/DynamicLayout'           : return { __esModule: true, DynamicLayout_Module: All_DynamicLayout_Module.DynamicLayout_Module };
+	}
+	const mod = moduleRegistry[name];
+	if ( mod !== undefined )
+	{
+		return mod;
+	}
+	console.error('DynamicLayout_Compile: require() could not resolve module: ' + name);
+	return undefined;
+};
+
 export async function DynamicLayout_Compile(responseText: string)
 {
 	// 02/07/2024 Paul.  Fix is still required, but stop dumping to reduce delay. 
@@ -250,4 +402,3 @@ export async function DynamicLayout_Compile(responseText: string)
 	})();
 	return view;
 }
-

@@ -12,7 +12,6 @@
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from '../Router5'              ;
 import { FontAwesomeIcon }                 from '@fortawesome/react-fontawesome';
-import { Appear }                          from 'react-lifecycle-appear'        ;
 import { observer }                        from 'mobx-react'                    ;
 // https://www.amcharts.com/docs/v4/getting-started/basics/
 import * as am4core                        from "@amcharts/amcharts4/core"      ;
@@ -101,6 +100,7 @@ export default class OppByLeadSource extends React.Component<IDashletProps, IOpp
 	componentDidMount()
 	{
 		//console.log((new Date()).toISOString() + ' ' + this.constructor.name + '.componentDidMount');
+		this.setState({ dashletVisible: true });
 		this._isMounted = true;
 		if ( !this.chart )
 		{
@@ -329,30 +329,28 @@ export default class OppByLeadSource extends React.Component<IDashletProps, IOpp
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
-					<div className="card-body DashletHeader">
-						<ErrorComponent error={error} />
-						<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
-						<span
-							style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
-							onClick={ (e) => this._onRefresh(e) }
-						>
-							{ this.legacyIcons
-							? <img src={ this.themeURL + 'refresh.gif'} style={ {borderWidth: '0px'} } />
-							: <FontAwesomeIcon icon="sync" size="lg" />
-							}
-						</span>
-						<span
-							style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
-							onClick={ () => this.setState({ optionsVisible: !optionsVisible }) }
-						>
-							{ this.legacyIcons
-							? <img src={ this.themeURL + 'edit.gif'} style={ {borderWidth: '0px'} } />
-							: <FontAwesomeIcon icon="cog" size="lg" />
-							}
-						</span>
-					</div>
-				</Appear>
+				<div className="card-body DashletHeader">
+					<ErrorComponent error={error} />
+					<h3 style={ {float: 'left'} }>{ L10n.Term(TITLE) }</h3>
+					<span
+						style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
+						onClick={ (e) => this._onRefresh(e) }
+					>
+						{ this.legacyIcons
+						? <img src={ this.themeURL + 'refresh.gif'} style={ {borderWidth: '0px'} } />
+						: <FontAwesomeIcon icon="sync" size="lg" />
+						}
+					</span>
+					<span
+						style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
+						onClick={ () => this.setState({ optionsVisible: !optionsVisible }) }
+					>
+						{ this.legacyIcons
+						? <img src={ this.themeURL + 'edit.gif'} style={ {borderWidth: '0px'} } />
+						: <FontAwesomeIcon icon="cog" size="lg" />
+						}
+					</span>
+				</div>
 				<div style={{ clear: 'both' }}>
 					<hr />
 					{ dashletVisible

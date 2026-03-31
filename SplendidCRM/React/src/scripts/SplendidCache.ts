@@ -67,6 +67,9 @@ export class SplendidCacheStore
 	SHORTCUTS                 : any     = new Object();
 	TERMINOLOGY               : any     = new Object();
 	TERMINOLOGY_LISTS         : any     = new Object();
+	// Stores the original {key: displayName} mapping from TERMINOLOGY_LISTS before array conversion.
+	// Used by L10n.ListTerm to resolve display names for list values.
+	TERMINOLOGY_LIST_VALUES   : any     = new Object();
 	// 07/01/2019 Paul.  The SubPanelsView needs to understand how to manage all relationships. 
 	RELATIONSHIPS             : any     = new Object();
 	// 03/01/2016 Paul.  Order management lists. 
@@ -505,12 +508,20 @@ export class SplendidCacheStore
 			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: TERMINOLOGY is null, ' + sTerm);
 			return null;
 		}
-		else if ( this.TERMINOLOGY[Credentials.sUSER_LANG + '.' + sTerm] == null )
+		let sValue = this.TERMINOLOGY[Credentials.sUSER_LANG + '.' + sTerm];
+		if ( sValue != null )
 		{
-			//console.log((new Date()).toISOString() + ' ' + 'SplendidCache: TERMINOLOGY could not find ' + sTerm, this.TERMINOLOGY);
-			return sTerm;
+			return sValue;
 		}
-		return this.TERMINOLOGY[Credentials.sUSER_LANG + '.' + sTerm];
+		// 03/25/2026 Fix.  The .NET 10 backend may not include .moduleList.X terminology entries.
+		// Provide a human-readable fallback: extract the module name from the key pattern.
+		// e.g., '.moduleList.Accounts' → 'Accounts', '.moduleList.Home' → 'Home'
+		if ( sTerm.startsWith('.moduleList.') )
+		{
+			return sTerm.substring('.moduleList.'.length);
+		}
+		//console.log((new Date()).toISOString() + ' ' + 'SplendidCache: TERMINOLOGY could not find ' + sTerm, this.TERMINOLOGY);
+		return sTerm;
 	}
 
 	// 05/15/2020 Paul.  EmailTemplates needs to be able to insert CampaignTrackers. 
@@ -538,6 +549,23 @@ export class SplendidCacheStore
 			return null;
 		}
 		return this.TERMINOLOGY_LISTS[Credentials.sUSER_LANG + '.' + sListName];
+	}
+
+	// Resolves a display name for a specific list value (e.g., 'Active' in 'user_status_dom').
+	// Returns the display name from the original backend data, or the raw sName if not found.
+	TerminologyListDisplayName(sListName: string, sName: string): string
+	{
+		if ( this.TERMINOLOGY_LIST_VALUES )
+		{
+			// Try with language prefix first
+			const sLangKey = Credentials.sUSER_LANG + '.' + sListName;
+			const values = this.TERMINOLOGY_LIST_VALUES[sLangKey] || this.TERMINOLOGY_LIST_VALUES[sListName];
+			if ( values && values[sName] !== undefined && values[sName] !== null )
+			{
+				return values[sName];
+			}
+		}
+		return sName;
 	}
 
 	// 05/15/2020 Paul.  EmailTemplates needs to be able to insert CampaignTrackers. 
@@ -1186,7 +1214,34 @@ export class SplendidCacheStore
 	// 05/12/2018 Paul.  React requires setters. 
 	SetTAB_MENU(obj)
 	{
-		this.TAB_MENU = obj;
+		// 03/26/2026 Paul.  Backend returns dict keyed by user GUID when view has USER_ID column,
+		// or keyed by empty GUID when it does not.  Normalize to flat array for frontend consumption.
+		if ( obj != null && !Array.isArray(obj) && typeof obj === 'object' )
+		{
+			let items: any[] = [];
+			let sUSER_ID: string = (this.UserID || '').toLowerCase();
+			// First try the current user's entries
+			if ( sUSER_ID && obj[sUSER_ID] )
+			{
+				items = obj[sUSER_ID];
+			}
+			else
+			{
+				// Fallback: merge all entries (handles Guid.Empty key scenario)
+				for ( let key in obj )
+				{
+					if ( Array.isArray(obj[key]) )
+					{
+						items = items.concat(obj[key]);
+					}
+				}
+			}
+			this.TAB_MENU = items;
+		}
+		else
+		{
+			this.TAB_MENU = obj;
+		}
 	}
 
 	SetMODULES(obj)
@@ -1270,11 +1325,108 @@ export class SplendidCacheStore
 	SetTERMINOLOGY_LISTS(obj)
 	{
 		// 12/10/2022 Paul.  Allow Login Terminology Lists to be customized. 
-		this.TERMINOLOGY_LISTS = obj ? obj : {};
+		if ( !obj )
+		{
+			this.TERMINOLOGY_LISTS = {};
+			return;
+		}
+		// 03/25/2026 Fix.  The .NET 10 backend may serialize TERMINOLOGY_LISTS values as
+		// objects {key: displayName} instead of arrays [key1, key2, ...].
+		// Consumers (ChatDashboardView, L10n.GetList, dropdowns) call .map() on these values,
+		// which crashes on plain objects.  Normalize each value to an array of its keys,
+		// but also preserve the display-name mapping so L10n.ListTerm can resolve labels.
+		if ( !this.TERMINOLOGY_LIST_VALUES )
+		{
+			this.TERMINOLOGY_LIST_VALUES = {};
+		}
+		for ( let sKey in obj )
+		{
+			if ( obj.hasOwnProperty(sKey) )
+			{
+				let val = obj[sKey];
+				if ( val && typeof val === 'object' && !Array.isArray(val) )
+				{
+					// Preserve the {key: displayName} mapping before converting to array
+					this.TERMINOLOGY_LIST_VALUES[sKey] = val;
+					obj[sKey] = Object.keys(val);
+				}
+			}
+		}
+		// 03/25/2026 Fix.  The .NET 10 backend may return list keys without the language
+		// prefix (e.g., 'account_type_dom' instead of 'en-US.account_type_dom').
+		// The TerminologyList() lookup uses Credentials.sUSER_LANG + '.' + sListName,
+		// so we must ensure all keys have the language prefix.
+		const sLang: string = Credentials.sUSER_LANG || 'en-US';
+		const langPattern: RegExp = /^[a-z]{2}-[A-Z]{2}\./;
+		const keys: string[] = Object.keys(obj);
+		if ( keys.length > 0 && !langPattern.test(keys[0]) )
+		{
+			const normalized: any = {};
+			const normalizedValues: any = {};
+			for ( const key of keys )
+			{
+				const normalizedKey = !langPattern.test(key) ? sLang + '.' + key : key;
+				normalized[normalizedKey] = obj[key];
+				// Also normalize TERMINOLOGY_LIST_VALUES keys to match
+				if ( this.TERMINOLOGY_LIST_VALUES && this.TERMINOLOGY_LIST_VALUES[key] )
+				{
+					normalizedValues[normalizedKey] = this.TERMINOLOGY_LIST_VALUES[key];
+				}
+			}
+			this.TERMINOLOGY_LISTS = normalized;
+			// Merge any normalized values into the main store
+			Object.assign(this.TERMINOLOGY_LIST_VALUES, normalizedValues);
+			return;
+		}
+		this.TERMINOLOGY_LISTS = obj;
 	}
 
 	SetTERMINOLOGY(obj)
 	{
+		// 03/25/2026 Fix.  The .NET 10 backend may return terminology keys without the
+		// language prefix (e.g., 'Users.LBL_USER_NAME' instead of 'en-US.Users.LBL_USER_NAME').
+		// The Terminology() lookup always uses Credentials.sUSER_LANG + '.' + sTerm,
+		// so we must ensure all keys have the language prefix.
+		//
+		// Key format rules:
+		//   Module-scoped terms: backend sends 'Users.LBL_USER_NAME'
+		//     → stored as 'en-US.Users.LBL_USER_NAME'
+		//     → looked up via L10n.Term('Users.LBL_USER_NAME') → Terminology('en-US.Users.LBL_USER_NAME') ✓
+		//   Global terms (no module): backend sends 'NTC_LOGIN_MESSAGE'
+		//     → stored as BOTH 'en-US.NTC_LOGIN_MESSAGE' AND 'en-US..NTC_LOGIN_MESSAGE'
+		//     → looked up via L10n.Term('.NTC_LOGIN_MESSAGE') → Terminology('en-US..NTC_LOGIN_MESSAGE') ✓
+		//     → also via L10n.Term('NTC_LOGIN_MESSAGE') → Terminology('en-US.NTC_LOGIN_MESSAGE') ✓
+		if ( obj && typeof obj === 'object' )
+		{
+			const sLang: string = Credentials.sUSER_LANG || 'en-US';
+			const langPattern: RegExp = /^[a-z]{2}-[A-Z]{2}\./;
+			const keys: string[] = Object.keys(obj);
+			// Check if keys already have language prefix (sample first key)
+			if ( keys.length > 0 && !langPattern.test(keys[0]) )
+			{
+				const normalized: any = {};
+				for ( const key of keys )
+				{
+					if ( !langPattern.test(key) )
+					{
+						// Always store with single-dot prefix
+						normalized[sLang + '.' + key] = obj[key];
+						// For global terms (no module prefix — no dot in the key),
+						// also store with double-dot to match lookups via L10n.Term('.KEY')
+						if ( key.indexOf('.') < 0 )
+						{
+							normalized[sLang + '..' + key] = obj[key];
+						}
+					}
+					else
+					{
+						normalized[key] = obj[key];
+					}
+				}
+				this.TERMINOLOGY = normalized;
+				return;
+			}
+		}
 		this.TERMINOLOGY = obj;
 	}
 
@@ -1522,11 +1674,6 @@ export class SplendidCacheStore
 	// 07/21/2019 Paul.  We need UserAccess control for buttons. 
 	GetUserAccess(sMODULE_NAME: string , sACCESS_TYPE: string, sCaller?: string): number
 	{
-		if ( this.MODULE_ACL_ACCESS == null )
-		{
-			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: MODULE_ACL_ACCESS is null, ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
-			return ACL_ACCESS.NONE;
-		}
 		if ( Sql.IsEmptyString(sMODULE_NAME) )
 		{
 			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: MODULE_NAME not specified for ' + sACCESS_TYPE + ' from ' + sCaller);
@@ -1537,25 +1684,11 @@ export class SplendidCacheStore
 		{
 			return ACL_ACCESS.FULL_ACCESS;
 		}
-		else if ( this.MODULE_ACL_ACCESS[sMODULE_NAME] == null )
-		{
-			// 04/17/2020 Paul.  Ignore Employee access errors if the module is disabled. 
-			if ( this.Module(sMODULE_NAME) != null )
-				console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: MODULE_ACL_ACCESS could not find ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
-			return ACL_ACCESS.NONE;
-		}
 
-		if ( this.ACL_ACCESS == null )
-		{
-			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: ACL_ACCESS is null, ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
-			return ACL_ACCESS.NONE;
-		}
-		if ( this.ACL_ACCESS[sMODULE_NAME] == null )
-		{
-			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: ACL_ACCESS could not find ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
-			return ACL_ACCESS.NONE;
-		}
-
+		// 03/25/2026 Fix.  Move the admin check BEFORE the MODULE_ACL_ACCESS/ACL_ACCESS lookups.
+		// When the backend returns empty MODULE_ACL_ACCESS (0 entries despite 76 rows in DB),
+		// admin users were being blocked from ALL modules.  Admin users should always have
+		// FULL_ACCESS to enabled modules regardless of ACL state.
 		let bIsAdmin = Security.IS_ADMIN();
 		if ( bIsAdmin )
 		{
@@ -1564,6 +1697,48 @@ export class SplendidCacheStore
 				return ACL_ACCESS.FULL_ACCESS;
 			else
 				return ACL_ACCESS.NONE;  // 08/10/2017 Paul.  We need to return a negative number to prevent access, not zero. 
+		}
+
+		if ( this.MODULE_ACL_ACCESS == null )
+		{
+			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: MODULE_ACL_ACCESS is null, ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
+			return ACL_ACCESS.NONE;
+		}
+		// 03/25/2026 Fix.  If MODULE_ACL_ACCESS is empty (backend serialization issue),
+		// grant access based on whether the module is enabled rather than blocking everything.
+		let bModuleAclEmpty: boolean = (typeof this.MODULE_ACL_ACCESS === 'object' && Object.keys(this.MODULE_ACL_ACCESS).length === 0);
+		if ( this.MODULE_ACL_ACCESS[sMODULE_NAME] == null && !bModuleAclEmpty )
+		{
+			// 04/17/2020 Paul.  Ignore Employee access errors if the module is disabled. 
+			if ( this.Module(sMODULE_NAME) != null )
+				console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: MODULE_ACL_ACCESS could not find ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
+			return ACL_ACCESS.NONE;
+		}
+		// 03/25/2026 Fix.  When MODULE_ACL_ACCESS is empty for all modules, fall through to
+		// enabled-module check below instead of returning NONE (which blocks all views).
+		if ( bModuleAclEmpty && this.MODULE_ACL_ACCESS[sMODULE_NAME] == null )
+		{
+			if ( this.Module(sMODULE_NAME) != null )
+				return ACL_ACCESS.FULL_ACCESS;
+			else
+				return ACL_ACCESS.NONE;
+		}
+
+		if ( this.ACL_ACCESS == null )
+		{
+			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: ACL_ACCESS is null, ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
+			// 03/25/2026 Fix.  If module is enabled, allow access rather than total block.
+			if ( this.Module(sMODULE_NAME) != null )
+				return ACL_ACCESS.FULL_ACCESS;
+			return ACL_ACCESS.NONE;
+		}
+		if ( this.ACL_ACCESS[sMODULE_NAME] == null )
+		{
+			// 03/25/2026 Fix.  If module is enabled, allow access rather than total block.
+			if ( this.Module(sMODULE_NAME) != null )
+				return ACL_ACCESS.FULL_ACCESS;
+			console.warn((new Date()).toISOString() + ' ' + 'SplendidCache: ACL_ACCESS could not find ' + sMODULE_NAME + ' ' + sACCESS_TYPE, jsonReactState);
+			return ACL_ACCESS.NONE;
 		}
 		
 		// 12/05/2006 Paul.  We need to combine Activity and Calendar related modules into a single access value. 

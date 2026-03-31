@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed                                        from 'react-pose'                        ;
 import { RouteComponentProps, withRouter }          from '../Router5'                  ;
 import { observer }                                 from 'mobx-react'                        ;
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome'    ;
-import { Appear }                                   from 'react-lifecycle-appear'            ;
 // 2. Store and Types. 
 import DETAILVIEWS_RELATIONSHIP                     from '../types/DETAILVIEWS_RELATIONSHIP' ;
 // 3. Scripts. 
@@ -31,18 +29,6 @@ import ErrorComponent                               from '../components/ErrorCom
 import DumpSQL                                      from '../components/DumpSQL'             ;
 import DynamicSubPanelView                          from '../views/DynamicSubPanelView'      ;
 import SubPanelButtonsFactory                       from '../ThemeComponents/SubPanelButtonsFactory';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface IDetailViewRelationshipsProps extends RouteComponentProps<any>
 {
@@ -100,6 +86,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 
 	async componentDidMount()
 	{
+		this.setState({ subPanelVisible: true });
 		try
 		{
 			let status = await AuthenticatedMethod(this.props, this.constructor.name + '.componentDidMount');
@@ -438,19 +425,19 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 			{
 				return (
 					<React.Fragment>
-						<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+						<div>
 							{ headerButtons
 							? React.createElement(headerButtons, { MODULE_NAME, ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: CONTROL_VIEW_NAME, row: null, showButtons: false, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, history: this.props.history, location: this.props.location, match: this.props.match })
 							: null
 							}
-						</Appear>
-						<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+						</div>
+						<div style={ {overflow: (open ? 'visible' : 'hidden')} }>
 						{ open
 						? <React.Fragment>
 							<div style={ {margin: '0', padding: '1em'} }>
 							{
 								items.map(item =>
-								(<div className='col-xs-6 col-sm-3 col-md-2' style={ {margin: '0', padding: '0'} }>
+								(<div key={ 'insight_' + item.CONTROL_VIEW_NAME } className='col-xs-6 col-sm-3 col-md-2' style={ {margin: '0', padding: '0'} }>
 									<div style={ {margin: '4px', padding: '0', borderRadius: '4px', border: '.15em solid #ced4da', borderTop: '3px solid #534d64', backgroundColor: (item.IS_PANEL_OPEN ? '#554d661f' : 'inherit'), cursor: 'pointer'} } onClick={ () => this.onSubPanelCollapse(item.CONTROL_VIEW_NAME, !item.IS_PANEL_OPEN) }>
 										<div style={ {padding: '0 .5em', marginTop: '.5em', textAlign: 'right'} }>
 											<img src={ this.themeURL + item.RELATED_TYPE + '.gif' } style={ {borderWidth: '0px', height: '24px', width: '24px'} } />
@@ -474,6 +461,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 								items.map(item =>
 								( item.IS_PANEL_OPEN
 								? <DynamicSubPanelView
+									key={ 'subpanel_open_' + item.CONTROL_VIEW_NAME }
 									PARENT_TYPE={ PARENT_TYPE }
 									row={ item.row }
 									layout={ item.layout }
@@ -488,7 +476,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 						</React.Fragment>
 						: null
 						}
-						</Content>
+						</div>
 					</React.Fragment>
 				);
 			}
@@ -497,6 +485,7 @@ class DetailViewRelationships extends React.Component<IDetailViewRelationshipsPr
 				return items.map(item =>
 				(
 					<DynamicSubPanelView
+						key={ 'subpanel_' + item.CONTROL_VIEW_NAME }
 						PARENT_TYPE={ PARENT_TYPE }
 						row={ item.row }
 						layout={ item.layout }

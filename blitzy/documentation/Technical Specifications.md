@@ -6,1200 +6,1279 @@
 
 ### 0.1.1 Core Refactoring Objective
 
-Based on the prompt, the Blitzy platform understands that the refactoring objective is to perform a **technology stack migration** of the SplendidCRM Community Edition v15.2 backend from the legacy .NET Framework 4.8 / ASP.NET WebForms / WCF / IIS platform to a modern .NET 10 ASP.NET Core MVC platform, while simultaneously decoupling all build and runtime dependencies from Windows-only / Visual Studio-only / IIS-only toolchains.
+Based on the prompt, the Blitzy platform understands that the refactoring objective is to **modernize the SplendidCRM React SPA from a Webpack-based, same-origin-hosted frontend into a standalone, decoupled React 19 / Vite application running on Node 20 LTS** — while preserving 100% visual and functional parity across all CRM modules.
 
-- **Refactoring type:** Tech stack migration (framework-level replatforming)
-- **Target repository:** Same repository — in-place migration of backend code
-- **Scope boundary:** This is Prompt 1 of 3 in a phased SplendidCRM modernization series. This prompt covers backend modernization and toolchain decoupling ONLY. Frontend modernization (Prompt 2) and containerization/AWS infrastructure (Prompt 3) are explicitly excluded.
+**Refactoring Type:** Tech stack migration + Build toolchain modernization + Hosting decoupling
+
+**Target Repository:** Same repository — the frontend at `SplendidCRM/React/` is extracted into a standalone workspace within the existing monorepo.
+
+**Prompt Context:** This is **Prompt 2 of 3** in the SplendidCRM modernization initiative. Prompt 1 (backend .NET 10 migration) is confirmed complete (85.5%, 600 tests passing, zero build errors). Prompt 3 covers containerization, AWS infrastructure, and deployment. This prompt covers the frontend modernization exclusively.
 
 **Refactoring Goals with Enhanced Clarity:**
 
-- **Goal 1 — Business Logic Extraction:** Extract all 74 root-level C# utility classes from `SplendidCRM/_code/` (including `Security.cs`, `SplendidCache.cs`, `SplendidInit.cs`, `SchedulerUtils.cs`, `RestUtil.cs`, `SearchBuilder.cs`, `EmailUtils.cs`, `Sql.cs`, and 60+ others) into a standalone .NET 10 class library project, preserving MVC pattern separation of Model and Controller logic.
-- **Goal 2 — REST API Conversion:** Convert the monolithic WCF REST surface in `Rest.svc.cs` (8,369 lines, 152 endpoint operations) to ASP.NET Core Web API controllers with identical route paths, HTTP methods, request/response JSON schemas, and full OData-style query support (`$filter`, `$select`, `$orderby`, `$groupby`).
-- **Goal 3 — SOAP API Preservation:** Convert the WCF SOAP surface in `soap.asmx.cs` (4,641 lines, 84 SOAP methods) to SoapCore middleware preserving the `sugarsoap` namespace (`http://www.sugarcrm.com/sugarcrm`), WSDL contract, and all data carriers (`contact_detail`, `entry_value`, `name_value`, `document_revision`, etc.).
-- **Goal 4 — Admin API Conversion:** Convert `Administration/Rest.svc.cs` (6,473 lines, 65 endpoint operations) and `Administration/Impersonation.svc.cs` to ASP.NET Core admin API controllers.
-- **Goal 5 — DLL-to-NuGet Modernization:** Replace all 37 manually managed DLL references (sourced from `BackupBin2012/`, `BackupBin2022/`, `BackupBin2025/`) with NuGet package references.
-- **Goal 6 — Application Lifecycle Migration:** Convert `Global.asax.cs` (400 lines) lifecycle management (`Application_Start`, `Session_Start`, timer initialization, `Application_End`) to `Program.cs` + three `IHostedService` implementations with configurable intervals and reentrancy guards.
-- **Goal 7 — SignalR Migration:** Migrate OWIN-hosted Microsoft.AspNet.SignalR 1.2.2 (10 files in `_code/SignalR/`) to ASP.NET Core SignalR, preserving hub method signatures for ChatManager, TwilioManager, and PhoneBurnerManager.
-- **Goal 8 — Distributed Session:** Migrate InProc session (20-minute timeout, configured in `Web.config`) to distributed session backed by Redis or SQL Server, selectable via `SESSION_PROVIDER` environment variable.
-- **Goal 9 — Configuration Externalization:** Externalize all environment-specific configuration from `Web.config` (196 lines) to a five-tier provider hierarchy: AWS Secrets Manager → Environment variables → AWS Systems Manager Parameter Store → `appsettings.{Environment}.json` → `appsettings.json`, with mandatory startup validation and fail-fast behavior.
-- **Goal 10 — Platform Independence:** Eliminate all Windows-only, IIS-only, and Visual Studio-only build dependencies so the backend builds and runs via `dotnet restore && dotnet build && dotnet run` on Linux with zero Windows dependencies.
+- **React 18.2.0 → React 19 Upgrade:** Address all breaking changes including removal of `defaultProps` on function components, deprecated legacy context API, `forwardRef` pattern changes, `StrictMode` behavioral updates, and PropTypes removal. The codebase has zero `defaultProps`, zero `ReactDOM.render`, zero `forwardRef` usage, and already uses `createRoot` — indicating high migration readiness.
+- **Webpack 5.90.2 → Vite Migration:** Replace 6 Webpack configuration files (`common.js`, `dev_local.js`, `dev_remote.js`, `mobile.js`, `prod.js`, `prod_minimize.js`) with a single `vite.config.ts`. Migrate from thread-loader/ts-loader/style-loader/css-loader/sass-loader/svg-inline-loader/file-loader/url-loader/ForkTsCheckerWebpackPlugin/HtmlWebpackPlugin/WebpackPwaManifest to Vite-native equivalents. Abandon the single-file `SteviaCRM.js` bundle pattern in favor of Vite's chunked output with `index.html` entry point.
+- **TypeScript 5.3.3 → 5.5+ Upgrade:** Modernize `tsconfig.json` from `target: ES5` / `module: CommonJS` to `target: ES2015+` / `module: ESNext` / `moduleResolution: bundler`. Preserve `experimentalDecorators: true` for MobX decorator syntax.
+- **CommonJS → ESM Module Transition:** Convert 44 files using `require()` calls (40+ in `BusinessProcesses/`, plus `DynamicLayout_Compile.ts`, `ProcessButtons.tsx`, `UserDropdown.tsx`) and 1 file using `module.exports` (`adal.ts`) to ESM `import`/`export` syntax.
+- **Node 16.20 → Node 20 LTS Compatibility:** Ensure all dependencies and build tooling operate on Node 20 LTS. Node 20.20.1 is already installed in the environment.
+- **Package Manager Modernization:** Migrate from Yarn 1.22 to npm (current LTS), aligning with `npm run build` as the canonical build command.
+- **Same-Origin Hosting → Standalone Decoupled SPA:** Remove the assumption that the React app is served from the same origin as the ASP.NET backend. Implement runtime configuration injection via `/config.json` for `API_BASE_URL`, `SIGNALR_URL`, and `ENVIRONMENT`.
+- **SignalR Client Upgrade:** Replace `@microsoft/signalr` 8.0.0 with 10.0.0 and remove legacy `signalr` 2.4.3 jQuery-based client entirely. Update hub connection URLs from legacy `/signalr` to discrete ASP.NET Core endpoints: `/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner`.
+- **Dependency Modernization:** Upgrade all npm dependencies to React 19 / Node 20 compatible versions, including critical updates like `lodash` 3.10.1 → 4.x (security), `react-router-dom` 6.22.1 → `react-router` 7.x, `node-sass` 9.0.0 → `sass` (Dart Sass), and React Bootstrap to a React 19 compatible version.
+- **`@babel/standalone` Preservation:** Maintain the runtime in-browser TSX compilation capability used by `DynamicLayout_Compile.ts` for metadata-driven UI rendering. This package must remain a production dependency and must not be tree-shaken or excluded by Vite's optimization.
 
 **Implicit Requirements Surfaced:**
 
-- Replace all `HttpContext.Current` static access (found in 31+ files across `_code/`, `Rest.svc.cs`, `soap.asmx.cs`, `Administration/Rest.svc.cs`) with `IHttpContextAccessor` dependency injection
-- Replace all `Application[]` state access (found in 36 files) with `IMemoryCache` or scoped service injection
-- Replace all `HttpRuntime.Cache` usage (5 files, primarily `SplendidCache.cs`) with `IMemoryCache`
-- Replace all `Session[]` direct access (20 files) with distributed session-compatible patterns via `IHttpContextAccessor`
-- Remove all `System.Web` namespace dependencies (65 files) in favor of `Microsoft.AspNetCore.*` equivalents
-- Eliminate WCF `system.serviceModel` configuration and assembly binding redirects entirely — NuGet dependency resolution replaces both
-- Preserve the P3P header intentional removal as a documented change (legacy IE iframe compatibility)
-- Maintain MD5 password hashing as-is for SugarCRM backward compatibility, documenting it as technical debt
+- **CORS Configuration:** The decoupled frontend requires the backend's `CORS_ORIGINS` environment variable to include the frontend origin for cross-origin API calls to succeed.
+- **Credential Forwarding:** All `fetch` calls must include `credentials: 'include'` for cross-origin cookie-based authentication.
+- **Cordova Compatibility:** The React SPA is also wrapped by Cordova 12.0.0 for mobile. Build changes must not break the mobile deployment pathway; however, Cordova configuration itself is explicitly out of scope.
+- **SCSS → Dart Sass Migration:** The current build uses `node-sass` 9.0.0, which is deprecated and incompatible with Node 20. Migration to `sass` (Dart Sass) is required. Only 1 SCSS file (`index.scss`) and 17 CSS files exist.
+- **webpack.ProvidePlugin Replacement:** The current Webpack config provides `process` as a global via `process/browser`. Vite handles environment differently — this requires explicit handling via `define` configuration or a polyfill.
+- **External Module Handling:** Webpack externalizes `xlsx`, `canvg`, and `pdfmake` as CommonJS modules. Vite must handle these via `optimizeDeps` pre-bundling or `ssr.external` configuration.
+- **CKEditor 5 Custom Build:** The CKEditor custom build at `SplendidCRM/React/ckeditor5-custom-build/` has its own Webpack configuration. This build produces pre-compiled output in `build/` and must be preserved as a local dependency.
 
 ### 0.1.2 Technical Interpretation
 
 This refactoring translates to the following technical transformation strategy:
 
-**Current Architecture → Target Architecture Mapping:**
+**Architecture Transformation — Before and After:**
 
-| Layer | Current (.NET Framework 4.8) | Target (.NET 10 ASP.NET Core) |
-|---|---|---|
-| Runtime | .NET Framework 4.8 (Windows-only) | .NET 10 LTS (cross-platform) |
-| Web Framework | ASP.NET WebForms + WCF | ASP.NET Core MVC |
-| REST API Surface | WCF REST (`Rest.svc.cs`, `[ServiceContract]`, `[WebInvoke]`) | ASP.NET Core Web API Controllers (`[ApiController]`, `[HttpPost]`) |
-| SOAP API Surface | ASMX Web Service (`soap.asmx.cs`, `[SoapRpcService]`) | SoapCore middleware 1.2.1.12 |
-| Admin API Surface | WCF REST (`Administration/Rest.svc.cs`) | ASP.NET Core Admin Controllers |
-| Application Lifecycle | `Global.asax.cs` (`HttpApplication` events + timer-based) | `Program.cs` + 3× `IHostedService` |
-| Authentication | `Web.config <authentication mode="Windows"/>` + custom `Security.cs` | ASP.NET Core authentication schemes (Negotiate, Cookie, OIDC/SAML) + custom `IAuthorizationHandler` |
-| Session Management | InProc `SessionState` (20 min, `Web.config`) | Distributed cache (Redis or SQL Server via `SESSION_PROVIDER`) |
-| Caching | `HttpRuntime.Cache` + `Application[]` + static dictionaries | `IMemoryCache` with equivalent keys and invalidation |
-| Configuration | `Web.config` (appSettings, connectionStrings, serviceModel) | AWS Secrets Manager + Env vars + Parameter Store + `appsettings.json` |
-| Data Access | `System.Data.SqlClient` (embedded in .NET Framework) | `Microsoft.Data.SqlClient` 6.1.4 NuGet |
-| Real-Time | OWIN SignalR 1.2.2 (`Microsoft.AspNet.SignalR`) | ASP.NET Core SignalR (`Microsoft.AspNetCore.SignalR`) |
-| JSON Serialization | Newtonsoft.Json 13.0 (binding redirect from 6.0) | System.Text.Json (primary) + Newtonsoft.Json 13.x fallback |
-| TLS Enforcement | `ServicePointManager.SecurityProtocol` in `Global.asax.cs` | Kestrel HTTPS configuration |
-| Dependency Management | 37 manual DLL references from `BackupBin*` folders | NuGet `<PackageReference>` in `.csproj` |
-| Build System | Visual Studio 2017 MSBuild (`.csproj` with GUID project types) | `dotnet` CLI SDK-style projects |
-| Hosting | IIS integrated pipeline | Kestrel (self-hosted, Linux-compatible) |
+```mermaid
+graph LR
+    subgraph BEFORE["Current Architecture"]
+        ASP["ASP.NET Backend<br/>+ React Served Same-Origin"]
+        WP["Webpack 5.90.2<br/>SteviaCRM.js Bundle"]
+        R18["React 18.2.0<br/>TypeScript 5.3.3<br/>CommonJS Modules"]
+        SR["Dual SignalR<br/>@microsoft/signalr 8.0.0<br/>+ legacy signalr 2.4.3"]
+    end
 
-**Transformation Rules:**
+    subgraph AFTER["Target Architecture"]
+        BE["ASP.NET Core 10 Backend<br/>Kestrel :5000"]
+        FE["Standalone React 19 SPA<br/>Served via Nginx"]
+        VT["Vite 6.x<br/>Chunked ESM Output"]
+        R19["React 19<br/>TypeScript 5.5+<br/>ESM Modules"]
+        SRC["@microsoft/signalr 10.0.0<br/>Discrete Hub Endpoints"]
+        CFG["/config.json<br/>Runtime Config Injection"]
+    end
 
-- Every `[ServiceContract]` + `[WebInvoke]` WCF endpoint → equivalent `[ApiController]` + `[HttpPost]`/`[HttpGet]` attribute routing
-- Every `[SoapRpcMethod]` + `[WebMethod]` SOAP operation → SoapCore `[ServiceContract]` + `[OperationContract]` interface method
-- Every `HttpContext.Current.Session["key"]` → `IHttpContextAccessor.HttpContext.Session.GetString("key")` (or typed equivalent)
-- Every `HttpContext.Current.Application["key"]` → `IMemoryCache.Get<T>("key")` via DI
-- Every `using System.Data.SqlClient` → `using Microsoft.Data.SqlClient`
-- Every `using System.Web` → replaced by appropriate `Microsoft.AspNetCore.*` equivalent
-- Every `Web.config <appSettings>` value → `IConfiguration["key"]` sourced from provider hierarchy
-- Timer-based `System.Timers.Timer` patterns → `IHostedService` with `PeriodicTimer` or `Task.Delay` loops
+    ASP --> BE
+    WP --> VT
+    R18 --> R19
+    SR --> SRC
+    FE --> CFG
+```
+
+**Transformation Rules and Patterns:**
+
+- **Build Entry Point:** Transform from Webpack JS entry (`src/index.tsx` → `SteviaCRM.js`) to Vite HTML entry (`index.html` → chunked `dist/` output with auto-injected `<script type="module">`)
+- **Module System:** Transform all application source from CommonJS (`require()` / `module.exports`) to ESM (`import` / `export`). Vite's `optimizeDeps` handles third-party CJS dependencies.
+- **API Communication:** Transform from implicit same-origin relative URLs to explicit `config.API_BASE_URL + path` for every REST, SignalR, and file upload call.
+- **Configuration:** Transform from build-time constants to runtime-injected values via `/config.json` loaded before React app initialization.
+- **SignalR Connections:** Transform from single `/signalr` endpoint with hub multiplexing to three discrete hub endpoints (`/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner`).
+- **CSS Processing:** Transform from Webpack's loader chain (`style-loader` → `css-loader` → `postcss-loader` → `sass-loader`) to Vite's built-in CSS/PostCSS/Sass support.
+- **Asset Handling:** Transform from Webpack's `file-loader`/`url-loader`/`svg-inline-loader` to Vite's built-in asset handling with `?inline` for SVGs and automatic asset fingerprinting.
+- **Type Checking:** Transform from `ForkTsCheckerWebpackPlugin` (in-build type checking) to `tsc --noEmit` as a separate script (Vite does not type-check during builds).
+
+**Confirmed Backend API Contracts (from Prompt 1):**
+
+- REST API: `{API_BASE_URL}/Rest.svc/` — 152 endpoints
+- Admin API: `{API_BASE_URL}/Administration/Rest.svc/` — 65 endpoints
+- SignalR Hubs: `{API_BASE_URL}/hubs/chat`, `{API_BASE_URL}/hubs/twilio`, `{API_BASE_URL}/hubs/phoneburner`
+- Health Check: `GET {API_BASE_URL}/api/health` → HTTP 200
+- SOAP: Preserved via SoapCore — not consumed by React frontend
+- JSON Serialization: Newtonsoft.Json 13.0.3 fallback alongside System.Text.Json — defensive parsing recommended
 
 ## 0.2 Source Analysis
 
 ### 0.2.1 Comprehensive Source File Discovery
 
-The following search patterns and manual inspection identified ALL files requiring migration as part of this backend modernization:
+The migration target is the React SPA located at `SplendidCRM/React/`. A thorough scan of this directory reveals 763 TypeScript/TSX source files, 17 CSS files, 1 SCSS file, and 0 JavaScript source files — the entire application is TypeScript.
 
-**WCF / SOAP Service Files (3 files — direct conversion required):**
-
-| File | Lines | Endpoints | Migration Target |
-|---|---|---|---|
-| `SplendidCRM/Rest.svc.cs` | 8,369 | 152 WCF operations | ASP.NET Core Web API Controllers |
-| `SplendidCRM/Administration/Rest.svc.cs` | 6,473 | 65 WCF operations | ASP.NET Core Admin Controllers |
-| `SplendidCRM/soap.asmx.cs` | 4,641 | 84 SOAP methods | SoapCore middleware |
-
-**WCF Admin Impersonation Service (1 file):**
-
-| File | Migration Target |
-|---|---|
-| `SplendidCRM/Administration/Impersonation.svc.cs` | ASP.NET Core controller action |
-
-**Application Lifecycle (1 file — decomposition required):**
-
-| File | Lines | Migration Target |
-|---|---|---|
-| `SplendidCRM/Global.asax.cs` | 400 | `Program.cs` + 3× `IHostedService` |
-
-**Core Business Logic — `SplendidCRM/_code/` Root Files (74 files):**
-
-| File | Lines | Role |
-|---|---|---|
-| `Security.cs` | 1,388 | Authentication, ACL enforcement, MD5 hashing, encryption |
-| `SplendidCache.cs` | 11,582 | Metadata caching hub, React dictionary helpers |
-| `SplendidInit.cs` | ~900 | Application bootstrap orchestrator |
-| `SchedulerUtils.cs` | ~600 | Cron job scheduling, reentrancy guards, timer callbacks |
-| `RestUtil.cs` | ~800 | REST serialization (DataTable→JSON), timezone math |
-| `SearchBuilder.cs` | ~500 | Provider-aware WHERE clause generation |
-| `EmailUtils.cs` | ~700 | Email sending, polling, campaign processing |
-| `MimeUtils.cs` | ~400 | MIME message construction |
-| `Sql.cs` | ~300 | SQL helper utilities, parameterized query builders |
-| `SqlBuild.cs` | ~300 | Database schema builder (idempotent DDL) |
-| `DbProviderFactory.cs` | ~100 | Provider-agnostic DB factory |
-| `SqlClientFactory.cs` | ~50 | SqlClient-specific factory |
-| `SplendidError.cs` | ~200 | Error logging/handling |
-| `SplendidDynamic.cs` | ~400 | Dynamic view/edit/list rendering support |
-| `SplendidExport.cs` | ~300 | Data export (CSV, Excel, XML) |
-| `SplendidImport.cs` | ~400 | Data import processing |
-| `SplendidControl.cs` | ~500 | Base WebForms control (migration adapter) |
-| `SplendidPage.cs` | ~500 | Base WebForms page (migration adapter) |
-| `SplendidCRM.cs` | ~200 | Core CRM utility class |
-| `SplendidDefaults.cs` | ~100 | Default configuration values |
-| `Utils.cs` | ~400 | General utility methods |
-| `L10N.cs` | ~300 | Localization/internationalization |
-| `Currency.cs` | ~200 | Currency formatting/conversion |
-| `TimeZone.cs` | ~300 | Timezone handling |
-| `GoogleApps.cs` | ~200 | Google integration utilities |
-| `GoogleSync.cs` | ~300 | Google calendar/contact sync |
-| `GoogleUtils.cs` | ~200 | Google API helpers |
-| `ExchangeSync.cs` | ~300 | Exchange sync utilities |
-| `ExchangeUtils.cs` | ~400 | Exchange API helpers |
-| `iCloudSync.cs` | ~200 | iCloud sync utilities |
-| `ActiveDirectory.cs` | ~300 | AD integration |
-| `FacebookUtils.cs` | ~200 | Facebook integration |
-| `SocialImport.cs` | ~200 | Social media import |
-| `CampaignUtils.cs` | ~300 | Campaign management |
-| `ModuleUtils.cs` | ~500 | Module metadata and routing |
-| `ReportingUtils.cs` | ~400 | Report generation |
-| `AuditView.cs` | ~200 | Audit trail display |
-| Remaining ~37 files | ~100-400 each | Various CRM utilities (ACL, workflow, relationships, etc.) |
-
-**Integration Subdirectories — 16 Dormant Stubs (358 files total):**
-
-| Subdirectory | Files | Purpose |
-|---|---|---|
-| `SplendidCRM/_code/Spring.Social.Facebook/` | 109 | Facebook API integration |
-| `SplendidCRM/_code/Spring.Social.Twitter/` | 77 | Twitter API integration |
-| `SplendidCRM/_code/Spring.Social.Salesforce/` | 53 | Salesforce sync integration |
-| `SplendidCRM/_code/Spring.Social.LinkedIn/` | 43 | LinkedIn integration |
-| `SplendidCRM/_code/Spring.Social.Office365/` | 43 | Office 365 integration |
-| `SplendidCRM/_code/Spring.Social.HubSpot/` | 3 | HubSpot integration |
-| `SplendidCRM/_code/Spring.Social.PhoneBurner/` | 2 | PhoneBurner integration |
-| `SplendidCRM/_code/Spring.Social.QuickBooks/` | 4 | QuickBooks integration |
-| `SplendidCRM/_code/PayPal/` | 4 | PayPal payment processing |
-| `SplendidCRM/_code/QuickBooks/` | 2 | QuickBooks (separate) |
-| `SplendidCRM/_code/Excel/` | 3 | Excel import/export |
-| `SplendidCRM/_code/OpenXML/` | 3 | OpenXML document handling |
-| `SplendidCRM/_code/FileBrowser/` | 3 | File management UI |
-| `SplendidCRM/_code/Workflow/` | 1 | Workflow engine v1 |
-| `SplendidCRM/_code/Workflow4/` | 1 | Workflow engine v4 |
-| `SplendidCRM/_code/mono/` | 1 | Mono compatibility layer |
-
-**Active Integration Subdirectories — 2 (migrated as active components, not stubs):**
-
-| Subdirectory | Files | Purpose |
-|---|---|---|
-| `SplendidCRM/_code/DuoUniversal/` | 7 | DuoUniversal 2FA (active authentication) |
-| `SplendidCRM/_code/SignalR/` | 10 | Real-time hubs: Chat, Twilio, PhoneBurner |
-
-**Configuration Files (2 files — replaced/eliminated):**
-
-| File | Lines | Migration Target |
-|---|---|---|
-| `SplendidCRM/Web.config` | 196 | `appsettings.json` + env vars + Secrets Manager + Parameter Store |
-| `SplendidCRM/SplendidCRM7_VS2017.csproj` | 250+ | New SDK-style `.csproj` with `<PackageReference>` entries |
-
-**Root-Level Application Files (8 additional .cs files):**
-
-| File | Purpose |
-|---|---|
-| `SplendidCRM/AssemblyInfo.cs` | Assembly metadata — replace with `<PropertyGroup>` attributes |
-| `SplendidCRM/default.aspx.cs` | Default page — React SPA redirect |
-| `SplendidCRM/SystemCheck.aspx.cs` | System diagnostics — convert to health check endpoint |
-| `SplendidCRM/TwiML.aspx.cs` | Twilio webhook handler — convert to controller |
-| `SplendidCRM/campaign_trackerv2.aspx.cs` | Campaign tracking — convert to controller |
-| `SplendidCRM/image.aspx.cs` | Image serving — convert to controller/middleware |
-| `SplendidCRM/RemoveMe.aspx.cs` | Unsubscribe handler — convert to controller |
-| `SplendidCRM/Administration/default.aspx.cs` | Admin default page |
-
-### 0.2.2 Current Structure Mapping
+**Current Structure Mapping:**
 
 ```
-Current:
-SplendidCRM/
-├── Global.asax.cs                          (400 lines — lifecycle → Program.cs + IHostedService)
-├── Rest.svc.cs                             (8,369 lines — WCF REST → Web API Controllers)
-├── soap.asmx.cs                            (4,641 lines — SOAP → SoapCore middleware)
-├── Web.config                              (196 lines — eliminated/externalized)
-├── SplendidCRM7_VS2017.csproj              (250+ lines — replaced with SDK-style)
-├── AssemblyInfo.cs                         (assembly metadata)
-├── default.aspx.cs                         (SPA redirect)
-├── SystemCheck.aspx.cs                     (health check source)
-├── TwiML.aspx.cs                           (Twilio webhook)
-├── campaign_trackerv2.aspx.cs              (campaign tracking)
-├── image.aspx.cs                           (image serving)
-├── RemoveMe.aspx.cs                        (unsubscribe handler)
-├── _code/                                  (443 .cs files total)
-│   ├── Security.cs                         (1,388 lines — auth/ACL)
-│   ├── SplendidCache.cs                    (11,582 lines — caching hub)
-│   ├── SplendidInit.cs                     (~900 lines — app bootstrap)
-│   ├── SchedulerUtils.cs                   (~600 lines — scheduler)
-│   ├── RestUtil.cs                         (~800 lines — REST serialization)
-│   ├── SearchBuilder.cs                    (~500 lines — SQL WHERE builder)
-│   ├── EmailUtils.cs                       (~700 lines — email operations)
-│   ├── DbProviderFactory.cs                (DB provider factory)
-│   ├── SqlClientFactory.cs                 (SqlClient factory)
-│   ├── [66 more root .cs files]            (various CRM utilities)
-│   ├── DuoUniversal/                       (7 files — active 2FA)
-│   ├── SignalR/                             (10 files — active real-time)
-│   ├── Spring.Social.Facebook/             (109 files — stub)
-│   ├── Spring.Social.Twitter/              (77 files — stub)
-│   ├── Spring.Social.Salesforce/           (53 files — stub)
-│   ├── Spring.Social.LinkedIn/             (43 files — stub)
-│   ├── Spring.Social.Office365/            (43 files — stub)
-│   ├── Spring.Social.HubSpot/             (3 files — stub)
-│   ├── Spring.Social.PhoneBurner/          (2 files — stub)
-│   ├── Spring.Social.QuickBooks/           (4 files — stub)
-│   ├── PayPal/                             (4 files — stub)
-│   ├── QuickBooks/                         (2 files — stub)
-│   ├── Excel/                              (3 files — stub)
-│   ├── OpenXML/                            (3 files — stub)
-│   ├── FileBrowser/                        (3 files — stub)
-│   ├── Workflow/                           (1 file — stub)
-│   ├── Workflow4/                          (1 file — stub)
-│   └── mono/                               (1 file — stub)
-├── Administration/
-│   ├── Rest.svc.cs                         (6,473 lines — WCF REST → Admin Controllers)
-│   ├── Impersonation.svc.cs                (WCF → Admin Controller)
-│   ├── default.aspx.cs                     (admin page)
-│   └── [9 more .ascx.cs view code-behinds]
-├── React/                                  (EXCLUDED — Prompt 2)
-├── Angular/                                (EXCLUDED — out of scope entirely)
-├── html5/                                  (EXCLUDED — out of scope entirely)
-└── [60+ module folders]/                   (WebForms code-behinds, ~1,064 .cs files)
+SplendidCRM/React/
+├── config.xml                          (Cordova configuration — out of scope)
+├── package.json                        (v15.2.9366 — primary migration target)
+├── package-lock.json                   (current lockfile — to be regenerated)
+├── tsconfig.json                       (TypeScript config — requires modernization)
+├── .vscode/                            (VS Code settings)
+├── ckeditor5-custom-build/             (Custom CKEditor 5 — preserve as local dep)
+│   ├── package.json
+│   ├── webpack.config.js               (CKEditor's own Webpack build — separate concern)
+│   ├── build/                          (Pre-compiled CKEditor output)
+│   │   ├── ckeditor.js
+│   │   └── translations/
+│   └── src/
+│       └── ckeditor.ts                 (Plugin configuration)
+├── configs/
+│   └── webpack/                        (6 Webpack configs — to be REMOVED)
+│       ├── common.js                   (Shared loaders, plugins, externals)
+│       ├── dev_local.js                (Dev server → localhost:80)
+│       ├── dev_remote.js               (Dev server → training.splendidcrm.com)
+│       ├── mobile.js                   (Cordova build with awesome-typescript-loader)
+│       ├── prod.js                     (Production bundle)
+│       └── prod_minimize.js            (Minified production bundle)
+├── src/
+│   ├── index.tsx                       (App entry — createRoot, createBrowserRouter)
+│   ├── index.html.ejs                  (Webpack HTML template — to be replaced)
+│   ├── index.scss                      (Global SCSS — only SCSS file in project)
+│   ├── App.tsx                         (Root app component)
+│   ├── AppVersion.ts                   (Version constant)
+│   ├── PrivateRoute.tsx                (Auth-guarded route wrapper)
+│   ├── PublicRouteFC.tsx               (Public route wrapper)
+│   ├── Router5.tsx                     (Legacy router — unused?)
+│   ├── routes.tsx                      (Route definitions)
+│   ├── scripts/                        (44 infrastructure modules)
+│   │   ├── SplendidRequest.ts          (HTTP abstraction — requires API_BASE_URL)
+│   │   ├── SplendidCache.ts            (Metadata cache — MobX observable)
+│   │   ├── Credentials.ts             (Auth state — MobX @observable decorators)
+│   │   ├── DynamicLayout.ts            (Layout resolution)
+│   │   ├── DynamicLayout_Compile.ts    (Runtime TSX compilation via @babel/standalone)
+│   │   ├── Application.ts             (App initialization)
+│   │   ├── Login.ts                    (Auth flow)
+│   │   ├── Security.ts                (Role/ACL checks)
+│   │   ├── Formatting.ts              (Display formatting)
+│   │   ├── L10n.ts                    (Localization)
+│   │   ├── Sql.ts                     (SQL query helpers)
+│   │   ├── utility.ts                 (General utilities)
+│   │   ├── adal.ts                    (Azure AD auth — has module.exports)
+│   │   └── ... (30+ more infrastructure scripts)
+│   ├── SignalR/                         (14 files — dual SignalR implementation)
+│   │   ├── SignalRCoreStore.ts          (Core SignalR orchestration store)
+│   │   ├── SignalRStore.ts              (Legacy SignalR store)
+│   │   ├── ChatCore.ts                  (Chat hub — @microsoft/signalr)
+│   │   ├── Chat.ts                      (Chat hub — legacy jQuery signalr)
+│   │   ├── TwilioCore.ts               (Twilio hub — Core)
+│   │   ├── Twilio.ts                    (Twilio hub — legacy)
+│   │   ├── PhoneBurnerCore.ts           (PhoneBurner hub — Core)
+│   │   ├── PhoneBurner.ts              (PhoneBurner hub — legacy)
+│   │   ├── AsteriskCore.ts             (Asterisk hub — Core)
+│   │   ├── Asterisk.ts                  (Asterisk hub — legacy)
+│   │   ├── AvayaCore.ts                (Avaya hub — Core)
+│   │   ├── Avaya.ts                     (Avaya hub — legacy)
+│   │   ├── TwitterCore.ts              (Twitter hub — Core)
+│   │   └── Twitter.ts                   (Twitter hub — legacy)
+│   ├── views/                           (30+ high-level view components)
+│   │   ├── DetailView.tsx
+│   │   ├── EditView.tsx
+│   │   ├── ListView.tsx
+│   │   ├── DashboardView.tsx
+│   │   ├── AdministrationView.tsx
+│   │   ├── CalendarView.tsx
+│   │   ├── BigCalendarView.tsx
+│   │   ├── ChatDashboardView.tsx
+│   │   ├── DynamicDetailView.tsx
+│   │   ├── DynamicEditView.tsx
+│   │   ├── DynamicListView.tsx
+│   │   ├── DynamicLayoutView.tsx
+│   │   └── ... (20+ more view components)
+│   ├── components/                      (22 shared UI components)
+│   │   ├── CKEditor.tsx                 (Rich text integration)
+│   │   ├── SplendidGrid.tsx             (Data grid component)
+│   │   ├── SplendidStream.tsx           (Activity stream)
+│   │   ├── DynamicButtons.tsx           (Metadata-driven buttons)
+│   │   ├── ProcessButtons.tsx           (BPMN buttons — has require())
+│   │   ├── UserDropdown.tsx             (User menu — has require())
+│   │   ├── SchedulingGrid.tsx           (Schedule display)
+│   │   └── ... (15 more components)
+│   ├── ModuleViews/                     (48 CRM module folders)
+│   │   ├── Accounts/
+│   │   ├── Contacts/
+│   │   ├── Leads/
+│   │   ├── Opportunities/
+│   │   ├── Cases/
+│   │   ├── Campaigns/
+│   │   ├── Emails/
+│   │   ├── Administration/
+│   │   │   └── BusinessProcesses/       (40+ files with require() — BPMN integration)
+│   │   ├── ... (40 more module folders)
+│   │   ├── Router5.tsx
+│   │   └── index.ts
+│   ├── types/                           (42 TypeScript type definition files)
+│   │   ├── MODULE.ts, CONFIG.ts, EDITVIEWS.ts, DETAILVIEWS.ts, ...
+│   │   └── ... (domain-specific interfaces)
+│   ├── styles/                          (Theme CSS files)
+│   │   ├── Arctic/                      (style.css, ChatDashboard.css, ...)
+│   │   ├── Atlantic.css
+│   │   ├── Seven/
+│   │   ├── Six/
+│   │   ├── gentelella/
+│   │   └── mobile.css
+│   ├── ThemeComponents/                 (7 theme implementations + factories)
+│   │   ├── Arctic/, Atlantic/, Pacific/, Seven/, Six/, Sugar/, Sugar2006/
+│   │   ├── HeaderButtonsFactory.ts
+│   │   ├── SubPanelButtonsFactory.ts
+│   │   └── index.ts
+│   ├── Dashlets/                        (Dashboard widget components)
+│   ├── DashletsJS/                      (JavaScript-based dashlets)
+│   ├── DashboardComponents/             (Dashboard infrastructure)
+│   ├── CustomViewsJS/                   (Custom view implementations)
+│   ├── DetailComponents/                (Detail view building blocks)
+│   ├── EditComponents/                  (Edit view building blocks)
+│   ├── GridComponents/                  (Grid/list building blocks)
+│   ├── DynamicLayoutComponents/         (Layout editor components)
+│   ├── ModuleBuilder/                   (Module builder interface)
+│   ├── ReportDesigner/                  (Report builder components)
+│   ├── SurveyComponents/               (Survey module components)
+│   └── SignalR/                         (see above)
+└── www/
+    ├── index.html                       (SPA shell — loads SteviaCRM.js)
+    ├── index.css                        (Global theme overrides)
+    └── manifest.json                    (PWA metadata)
 ```
 
-**Quantitative Summary:**
+### 0.2.2 CommonJS require() Hotspot Analysis
 
-| Category | File Count | Line Estimate |
+44 files in the source tree use CommonJS `require()` patterns that must be converted to ESM `import` statements for Vite compatibility.
+
+| Location Pattern | File Count | Context |
 |---|---|---|
-| WCF/SOAP Services | 4 | ~20,000 |
-| Application Lifecycle | 1 | ~400 |
-| Core Business Logic (_code root) | 74 | ~25,000 |
-| Integration Stubs (16 subdirs) | 358 | ~30,000 |
-| Active Integrations (DuoUniversal + SignalR) | 17 | ~3,000 |
-| Configuration/Project Files | 2 | ~450 |
-| Root Application Files | 8 | ~1,500 |
-| Administration Root Files | 12 | ~13,500 |
-| **Total In-Scope Backend Files** | **~476** | **~94,000** |
+| `src/ModuleViews/Administration/BusinessProcesses/**/*.ts` | 40 | bpmn-js integration modules using `require()` for diagram.js plugin registration |
+| `src/scripts/DynamicLayout_Compile.ts` | 1 | Runtime compilation — 44+ `require()` calls making modules available to `@babel/standalone` compiled components |
+| `src/components/ProcessButtons.tsx` | 1 | Lazy-loads BPMN process button functionality |
+| `src/components/UserDropdown.tsx` | 1 | Lazy-loads user dropdown dependencies |
+| `src/scripts/adal.ts` | 1 | Azure AD auth library — sole `module.exports` usage |
+
+**Critical Note on `DynamicLayout_Compile.ts`:** This file's `require()` calls are not standard module imports — they register modules in a global scope so that `@babel/standalone`-compiled components can reference them at runtime. The ESM conversion strategy for this file must preserve the runtime module registry pattern, potentially using dynamic `import()` or a Vite-compatible module registration approach.
+
+### 0.2.3 MobX Decorator Usage
+
+The codebase uses MobX's legacy decorator syntax (`experimentalDecorators`) in 7 instances across infrastructure stores:
+
+| File | Decorator Usage |
+|---|---|
+| `src/scripts/Credentials.ts` | `@observable` on authentication state properties (theme, date format, currency, user prefs) |
+| Other MobX stores | `@observable`, `@action`, `@computed` on store class members |
+
+The Vite build must include Babel plugin configuration for legacy decorator transpilation. The `@vitejs/plugin-react` plugin must be configured with `babel.plugins` including `['@babel/plugin-proposal-decorators', { legacy: true }]` and `['@babel/plugin-proposal-class-properties', { loose: true }]`.
+
+### 0.2.4 SignalR Dual Implementation
+
+The `src/SignalR/` directory contains 14 files implementing a dual SignalR architecture:
+
+- **Core implementations** (`*Core.ts`): Use `@microsoft/signalr` `HubConnection` — these are the migration targets
+- **Legacy implementations** (non-`Core` files): Use jQuery-based `signalr` 2.4.3 — these must be removed entirely
+
+The Core implementations must be updated to:
+- Use `@microsoft/signalr` 10.0.0 API
+- Connect to discrete hub endpoints (`/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner`) instead of the legacy `/signalr` path
+- Read hub URLs from runtime config (`API_BASE_URL` or `SIGNALR_URL`)
+
+### 0.2.5 Build Configuration Analysis
+
+**Current Webpack Configuration (6 files in `configs/webpack/`):**
+
+| Config File | Purpose | Key Settings |
+|---|---|---|
+| `common.js` (117 lines) | Shared base configuration | ts-loader with thread-loader (4 workers), style-loader/css-loader/postcss-loader chain, sass-loader, svg-inline-loader, file-loader (fonts), url-loader (images), ForkTsCheckerWebpackPlugin, HtmlWebpackPlugin (index.html.ejs), WebpackPwaManifest, ProvidePlugin (process/browser), externals (xlsx/canvg/pdfmake) |
+| `dev_local.js` | Local development | Merges common + devServer proxy to `http://localhost:80`, hot reload, source-map |
+| `dev_remote.js` | Remote development | Merges common + devServer proxy to `https://training.splendidcrm.com`, source-map |
+| `prod.js` | Production build | Merges common + output `SteviaCRM.js`, no minimization |
+| `prod_minimize.js` | Minified production | Merges common + TerserPlugin minimization |
+| `mobile.js` | Cordova mobile build | Uses `awesome-typescript-loader` instead of `ts-loader`, targets Cordova WebView |
+
+### 0.2.6 Codebase Metrics Summary
+
+| Metric | Count |
+|---|---|
+| TypeScript/TSX source files | 763 |
+| JavaScript source files | 0 |
+| CSS files | 17 |
+| SCSS files | 1 (`index.scss`) |
+| CRM module view folders | 48 |
+| Infrastructure script files | 44 |
+| SignalR hub files | 14 |
+| Shared UI component files | 22 |
+| High-level view files | 30+ |
+| Type definition files | 42 |
+| Theme variants | 7 (Arctic, Atlantic, Pacific, Seven, Six, Sugar, Sugar2006) |
+| Files with `require()` patterns | 44 |
+| Files with `module.exports` | 1 |
+| MobX decorator instances | 7 |
+| `defaultProps` usage | 0 |
+| `ReactDOM.render` usage | 0 |
+| `forwardRef` usage | 0 |
+| `createRoot` usage | 1 (`index.tsx`) |
 
 ## 0.3 Scope Boundaries
 
 ### 0.3.1 Exhaustively In Scope
 
-**Source Transformations (backend C# code):**
+**Source Transformations:**
 
-- `SplendidCRM/Rest.svc.cs` — WCF REST → ASP.NET Core Web API controllers
-- `SplendidCRM/soap.asmx.cs` — ASMX SOAP → SoapCore middleware
-- `SplendidCRM/Administration/Rest.svc.cs` — WCF REST → ASP.NET Core admin controllers
-- `SplendidCRM/Administration/Impersonation.svc.cs` — WCF → ASP.NET Core controller
-- `SplendidCRM/Global.asax.cs` — Lifecycle → `Program.cs` + `IHostedService`
-- `SplendidCRM/_code/*.cs` — All 74 root business logic files → .NET 10 class library
-- `SplendidCRM/_code/DuoUniversal/*.cs` — Active 2FA integration → .NET 10
-- `SplendidCRM/_code/SignalR/*.cs` — OWIN SignalR → ASP.NET Core SignalR
-- `SplendidCRM/_code/Spring.Social.*/**/*.cs` — 8 integration stub dirs → .NET 10 compilation
-- `SplendidCRM/_code/PayPal/*.cs` — Payment stub → .NET 10 compilation
-- `SplendidCRM/_code/QuickBooks/*.cs` — Accounting stub → .NET 10 compilation
-- `SplendidCRM/_code/Excel/*.cs` — Excel export stub → .NET 10 compilation
-- `SplendidCRM/_code/OpenXML/*.cs` — Document stub → .NET 10 compilation
-- `SplendidCRM/_code/FileBrowser/*.cs` — File management stub → .NET 10 compilation
-- `SplendidCRM/_code/Workflow/*.cs` — Workflow v1 stub → .NET 10 compilation
-- `SplendidCRM/_code/Workflow4/*.cs` — Workflow v4 stub → .NET 10 compilation
-- `SplendidCRM/_code/mono/*.cs` — Mono compat stub → .NET 10 compilation
-- `SplendidCRM/AssemblyInfo.cs` — Replace with `<PropertyGroup>` in SDK-style csproj
-- `SplendidCRM/SystemCheck.aspx.cs` — Convert to health check endpoint
-- `SplendidCRM/TwiML.aspx.cs` — Convert to ASP.NET Core controller
-- `SplendidCRM/campaign_trackerv2.aspx.cs` — Convert to ASP.NET Core controller
-- `SplendidCRM/image.aspx.cs` — Convert to ASP.NET Core controller/middleware
-- `SplendidCRM/RemoveMe.aspx.cs` — Convert to ASP.NET Core controller
-- `SplendidCRM/default.aspx.cs` — Convert to SPA redirect middleware
+- `SplendidCRM/React/src/**/*.ts` — All 763 TypeScript source files requiring ESM conversion, React 19 compatibility, and import path updates
+- `SplendidCRM/React/src/**/*.tsx` — All TSX component files for React 19 API compliance
+- `SplendidCRM/React/src/scripts/**/*.ts` — 44 infrastructure modules (SplendidRequest, Credentials, DynamicLayout_Compile, etc.)
+- `SplendidCRM/React/src/SignalR/**/*.ts` — 14 SignalR files: remove 7 legacy files, upgrade 7 Core files
+- `SplendidCRM/React/src/ModuleViews/Administration/BusinessProcesses/**/*.ts` — 40+ BPMN integration files with `require()` → ESM conversion
+- `SplendidCRM/React/src/components/ProcessButtons.tsx` — require() → ESM conversion
+- `SplendidCRM/React/src/components/UserDropdown.tsx` — require() → ESM conversion
+- `SplendidCRM/React/src/scripts/adal.ts` — module.exports → ESM export conversion
 
-**Configuration Transformations:**
+**Build Configuration:**
 
-- `SplendidCRM/Web.config` — Decompose into externalized configuration providers
-- `SplendidCRM/SplendidCRM7_VS2017.csproj` — Replace with SDK-style `.csproj` files
+- `SplendidCRM/React/package.json` — Complete rewrite: remove Webpack/Babel dev deps, add Vite deps, update scripts, upgrade all runtime deps
+- `SplendidCRM/React/tsconfig.json` — Modernize: target ES2015+, module ESNext, moduleResolution bundler, preserve experimentalDecorators
+- `SplendidCRM/React/vite.config.ts` — CREATE: New Vite configuration with React plugin, Babel decorator support, dev proxy, asset handling, build output
+- `SplendidCRM/React/index.html` — CREATE: Vite entry point HTML replacing index.html.ejs Webpack template
+- `SplendidCRM/React/public/config.json` — CREATE: Development runtime config with localhost defaults
 
-**Dependency Modernization:**
+**Webpack Files to Remove:**
 
-- `BackupBin2012/*.dll` — 22 DLLs → NuGet packages
-- `BackupBin2022/*.dll` — 2 DLLs → NuGet packages
-- `BackupBin2025/*.dll` — 13 DLLs → NuGet packages or framework-included
+- `SplendidCRM/React/configs/webpack/common.js` — REMOVE
+- `SplendidCRM/React/configs/webpack/dev_local.js` — REMOVE
+- `SplendidCRM/React/configs/webpack/dev_remote.js` — REMOVE
+- `SplendidCRM/React/configs/webpack/mobile.js` — REMOVE
+- `SplendidCRM/React/configs/webpack/prod.js` — REMOVE
+- `SplendidCRM/React/configs/webpack/prod_minimize.js` — REMOVE
+- `SplendidCRM/React/configs/` — REMOVE (entire directory)
 
-**New Files to Create:**
+**Runtime Configuration:**
 
-- `SplendidCRM.sln` — New .NET 10 solution file
-- `src/SplendidCRM.Core/SplendidCRM.Core.csproj` — Class library project
-- `src/SplendidCRM.Web/SplendidCRM.Web.csproj` — ASP.NET Core MVC web project
-- `src/SplendidCRM.Web/Program.cs` — Application entry point with provider registration and startup validation
-- `src/SplendidCRM.Web/appsettings.json` — Base configuration defaults
-- `src/SplendidCRM.Web/appsettings.Development.json` — Development overrides
-- `src/SplendidCRM.Web/appsettings.Staging.json` — Staging overrides
-- `src/SplendidCRM.Web/appsettings.Production.json` — Production overrides
-- `src/SplendidCRM.Web/Controllers/RestController.cs` — Primary REST API controller(s)
-- `src/SplendidCRM.Web/Controllers/AdminRestController.cs` — Admin REST API controller(s)
-- `src/SplendidCRM.Web/Controllers/ImpersonationController.cs` — Admin impersonation
-- `src/SplendidCRM.Web/Services/SchedulerHostedService.cs` — Scheduler background service
-- `src/SplendidCRM.Web/Services/EmailPollingHostedService.cs` — Email polling background service
-- `src/SplendidCRM.Web/Services/ArchiveHostedService.cs` — Archive background service
-- `src/SplendidCRM.Web/Middleware/SoapServiceMiddleware.cs` — SoapCore registration
-- `src/SplendidCRM.Web/Hubs/ChatManagerHub.cs` — ASP.NET Core SignalR hub
-- `src/SplendidCRM.Web/Hubs/TwilioManagerHub.cs` — ASP.NET Core SignalR hub
-- `src/SplendidCRM.Web/Authorization/ModuleAuthorizationHandler.cs` — 4-tier ACL handler
-- Health check endpoint at `/api/health`
+- `SplendidCRM/React/src/scripts/SplendidRequest.ts` — Prepend `API_BASE_URL` to all HTTP request URLs
+- `SplendidCRM/React/src/scripts/Credentials.ts` — Update `RemoteServer` getter to read from runtime config
+- `SplendidCRM/React/src/scripts/Application.ts` — Load `/config.json` before app initialization
+- `SplendidCRM/React/src/index.tsx` — Initialize runtime config before `createRoot`
+- `SplendidCRM/React/src/SignalR/ChatCore.ts` — Use runtime config for hub URL
+- `SplendidCRM/React/src/SignalR/TwilioCore.ts` — Use runtime config for hub URL
+- `SplendidCRM/React/src/SignalR/PhoneBurnerCore.ts` — Use runtime config for hub URL
+- `SplendidCRM/React/src/SignalR/AsteriskCore.ts` — Use runtime config for hub URL
+- `SplendidCRM/React/src/SignalR/AvayaCore.ts` — Use runtime config for hub URL
+- `SplendidCRM/React/src/SignalR/TwitterCore.ts` — Use runtime config for hub URL
 
 **Import Corrections:**
 
-- Every file containing `using System.Web` (65 files in `_code/`)
-- Every file containing `using System.Data.SqlClient` (5 files)
-- Every file containing `HttpContext.Current` (31 files)
-- Every file containing `Application[` (36 files)
-- Every file containing `HttpRuntime.Cache` (5 files)
-- Every file containing `Session[` (20 files)
-- Every file referencing WCF namespaces (`System.ServiceModel`, `System.ServiceModel.Web`, `System.ServiceModel.Activation`)
+- `SplendidCRM/React/src/**/*.ts` — Update `react-router-dom` imports to `react-router`
+- `SplendidCRM/React/src/**/*.tsx` — Update `react-router-dom` imports to `react-router`
+- `SplendidCRM/React/src/ModuleViews/Administration/BusinessProcesses/**/*.ts` — Convert `require()` to `import`
+- `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` — Restructure `require()` registry for ESM compatibility
 
-**Documentation Updates:**
+**CSS/Style Updates:**
 
-- `README.md` — Update build instructions, runtime requirements, architecture description
+- `SplendidCRM/React/src/index.scss` — Verify Dart Sass compatibility (replacing node-sass)
+- `SplendidCRM/React/src/styles/**/*.css` — 17 CSS files, verify Vite CSS processing
+
+**Documentation and Validation:**
+
+- `docs/environment-setup.md` — CREATE: Full-stack environment setup guide
+- `scripts/build-and-run.sh` — CREATE: Automated local development setup script
+- `validation/screenshots/` — CREATE: E2E test screenshot evidence directory
+- `validation/database-changes.md` — CREATE: Schema change log (ideally empty)
+- `validation/backend-changes.md` — CREATE: Backend change log (ideally empty)
+
+**Dependencies to Add:**
+
+- `vite` — Build tool
+- `@vitejs/plugin-react` — React plugin for Vite with Babel support
+- `sass` — Dart Sass (replacing node-sass)
+- `@microsoft/signalr@10.0.0` — Upgraded SignalR client
+
+**Dependencies to Remove:**
+
+- `webpack`, `webpack-cli`, `webpack-dev-server` — Replaced by Vite
+- `ts-loader`, `thread-loader`, `awesome-typescript-loader` — Replaced by Vite's built-in TypeScript support
+- `style-loader`, `css-loader`, `postcss-loader`, `sass-loader` — Replaced by Vite's built-in CSS processing
+- `svg-inline-loader`, `file-loader`, `url-loader` — Replaced by Vite's built-in asset handling
+- `fork-ts-checker-webpack-plugin` — Replaced by separate `tsc --noEmit`
+- `html-webpack-plugin`, `webpack-pwa-manifest` — Replaced by Vite's HTML entry and PWA plugin
+- `terser-webpack-plugin`, `webpack-merge` — No longer needed
+- `node-sass` — Replaced by `sass` (Dart Sass)
+- `signalr` (2.4.3) — Legacy jQuery SignalR client removed
+- `react-router-dom` — Replaced by `react-router` (v7 consolidation)
 
 ### 0.3.2 Explicitly Out of Scope
 
-The following items are explicitly excluded from this migration effort per user directives:
+**Backend Code (Prompt 1 Responsibility):**
 
-**Frontend Code (Prompt 2):**
-- `SplendidCRM/React/` — All React SPA code, TypeScript, npm, Webpack — handled by Prompt 2
-- `SplendidCRM/Angular/` — Entire Angular client — excluded from modernization entirely
-- `SplendidCRM/html5/` — Entire HTML5 legacy client — excluded from modernization entirely
-- `SplendidCRM/Include/` — Shared JavaScript utility scripts
+- `SplendidCRM/_code/**/*.cs` — All C# backend code
+- `SplendidCRM/Administration/**/*.cs` — Admin backend code
+- `SplendidCRM/Web.config` — ASP.NET configuration
+- SQL Server schema, stored procedures, views — Database layer
+- **Exception:** Minimal backend/schema changes permitted ONLY as last resort to unblock E2E test failures, documented in `validation/backend-changes.md` and `validation/database-changes.md`
 
-**SQL Server Schema (Zero DDL Changes):**
-- `SQL Scripts Community/` — All SQL build pipeline content and `Build.sql` artifact
-- All database tables, views, stored procedures, functions, and triggers — zero modifications
+**Other Frontend Clients:**
 
-**Infrastructure (Prompt 3):**
-- Dockerfiles and container configuration
-- AWS infrastructure: Terraform, ECR, ECS, ALB, RDS
-- CI/CD pipeline definitions
+- `SplendidCRM/Angular/` — Angular 13 experimental client, excluded from modernization
+- `SplendidCRM/html5/` — Legacy HTML5/jQuery client, excluded
+- `SplendidCRM/*.aspx` / `SplendidCRM/*.ascx` — WebForms pages, excluded
 
-**Feature Additions:**
-- No new CRM features or module additions
-- No Enterprise Edition integration connector activation
-- No code optimization or improvement beyond what the framework migration requires
+**Mobile Platform Configuration:**
 
-**Security Exceptions:**
-- MD5 password hashing — preserve as-is, document as known technical debt
-- Address security vulnerabilities ONLY if critical (CVSS > 7.0) or introduced by the migration itself
+- `SplendidCRM/React/config.xml` — Cordova configuration (separate effort)
+- Cordova platform plugins — Android/iOS native layer
+- Mobile-specific Webpack config migration (`mobile.js`) — Cordova build is a separate concern
 
-**WebForms Module Code-Behinds (~1,064 files):**
-- `SplendidCRM/Accounts/*.aspx.cs`, `SplendidCRM/Contacts/*.aspx.cs`, etc. — WebForms pages are NOT in scope for this backend migration; they are legacy presentation layer artifacts. Only the backend business logic they depend on (in `_code/`) is migrated.
-- `SplendidCRM/_controls/*.cs` (44 files) — WebForms user controls
-- `SplendidCRM/_devtools/*.cs` (8 files) — Developer tools
-- `SplendidCRM/Administration/*.ascx.cs` (9 view code-behinds) — Admin WebForms views
+**Architecture and Design Decisions:**
 
-**Documentation Build Pipeline:**
-- `SQL Scripts Community/Build.bat` and `Build.sql` artifact — unchanged
+- New UI features, screens, or module additions — NOT permitted
+- UI/UX redesign or visual improvements — Visual parity only
+- CSS framework migration — Bootstrap stays at 5.3.x
+- State management migration — MobX stays (no Redux/Zustand)
+- `moment` → `date-fns` migration — Explicitly out of scope
+- Class component → function component conversion — Only if React 19 forces deprecation
+- `lodash` → native utilities migration — Only 3.x → 4.x security upgrade
+
+**Infrastructure (Prompt 3 Responsibility):**
+
+- Docker containerization
+- AWS ECS/Fargate deployment
+- Nginx configuration
+- ALB setup
+- CI/CD pipeline creation
+
+### 0.3.3 Scope Boundary Diagram
+
+```mermaid
+graph TB
+    subgraph IN_SCOPE["IN SCOPE — This Prompt"]
+        SRC["SplendidCRM/React/src/**<br/>763 TS/TSX Files"]
+        PKG["package.json<br/>tsconfig.json"]
+        VITE["vite.config.ts (CREATE)"]
+        HTML["index.html (CREATE)"]
+        CFG["public/config.json (CREATE)"]
+        DOCS["docs/ + scripts/ + validation/"]
+        WP_DEL["configs/webpack/ (DELETE)"]
+    end
+
+    subgraph OUT_SCOPE["OUT OF SCOPE"]
+        BE["Backend C# Code<br/>(Prompt 1)"]
+        DB["SQL Server Schema<br/>(Prompt 1)"]
+        ANG["Angular Client"]
+        H5["HTML5 Client"]
+        CORD["Cordova Config"]
+        INFRA["Docker/AWS/Nginx<br/>(Prompt 3)"]
+    end
+
+    SRC -->|"Upgrades"| PKG
+    PKG -->|"Replaces Webpack"| VITE
+    VITE -->|"New Entry"| HTML
+    HTML -->|"Runtime Config"| CFG
+    SRC -->|"Validation"| DOCS
+    WP_DEL -->|"Deleted"| VITE
+```
 
 ## 0.4 Target Design
 
 ### 0.4.1 Refactored Structure Planning
 
-The target structure follows a two-project .NET 10 solution: a class library for extracted business logic and an ASP.NET Core MVC web project for hosting, API controllers, middleware, and background services.
+The target architecture transforms `SplendidCRM/React/` from a Webpack-hosted, same-origin React 18 app into a standalone Vite-powered React 19 workspace. The existing component and module organization is preserved — only the build tooling, configuration, and infrastructure layers change.
+
+**Target Architecture:**
 
 ```
-Target:
-SplendidCRM.sln
-src/
-├── SplendidCRM.Core/                               (Class Library — Business Logic)
-│   ├── SplendidCRM.Core.csproj                     (SDK-style, net10.0, NuGet refs)
-│   ├── Security.cs                                 (Auth/ACL → IHttpContextAccessor DI)
-│   ├── SplendidCache.cs                            (→ IMemoryCache injection)
-│   ├── SplendidInit.cs                             (App bootstrap → service methods)
-│   ├── SchedulerUtils.cs                           (Job execution logic)
-│   ├── RestUtil.cs                                 (REST serialization)
-│   ├── SearchBuilder.cs                            (SQL WHERE builder)
-│   ├── EmailUtils.cs                               (Email operations)
-│   ├── MimeUtils.cs                                (MIME construction)
-│   ├── Sql.cs                                      (SQL helpers)
-│   ├── SqlBuild.cs                                 (Schema builder)
-│   ├── DbProviderFactory.cs                        (→ Microsoft.Data.SqlClient)
-│   ├── SqlClientFactory.cs                         (→ Microsoft.Data.SqlClient)
-│   ├── SplendidError.cs                            (Error logging)
-│   ├── SplendidDynamic.cs                          (Dynamic rendering support)
-│   ├── SplendidExport.cs                           (Data export)
-│   ├── SplendidImport.cs                           (Data import)
-│   ├── SplendidControl.cs                          (Base control adapter)
-│   ├── SplendidPage.cs                             (Base page adapter)
-│   ├── SplendidCRM.cs                              (Core utility)
-│   ├── SplendidDefaults.cs                         (Defaults)
-│   ├── Utils.cs                                    (General utilities)
-│   ├── L10N.cs                                     (Localization)
-│   ├── Currency.cs                                 (Currency handling)
-│   ├── TimeZone.cs                                 (Timezone handling)
-│   ├── CampaignUtils.cs                            (Campaign logic)
-│   ├── ModuleUtils.cs                              (Module metadata)
-│   ├── ReportingUtils.cs                           (Reporting)
-│   ├── AuditView.cs                                (Audit trail)
-│   ├── ActiveDirectory.cs                          (AD integration)
-│   ├── ExchangeSync.cs                             (Exchange sync)
-│   ├── ExchangeUtils.cs                            (Exchange helpers)
-│   ├── GoogleApps.cs                               (Google integration)
-│   ├── GoogleSync.cs                               (Google sync)
-│   ├── GoogleUtils.cs                              (Google helpers)
-│   ├── iCloudSync.cs                               (iCloud sync)
-│   ├── FacebookUtils.cs                            (Facebook integration)
-│   ├── SocialImport.cs                             (Social media import)
-│   ├── [remaining ~37 _code root files]            (All other utilities)
-│   ├── DuoUniversal/                               (7 files — active 2FA)
-│   │   ├── Client.cs
-│   │   ├── ClientBuilder.cs
-│   │   ├── CertificatePinnerFactory.cs
-│   │   ├── DuoException.cs
-│   │   ├── JwtUtils.cs
-│   │   ├── Labels.cs
-│   │   ├── Models.cs
-│   │   └── Utils.cs
-│   └── Integrations/                               (16 dormant stub subdirs)
-│       ├── Spring.Social.Facebook/                 (109 files)
-│       ├── Spring.Social.Twitter/                  (77 files)
-│       ├── Spring.Social.Salesforce/               (53 files)
-│       ├── Spring.Social.LinkedIn/                 (43 files)
-│       ├── Spring.Social.Office365/                (43 files)
-│       ├── Spring.Social.HubSpot/                  (3 files)
-│       ├── Spring.Social.PhoneBurner/              (2 files)
-│       ├── Spring.Social.QuickBooks/               (4 files)
-│       ├── PayPal/                                 (4 files)
-│       ├── QuickBooks/                             (2 files)
-│       ├── Excel/                                  (3 files)
-│       ├── OpenXML/                                (3 files)
-│       ├── FileBrowser/                            (3 files)
-│       ├── Workflow/                               (1 file)
-│       ├── Workflow4/                              (1 file)
-│       └── mono/                                   (1 file)
-│
-├── SplendidCRM.Web/                                (ASP.NET Core MVC — Hosting)
-│   ├── SplendidCRM.Web.csproj                      (SDK-style, net10.0, refs SplendidCRM.Core)
-│   ├── Program.cs                                  (Entry point: config providers, middleware, validation)
-│   ├── appsettings.json                            (Base defaults)
-│   ├── appsettings.Development.json                (Dev overrides)
-│   ├── appsettings.Staging.json                    (Staging overrides)
-│   ├── appsettings.Production.json                 (Prod overrides)
-│   ├── Controllers/
-│   │   ├── RestController.cs                       (Main REST API — from Rest.svc.cs)
-│   │   ├── AdminRestController.cs                  (Admin REST — from Administration/Rest.svc.cs)
-│   │   ├── ImpersonationController.cs              (From Impersonation.svc.cs)
-│   │   ├── CampaignTrackerController.cs            (From campaign_trackerv2.aspx.cs)
-│   │   ├── ImageController.cs                      (From image.aspx.cs)
-│   │   ├── UnsubscribeController.cs                (From RemoveMe.aspx.cs)
-│   │   ├── TwiMLController.cs                      (From TwiML.aspx.cs)
-│   │   └── HealthCheckController.cs                (New — /api/health)
-│   ├── Services/
-│   │   ├── SchedulerHostedService.cs               (IHostedService — from Global.asax.cs OnTimer)
-│   │   ├── EmailPollingHostedService.cs            (IHostedService — from Global.asax.cs email timer)
-│   │   ├── ArchiveHostedService.cs                 (IHostedService — from Global.asax.cs OnArchiveTimer)
-│   │   └── CacheInvalidationService.cs             (vwSYSTEM_EVENTS monitoring)
-│   ├── Soap/
-│   │   ├── ISugarSoapService.cs                    (Service interface from soap.asmx.cs)
-│   │   ├── SugarSoapService.cs                     (Implementation)
-│   │   └── DataCarriers.cs                         (contact_detail, entry_value, name_value DTOs)
-│   ├── Hubs/
-│   │   ├── ChatManagerHub.cs                       (ASP.NET Core SignalR)
-│   │   ├── TwilioManagerHub.cs                     (ASP.NET Core SignalR)
-│   │   └── PhoneBurnerHub.cs                       (ASP.NET Core SignalR)
-│   ├── SignalR/
-│   │   ├── ChatManager.cs                          (Chat business logic)
-│   │   ├── TwilioManager.cs                        (Twilio business logic)
-│   │   ├── PhoneBurnerManager.cs                   (PhoneBurner logic)
-│   │   ├── SignalRUtils.cs                         (SignalR utilities)
-│   │   └── SplendidHubAuthorize.cs                 (Hub authorization filter)
-│   ├── Authentication/
-│   │   ├── WindowsAuthenticationSetup.cs           (Negotiate/NTLM scheme)
-│   │   ├── FormsAuthenticationSetup.cs             (Cookie auth with custom login)
-│   │   ├── SsoAuthenticationSetup.cs               (OIDC/SAML middleware)
-│   │   └── DuoTwoFactorSetup.cs                   (DuoUniversal 2FA integration)
-│   ├── Authorization/
-│   │   ├── ModuleAuthorizationHandler.cs           (Module-level ACL)
-│   │   ├── TeamAuthorizationHandler.cs             (Team-level ACL)
-│   │   ├── FieldAuthorizationHandler.cs            (Field-level ACL)
-│   │   ├── RecordAuthorizationHandler.cs           (Record-level ACL)
-│   │   └── SecurityFilterMiddleware.cs             (Security.Filter SQL predicate injection)
-│   ├── Middleware/
-│   │   ├── SpaRedirectMiddleware.cs                (React SPA URL rewriting — from Global.asax.cs)
-│   │   └── CookiePolicySetup.cs                    (SameSite/Secure — from Global.asax.cs)
-│   └── Configuration/
-│       ├── AwsSecretsManagerProvider.cs            (AWS Secrets Manager config provider)
-│       ├── AwsParameterStoreProvider.cs            (AWS SSM Parameter Store provider)
-│       └── StartupValidator.cs                     (Required config validation + fail-fast)
-│
-└── README.md                                       (Updated build/run instructions)
+SplendidCRM/React/                     (Standalone React 19 + Vite workspace)
+├── index.html                          (CREATE — Vite HTML entry point)
+├── package.json                        (UPDATE — React 19, Vite, ESM deps)
+├── package-lock.json                   (REGENERATE — via npm install)
+├── tsconfig.json                       (UPDATE — ES2015+, ESNext modules)
+├── vite.config.ts                      (CREATE — Vite config with React plugin)
+├── .npmrc                              (CREATE — if needed for registry config)
+├── public/
+│   ├── config.json                     (CREATE — runtime config defaults)
+│   ├── manifest.json                   (MOVE — from www/)
+│   └── favicon.ico                     (MOVE — from www/ or existing assets)
+├── ckeditor5-custom-build/             (PRESERVE — local CKEditor dependency)
+│   ├── package.json                    (PRESERVE — CKEditor's own build)
+│   ├── build/
+│   │   ├── ckeditor.js                 (PRESERVE — pre-compiled output)
+│   │   └── translations/
+│   └── src/
+│       └── ckeditor.ts
+├── src/
+│   ├── index.tsx                       (UPDATE — config loading before createRoot)
+│   ├── index.scss                      (UPDATE — verify Dart Sass compat)
+│   ├── App.tsx                         (UPDATE — React 19 compat)
+│   ├── AppVersion.ts                   (PRESERVE)
+│   ├── config.ts                       (CREATE — runtime config loader module)
+│   ├── PrivateRoute.tsx                (UPDATE — react-router v7 imports)
+│   ├── PublicRouteFC.tsx               (UPDATE — react-router v7 imports)
+│   ├── routes.tsx                      (UPDATE — react-router v7 imports)
+│   ├── vite-env.d.ts                   (CREATE — Vite type declarations)
+│   ├── scripts/                        (UPDATE — ESM conversion, API_BASE_URL)
+│   │   ├── SplendidRequest.ts          (UPDATE — prepend API_BASE_URL)
+│   │   ├── Credentials.ts             (UPDATE — runtime config for RemoteServer)
+│   │   ├── DynamicLayout_Compile.ts    (UPDATE — ESM-compatible module registry)
+│   │   ├── Application.ts             (UPDATE — config initialization)
+│   │   ├── Login.ts                    (UPDATE — ESM imports)
+│   │   ├── adal.ts                    (UPDATE — module.exports → export default)
+│   │   └── ... (remaining 38 scripts — ESM conversion)
+│   ├── SignalR/                         (UPDATE — remove legacy, upgrade Core)
+│   │   ├── SignalRCoreStore.ts          (UPDATE — signalr 10.x, runtime URLs)
+│   │   ├── ChatCore.ts                  (UPDATE — /hubs/chat endpoint)
+│   │   ├── TwilioCore.ts               (UPDATE — /hubs/twilio endpoint)
+│   │   ├── PhoneBurnerCore.ts           (UPDATE — /hubs/phoneburner endpoint)
+│   │   ├── AsteriskCore.ts             (UPDATE — runtime hub URL)
+│   │   ├── AvayaCore.ts                (UPDATE — runtime hub URL)
+│   │   ├── TwitterCore.ts              (UPDATE — runtime hub URL)
+│   │   ├── SignalRStore.ts              (REMOVE — legacy jQuery signalr)
+│   │   ├── Chat.ts                      (REMOVE — legacy)
+│   │   ├── Twilio.ts                    (REMOVE — legacy)
+│   │   ├── PhoneBurner.ts              (REMOVE — legacy)
+│   │   ├── Asterisk.ts                  (REMOVE — legacy)
+│   │   ├── Avaya.ts                     (REMOVE — legacy)
+│   │   └── Twitter.ts                   (REMOVE — legacy)
+│   ├── views/**/*.tsx                   (UPDATE — react-router v7 imports)
+│   ├── components/**/*.tsx              (UPDATE — ESM, React 19 compat)
+│   ├── ModuleViews/**/*.tsx             (UPDATE — ESM, react-router v7 imports)
+│   ├── ModuleViews/Administration/BusinessProcesses/**/*.ts
+│   │                                    (UPDATE — require() → import)
+│   ├── types/**/*.ts                    (PRESERVE — type definitions)
+│   ├── styles/**/*.css                  (PRESERVE — CSS files)
+│   ├── ThemeComponents/**/*.ts          (UPDATE — ESM imports)
+│   ├── Dashlets/**/*.tsx                (UPDATE — ESM, React 19)
+│   ├── DashletsJS/**/*.tsx              (UPDATE — ESM)
+│   ├── DashboardComponents/**/*.tsx     (UPDATE — ESM)
+│   ├── DetailComponents/**/*.tsx        (UPDATE — ESM)
+│   ├── EditComponents/**/*.tsx          (UPDATE — ESM)
+│   ├── GridComponents/**/*.tsx          (UPDATE — ESM)
+│   ├── DynamicLayoutComponents/**/*.tsx (UPDATE — ESM)
+│   ├── ModuleBuilder/**/*.tsx           (UPDATE — ESM)
+│   ├── ReportDesigner/**/*.tsx          (UPDATE — ESM)
+│   ├── SurveyComponents/**/*.tsx        (UPDATE — ESM)
+│   └── CustomViewsJS/**/*.tsx           (UPDATE — ESM)
+├── dist/                                (BUILD OUTPUT — Vite production)
+│   ├── index.html                       (Vite-generated with script injection)
+│   └── assets/
+│       ├── index-[hash].js              (App entry chunk)
+│       ├── vendor-[hash].js             (Vendor chunk)
+│       └── index-[hash].css             (Compiled styles)
+├── docs/
+│   └── environment-setup.md             (CREATE — full-stack setup guide)
+├── scripts/
+│   └── build-and-run.sh                 (CREATE — automated setup script)
+├── validation/
+│   ├── screenshots/                     (CREATE — E2E test evidence)
+│   ├── database-changes.md              (CREATE — schema change log)
+│   └── backend-changes.md               (CREATE — backend change log)
+└── www/                                 (DEPRECATE — Webpack output directory)
+    ├── index.html                       (SUPERSEDED by root index.html)
+    ├── index.css                        (REVIEW — merge into src/styles if needed)
+    └── manifest.json                    (MOVE to public/)
 ```
 
 ### 0.4.2 Web Search Research Conducted
 
-- **.NET 10 LTS release:** Released November 11, 2025 with Long-Term Support until November 2028. Ships with C# 14, ASP.NET Core 10, and full cross-platform support on Linux. Default container images now use Ubuntu.
-- **SoapCore NuGet:** Latest stable version 1.2.1.12 (December 11, 2025). Supports ASP.NET Core 3.1+ with endpoint routing. Compatible with `[ServiceContract]` and `[OperationContract]` attributes and `XmlSerializer` serialization.
-- **Microsoft.Data.SqlClient:** Latest stable version 6.1.4 — direct drop-in replacement for `System.Data.SqlClient` with identical `SqlConnection`, `SqlCommand`, `SqlDataReader`, `SqlDataAdapter` API surface. Supports .NET 8+ and .NET Framework 4.6.2+.
-- **MailKit:** Latest stable version 4.15.0 — cross-platform .NET mail client supporting SMTP, IMAP, POP3 with full async support.
-- **ASP.NET Core SignalR:** Ships as part of the .NET 10 framework; replaces `Microsoft.AspNet.SignalR` 1.2.2 with `Microsoft.AspNetCore.SignalR`.
-- **ASP.NET Core Identity + OIDC:** Built into .NET 10 framework; supports Negotiate (Windows Auth), Cookie, OpenID Connect, and SAML authentication schemes.
+Research was conducted on the following topics to inform the target design:
+
+- **React 19 Breaking Changes:** React official upgrade guide confirms removal of `defaultProps` on function components, PropTypes silently ignored, legacy context removed, `forwardRef` simplified (ref as prop), `StrictMode` improvements. The SplendidCRM codebase has zero usage of deprecated patterns — migration readiness is high.
+- **Vite Version Selection:** Vite 6.x is the recommended stable version for production use with Node 20. Vite 7 requires Node 20.19+ and Vite 8 (latest, using Rolldown) requires Node 20.19+. Since the user's prompt specifies "Vite (latest stable)" and Node 20 LTS, **Vite 6.x** is the safe target — it is the latest major version with proven Node 20 compatibility and broad ecosystem support. Vite 7/8 may also work but introduce more migration risk.
+- **React Router v6 → v7 Migration:** The v7 upgrade is designed to have no breaking changes if future flags are enabled in v6. Key change: `react-router-dom` is consolidated into `react-router` package. `createBrowserRouter` and `RouterProvider` (already used by SplendidCRM) are the recommended router creation methods in v7.
+- **MobX + React 19 Compatibility:** MobX releases confirm React 19 support was added in `mobx-react-lite@4.1.0` and `mobx-react@9.2.0`. The `mobx` core at 6.15.0 also supports React 19. Decorator support (`experimentalDecorators`) continues to work with appropriate Babel configuration.
+- **@microsoft/signalr 10.0.0:** Latest stable version on npm, compatible with ASP.NET Core SignalR. API is compatible with 8.x — `HubConnectionBuilder`, `withUrl()`, `.start()`, `.invoke()`, `.on()` patterns unchanged.
+- **node-sass → sass Migration:** `node-sass` is deprecated and incompatible with Node 20. `sass` (Dart Sass) is the official replacement with compatible API. Vite uses `sass` natively.
 
 ### 0.4.3 Design Pattern Applications
 
-- **Service layer pattern** — Business logic classes from `_code/` are wrapped as injectable services via DI, replacing static class access with constructor injection
-- **Dependency injection** — All `HttpContext.Current`, `Application[]`, `HttpRuntime.Cache`, and `Session[]` static access patterns replaced with `IHttpContextAccessor`, `IMemoryCache`, and `IDistributedCache` injected via constructor
-- **Repository pattern (preserved)** — Existing `DbProviderFactory`/`SqlClientFactory` data access pattern maintained with `Microsoft.Data.SqlClient` swap
-- **Background service pattern** — Three `IHostedService` implementations replace timer-based approach in `Global.asax.cs`, each with `SemaphoreSlim(1,1)` reentrancy guards matching existing `bInsideTimer`/`bInsideArchiveTimer` patterns
-- **Middleware pipeline pattern** — SPA redirect, cookie policy, CORS, and SoapCore registered as ASP.NET Core middleware replacing IIS pipeline hooks
-- **Configuration provider pattern** — Five-tier hierarchical configuration with AWS Secrets Manager at top priority, cascading through env vars, Parameter Store, and JSON files
-- **Authorization handler pattern** — Four custom `IAuthorizationHandler` implementations replicating the 4-tier ACL model (Module → Team → Field → Record) from `Security.cs`
+- **Runtime Configuration Pattern:** A config loader module (`src/config.ts`) fetches `/config.json` at startup and exports a typed singleton. All modules read from this singleton rather than environment variables or build-time constants. This pattern enables the same build artifact to run in any environment.
+- **API Base URL Injection:** `SplendidRequest.ts` adopts a base URL prefix pattern where every HTTP call prepends `config.API_BASE_URL` to the request path. This replaces the implicit same-origin assumption.
+- **Hub Connection Factory:** SignalR Core stores adopt a factory pattern where hub URLs are constructed from `config.API_BASE_URL + '/hubs/{hubName}'`, replacing hardcoded paths.
+- **ESM Module Registry (for DynamicLayout_Compile):** The runtime compilation system requires a module registry that `@babel/standalone`-compiled components can access. The refactored approach pre-imports all required modules via ESM and registers them in a global map, replacing the `require()` registry.
+- **Vite Plugin Composition:** The Vite config composes plugins for React (with Babel decorator support), SCSS, SVG handling, and PWA manifest generation.
 
-### 0.4.4 Handoff Documentation
+### 0.4.4 Key Vite Configuration Design
 
-**Handoff to Prompt 2 (Frontend Modernization):**
-- REST API base path: `/Rest.svc/` compatibility route maintained (or `/api/` with redirect)
-- SignalR hub negotiation endpoint: `/hubs/chat`, `/hubs/twilio` (document any path changes from OWIN SignalR `/signalr` default)
-- JSON serialization: System.Text.Json primary with Newtonsoft.Json 13.x fallback; document any edge-case serialization differences (e.g., `DateTime` format, `null` handling, camelCase defaults)
-- CORS configuration: `CORS_ORIGINS` env var defines allowed origins
-- Health check endpoint: `GET /api/health` returning `200 OK` with JSON status
+```typescript
+// vite.config.ts — key structure outline
+export default defineConfig({
+  plugins: [
+    react({
+      babel: {
+        plugins: [
+          ['@babel/plugin-proposal-decorators', { legacy: true }],
+          ['@babel/plugin-proposal-class-properties', { loose: true }]
+        ]
+      }
+    })
+  ],
+  resolve: { alias: { /* path aliases */ } },
+  define: { 'process.env': {} },
+  server: {
+    proxy: {
+      '/Rest.svc': 'http://localhost:5000',
+      '/Administration/Rest.svc': 'http://localhost:5000',
+      '/hubs': { target: 'http://localhost:5000', ws: true },
+      '/api': 'http://localhost:5000'
+    }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true
+  },
+  optimizeDeps: {
+    include: ['@babel/standalone']
+  }
+})
+```
 
-**Handoff to Prompt 3 (Containerization & AWS):**
-- `dotnet publish` output: `src/SplendidCRM.Web/bin/Release/net10.0/publish/`
-- Required environment variables: 18 variables documented in Configuration Externalization section
-- Health check: `GET /api/health` → `200 OK` `{"status":"Healthy"}`
-- Kestrel port: configurable via `ASPNETCORE_URLS` (default `http://+:5000`)
-- Volume mounts: temp file directory for campaign tracker, export files
-- IAM requirement: ECS Task Role requires `kms:Decrypt` on CMK + `secretsmanager:GetSecretValue`
+### 0.4.5 Runtime Configuration Design
+
+```json
+// public/config.json — development defaults
+{
+  "API_BASE_URL": "http://localhost:5000",
+  "SIGNALR_URL": "",
+  "ENVIRONMENT": "development"
+}
+```
+
+The config loader module (`src/config.ts`) fetches this file before app initialization and exports a typed configuration object. The `SIGNALR_URL` defaults to `API_BASE_URL` when empty or omitted. The `index.html` entry point includes an inline script that loads config before the Vite module entry.
+
+### 0.4.6 Handoff Artifacts for Prompt 3
+
+The following information is documented for the containerization prompt:
+
+- **Build command:** `npm run build` → output directory `dist/`
+- **config.json schema:** `{ "API_BASE_URL": "string", "SIGNALR_URL": "string (optional)", "ENVIRONMENT": "string" }`
+- **Nginx requirements:** SPA fallback (`try_files $uri $uri/ /index.html`), static asset cache headers, no proxy pass needed
+- **Entrypoint script:** Writes env vars → `/usr/share/nginx/html/config.json`
+- **API_BASE_URL format:** Full URL to ALB backend (e.g., `http://internal-alb-dns`)
+- **Zero build-time env vars:** All config is runtime-injected
 
 ## 0.5 Transformation Mapping
 
 ### 0.5.1 File-by-File Transformation Plan
 
-The entire refactor is executed in **ONE phase**. Every target file is mapped to a source file. Transformation modes:
-- **UPDATE** — Modify an existing file for .NET 10 compatibility
-- **CREATE** — Create a new file (new infrastructure, decomposed from existing)
-- **REFERENCE** — Use an existing file as a pattern reference
+The entire refactor is executed in **ONE phase**. Every target file is mapped to a source file with explicit transformation mode and key changes.
 
-**Solution and Project Files:**
+**Build Configuration and Project Root Files:**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `SplendidCRM.sln` | CREATE | `SplendidCRM/SplendidCRM7_VS2017.csproj` | New .NET 10 solution with two projects |
-| `src/SplendidCRM.Core/SplendidCRM.Core.csproj` | CREATE | `SplendidCRM/SplendidCRM7_VS2017.csproj` | SDK-style class library, net10.0 TFM, NuGet PackageReferences |
-| `src/SplendidCRM.Web/SplendidCRM.Web.csproj` | CREATE | `SplendidCRM/SplendidCRM7_VS2017.csproj` | SDK-style web project, net10.0 TFM, ProjectReference to Core |
+| `SplendidCRM/React/package.json` | UPDATE | `SplendidCRM/React/package.json` | Remove all 81 current deps; add React 19, Vite, ESM-compatible deps; update scripts to `vite build`/`vite`/`vite preview`; remove Webpack/Babel/Cordova dev deps |
+| `SplendidCRM/React/tsconfig.json` | UPDATE | `SplendidCRM/React/tsconfig.json` | Change target ES5→ES2015, module CommonJS→ESNext, add moduleResolution bundler, preserve experimentalDecorators, update jsx to react-jsx |
+| `SplendidCRM/React/vite.config.ts` | CREATE | `SplendidCRM/React/configs/webpack/common.js` | New Vite config: @vitejs/plugin-react with Babel decorator plugins, dev proxy, CSS/SCSS support, optimizeDeps for @babel/standalone, define process.env |
+| `SplendidCRM/React/index.html` | CREATE | `SplendidCRM/React/src/index.html.ejs` | Vite HTML entry point: config.json loading script, `<script type="module" src="/src/index.tsx">`, PWA manifest link |
+| `SplendidCRM/React/public/config.json` | CREATE | — | Runtime config: `{"API_BASE_URL":"http://localhost:5000","SIGNALR_URL":"","ENVIRONMENT":"development"}` |
+| `SplendidCRM/React/public/manifest.json` | CREATE | `SplendidCRM/React/www/manifest.json` | Move PWA manifest to Vite public directory |
+| `SplendidCRM/React/package-lock.json` | CREATE | — | Regenerated by npm install |
 
-**Application Entry Point and Configuration:**
-
-| Target File | Transformation | Source File | Key Changes |
-|---|---|---|---|
-| `src/SplendidCRM.Web/Program.cs` | CREATE | `SplendidCRM/Global.asax.cs` | 5-tier config provider registration, middleware pipeline, DI container, startup validation, fail-fast on missing config |
-| `src/SplendidCRM.Web/appsettings.json` | CREATE | `SplendidCRM/Web.config` | Base defaults extracted from Web.config appSettings, connectionStrings placeholder |
-| `src/SplendidCRM.Web/appsettings.Development.json` | CREATE | `SplendidCRM/Web.config` | Development-specific overrides |
-| `src/SplendidCRM.Web/appsettings.Staging.json` | CREATE | `SplendidCRM/Web.config` | Staging-specific overrides |
-| `src/SplendidCRM.Web/appsettings.Production.json` | CREATE | `SplendidCRM/Web.config` | Production-specific overrides |
-| `src/SplendidCRM.Web/Configuration/AwsSecretsManagerProvider.cs` | CREATE | `SplendidCRM/Web.config` | AWS Secrets Manager IConfigurationProvider for DB creds, SMTP, SSO secrets, Duo keys |
-| `src/SplendidCRM.Web/Configuration/AwsParameterStoreProvider.cs` | CREATE | `SplendidCRM/Web.config` | AWS SSM Parameter Store IConfigurationProvider for non-secret env config |
-| `src/SplendidCRM.Web/Configuration/StartupValidator.cs` | CREATE | `SplendidCRM/Global.asax.cs` | Validate required config at startup, fail-fast with descriptive error |
-
-**REST API Controllers (from WCF):**
+**Files to Remove:**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `src/SplendidCRM.Web/Controllers/RestController.cs` | CREATE | `SplendidCRM/Rest.svc.cs` | Convert 152 WCF `[WebInvoke]` operations to `[HttpPost]`/`[HttpGet]` controller actions; preserve exact route paths `/Rest.svc/{operation}` via attribute routing |
-| `src/SplendidCRM.Web/Controllers/AdminRestController.cs` | CREATE | `SplendidCRM/Administration/Rest.svc.cs` | Convert 65 WCF operations to admin controller actions; preserve routes |
-| `src/SplendidCRM.Web/Controllers/ImpersonationController.cs` | CREATE | `SplendidCRM/Administration/Impersonation.svc.cs` | Convert WCF impersonation service to controller |
-| `src/SplendidCRM.Web/Controllers/HealthCheckController.cs` | CREATE | `SplendidCRM/SystemCheck.aspx.cs` | New `/api/health` endpoint; reference SystemCheck for diagnostic patterns |
-| `src/SplendidCRM.Web/Controllers/CampaignTrackerController.cs` | CREATE | `SplendidCRM/campaign_trackerv2.aspx.cs` | Convert ASPX campaign tracker to controller |
-| `src/SplendidCRM.Web/Controllers/ImageController.cs` | CREATE | `SplendidCRM/image.aspx.cs` | Convert ASPX image serving to controller |
-| `src/SplendidCRM.Web/Controllers/UnsubscribeController.cs` | CREATE | `SplendidCRM/RemoveMe.aspx.cs` | Convert ASPX unsubscribe to controller |
-| `src/SplendidCRM.Web/Controllers/TwiMLController.cs` | CREATE | `SplendidCRM/TwiML.aspx.cs` | Convert Twilio webhook handler to controller |
+| `SplendidCRM/React/configs/webpack/common.js` | REMOVE | — | Replaced by vite.config.ts |
+| `SplendidCRM/React/configs/webpack/dev_local.js` | REMOVE | — | Replaced by vite.config.ts server.proxy |
+| `SplendidCRM/React/configs/webpack/dev_remote.js` | REMOVE | — | Replaced by vite.config.ts server.proxy |
+| `SplendidCRM/React/configs/webpack/mobile.js` | REMOVE | — | Cordova build out of scope |
+| `SplendidCRM/React/configs/webpack/prod.js` | REMOVE | — | Replaced by vite build |
+| `SplendidCRM/React/configs/webpack/prod_minimize.js` | REMOVE | — | Replaced by vite build (minified by default) |
+| `SplendidCRM/React/src/index.html.ejs` | REMOVE | — | Replaced by root index.html |
 
-**SOAP Service (SoapCore):**
-
-| Target File | Transformation | Source File | Key Changes |
-|---|---|---|---|
-| `src/SplendidCRM.Web/Soap/ISugarSoapService.cs` | CREATE | `SplendidCRM/soap.asmx.cs` | Extract `[ServiceContract]` interface with `[OperationContract]` methods from 84 SOAP methods; preserve `sugarsoap` namespace |
-| `src/SplendidCRM.Web/Soap/SugarSoapService.cs` | CREATE | `SplendidCRM/soap.asmx.cs` | Implementation class; migrate all SOAP method bodies |
-| `src/SplendidCRM.Web/Soap/DataCarriers.cs` | CREATE | `SplendidCRM/soap.asmx.cs` | Extract serializable DTOs: `contact_detail`, `entry_value`, `name_value`, `document_revision`, etc. with identical XML serialization attributes |
-
-**Background Services (from Global.asax.cs timers):**
+**Application Entry and Routing:**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `src/SplendidCRM.Web/Services/SchedulerHostedService.cs` | CREATE | `SplendidCRM/Global.asax.cs` | `IHostedService` wrapping `SchedulerUtils.OnTimer`; interval from `SCHEDULER_INTERVAL_MS` env var; `SemaphoreSlim(1,1)` reentrancy guard replacing `bInsideTimer` |
-| `src/SplendidCRM.Web/Services/EmailPollingHostedService.cs` | CREATE | `SplendidCRM/Global.asax.cs` | `IHostedService` for email polling; interval from `EMAIL_POLL_INTERVAL_MS`; reentrancy guard |
-| `src/SplendidCRM.Web/Services/ArchiveHostedService.cs` | CREATE | `SplendidCRM/Global.asax.cs` | `IHostedService` wrapping `SchedulerUtils.OnArchiveTimer`; interval from `ARCHIVE_INTERVAL_MS`; `SemaphoreSlim(1,1)` replacing `bInsideArchiveTimer` |
-| `src/SplendidCRM.Web/Services/CacheInvalidationService.cs` | CREATE | `SplendidCRM/_code/SchedulerUtils.cs` | Background monitoring of `vwSYSTEM_EVENTS` for cache invalidation |
+| `SplendidCRM/React/src/index.tsx` | UPDATE | `SplendidCRM/React/src/index.tsx` | Load config.json before createRoot; update react-router-dom→react-router imports; update createBrowserRouter for v7 |
+| `SplendidCRM/React/src/config.ts` | CREATE | `SplendidCRM/React/src/scripts/Credentials.ts` | New runtime config loader: fetch /config.json, export typed AppConfig singleton with API_BASE_URL, SIGNALR_URL, ENVIRONMENT |
+| `SplendidCRM/React/src/vite-env.d.ts` | CREATE | — | Vite client type declarations: `/// <reference types="vite/client" />` |
+| `SplendidCRM/React/src/App.tsx` | UPDATE | `SplendidCRM/React/src/App.tsx` | React 19 compatibility review; verify no deprecated API usage |
+| `SplendidCRM/React/src/PrivateRoute.tsx` | UPDATE | `SplendidCRM/React/src/PrivateRoute.tsx` | Change `from 'react-router-dom'` → `from 'react-router'` |
+| `SplendidCRM/React/src/PublicRouteFC.tsx` | UPDATE | `SplendidCRM/React/src/PublicRouteFC.tsx` | Change `from 'react-router-dom'` → `from 'react-router'` |
+| `SplendidCRM/React/src/routes.tsx` | UPDATE | `SplendidCRM/React/src/routes.tsx` | Change `from 'react-router-dom'` → `from 'react-router'` |
+| `SplendidCRM/React/src/Router5.tsx` | UPDATE | `SplendidCRM/React/src/Router5.tsx` | Change `from 'react-router-dom'` → `from 'react-router'`; update re-exports |
 
-**SignalR Hubs (from OWIN SignalR):**
-
-| Target File | Transformation | Source File | Key Changes |
-|---|---|---|---|
-| `src/SplendidCRM.Web/Hubs/ChatManagerHub.cs` | CREATE | `SplendidCRM/_code/SignalR/ChatManagerHub.cs` | Rewrite as ASP.NET Core `Hub<T>`; preserve method signatures |
-| `src/SplendidCRM.Web/Hubs/TwilioManagerHub.cs` | CREATE | `SplendidCRM/_code/SignalR/TwilioManagerHub.cs` | Rewrite as ASP.NET Core `Hub<T>`; preserve method signatures |
-| `src/SplendidCRM.Web/Hubs/PhoneBurnerHub.cs` | CREATE | `SplendidCRM/_code/SignalR/PhoneBurnerManager.cs` | Rewrite as ASP.NET Core `Hub<T>` |
-| `src/SplendidCRM.Web/SignalR/ChatManager.cs` | UPDATE | `SplendidCRM/_code/SignalR/ChatManager.cs` | Replace OWIN hub context with ASP.NET Core `IHubContext<T>` |
-| `src/SplendidCRM.Web/SignalR/TwilioManager.cs` | UPDATE | `SplendidCRM/_code/SignalR/TwilioManager.cs` | Replace OWIN hub context with ASP.NET Core `IHubContext<T>` |
-| `src/SplendidCRM.Web/SignalR/PhoneBurnerManager.cs` | UPDATE | `SplendidCRM/_code/SignalR/PhoneBurnerManager.cs` | Replace OWIN hub context |
-| `src/SplendidCRM.Web/SignalR/SignalRUtils.cs` | UPDATE | `SplendidCRM/_code/SignalR/SignalRUtils.cs` | Remove OWIN startup; replace with `MapHub<T>` registration |
-| `src/SplendidCRM.Web/SignalR/SplendidHubAuthorize.cs` | UPDATE | `SplendidCRM/_code/SignalR/SplendidHubAuthorize.cs` | Convert to ASP.NET Core `IHubFilter` or authorization requirement |
-
-**Authentication and Authorization:**
+**Infrastructure Scripts (44 files in `src/scripts/`):**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `src/SplendidCRM.Web/Authentication/WindowsAuthenticationSetup.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Configure Negotiate/NTLM scheme from `AUTH_MODE` env var |
-| `src/SplendidCRM.Web/Authentication/FormsAuthenticationSetup.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Cookie auth with custom login endpoint |
-| `src/SplendidCRM.Web/Authentication/SsoAuthenticationSetup.cs` | CREATE | `SplendidCRM/_code/Security.cs` | OIDC/SAML middleware from `SSO_AUTHORITY`, `SSO_CLIENT_ID`, `SSO_CLIENT_SECRET` |
-| `src/SplendidCRM.Web/Authentication/DuoTwoFactorSetup.cs` | CREATE | `SplendidCRM/_code/DuoUniversal/Client.cs` | DuoUniversal 2FA integration from `DUO_INTEGRATION_KEY`, `DUO_SECRET_KEY`, `DUO_API_HOSTNAME` |
-| `src/SplendidCRM.Web/Authorization/ModuleAuthorizationHandler.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Module-level ACL from `Security.GetUserAccess` |
-| `src/SplendidCRM.Web/Authorization/TeamAuthorizationHandler.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Team-level ACL from team hierarchy filters |
-| `src/SplendidCRM.Web/Authorization/FieldAuthorizationHandler.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Field-level ACL from `ACL_FIELD_ACCESS` |
-| `src/SplendidCRM.Web/Authorization/RecordAuthorizationHandler.cs` | CREATE | `SplendidCRM/_code/Security.cs` | Record-level security filters |
-| `src/SplendidCRM.Web/Authorization/SecurityFilterMiddleware.cs` | CREATE | `SplendidCRM/_code/Security.cs` | `Security.Filter` SQL predicate injection middleware |
+| `SplendidCRM/React/src/scripts/SplendidRequest.ts` | UPDATE | `SplendidCRM/React/src/scripts/SplendidRequest.ts` | Prepend `config.API_BASE_URL` to all HTTP request URLs; add `credentials: 'include'` for cross-origin; ESM imports |
+| `SplendidCRM/React/src/scripts/Credentials.ts` | UPDATE | `SplendidCRM/React/src/scripts/Credentials.ts` | Update RemoteServer getter to read from runtime config; ESM imports |
+| `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | UPDATE | `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | Convert 44+ require() calls to ESM imports; create module registry map for @babel/standalone runtime compilation |
+| `SplendidCRM/React/src/scripts/Application.ts` | UPDATE | `SplendidCRM/React/src/scripts/Application.ts` | Initialize runtime config from /config.json during app startup; ESM imports |
+| `SplendidCRM/React/src/scripts/adal.ts` | UPDATE | `SplendidCRM/React/src/scripts/adal.ts` | Convert `module.exports` to `export default` |
+| `SplendidCRM/React/src/scripts/Login.ts` | UPDATE | `SplendidCRM/React/src/scripts/Login.ts` | ESM imports; verify API URL usage with runtime config |
+| `SplendidCRM/React/src/scripts/*.ts` | UPDATE | `SplendidCRM/React/src/scripts/*.ts` | Remaining 38 scripts: ESM import verification, runtime config adoption where API calls exist |
 
-**Middleware:**
+**SignalR Files (14 files in `src/SignalR/`):**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `src/SplendidCRM.Web/Middleware/SpaRedirectMiddleware.cs` | CREATE | `SplendidCRM/Global.asax.cs` | React SPA URL rewriting from `Application_BeginRequest` |
-| `src/SplendidCRM.Web/Middleware/CookiePolicySetup.cs` | CREATE | `SplendidCRM/Global.asax.cs` | SameSite/Secure cookie settings from `Session_Start` |
+| `SplendidCRM/React/src/SignalR/SignalRCoreStore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/SignalRCoreStore.ts` | Update @microsoft/signalr 8→10 API; remove jQuery proxy helpers; use runtime config for hub URLs |
+| `SplendidCRM/React/src/SignalR/ChatCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/ChatCore.ts` | Hub URL: `{config.API_BASE_URL}/hubs/chat`; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/TwilioCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/TwilioCore.ts` | Hub URL: `{config.API_BASE_URL}/hubs/twilio`; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/PhoneBurnerCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/PhoneBurnerCore.ts` | Hub URL: `{config.API_BASE_URL}/hubs/phoneburner`; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/AsteriskCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/AsteriskCore.ts` | Hub URL from runtime config; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/AvayaCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/AvayaCore.ts` | Hub URL from runtime config; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/TwitterCore.ts` | UPDATE | `SplendidCRM/React/src/SignalR/TwitterCore.ts` | Hub URL from runtime config; signalr 10.x API |
+| `SplendidCRM/React/src/SignalR/SignalRStore.ts` | REMOVE | — | Legacy jQuery SignalR store — replaced by SignalRCoreStore |
+| `SplendidCRM/React/src/SignalR/Chat.ts` | REMOVE | — | Legacy jQuery SignalR — replaced by ChatCore.ts |
+| `SplendidCRM/React/src/SignalR/Twilio.ts` | REMOVE | — | Legacy — replaced by TwilioCore.ts |
+| `SplendidCRM/React/src/SignalR/PhoneBurner.ts` | REMOVE | — | Legacy — replaced by PhoneBurnerCore.ts |
+| `SplendidCRM/React/src/SignalR/Asterisk.ts` | REMOVE | — | Legacy — replaced by AsteriskCore.ts |
+| `SplendidCRM/React/src/SignalR/Avaya.ts` | REMOVE | — | Legacy — replaced by AvayaCore.ts |
+| `SplendidCRM/React/src/SignalR/Twitter.ts` | REMOVE | — | Legacy — replaced by TwitterCore.ts |
 
-**Core Business Logic (Class Library):**
-
-| Target File | Transformation | Source File | Key Changes |
-|---|---|---|---|
-| `src/SplendidCRM.Core/Security.cs` | UPDATE | `SplendidCRM/_code/Security.cs` | Replace `HttpContext.Current` → `IHttpContextAccessor`; replace `Session[]` → distributed session; preserve MD5 hashing with tech debt comment |
-| `src/SplendidCRM.Core/SplendidCache.cs` | UPDATE | `SplendidCRM/_code/SplendidCache.cs` | Replace `HttpRuntime.Cache` + `Application[]` → `IMemoryCache`; preserve all cache keys, invalidation logic, React getters |
-| `src/SplendidCRM.Core/SplendidInit.cs` | UPDATE | `SplendidCRM/_code/SplendidInit.cs` | Replace `Application` lock → DI-scoped initialization; replace `HttpContext.Current` → `IHttpContextAccessor` |
-| `src/SplendidCRM.Core/SchedulerUtils.cs` | UPDATE | `SplendidCRM/_code/SchedulerUtils.cs` | Replace `HttpContext.Current` and `Application[]` → injected services; preserve `OnTimer`/`OnArchiveTimer` logic |
-| `src/SplendidCRM.Core/RestUtil.cs` | UPDATE | `SplendidCRM/_code/RestUtil.cs` | Replace `HttpContext.Current` → `IHttpContextAccessor`; ensure byte-identical JSON responses |
-| `src/SplendidCRM.Core/SearchBuilder.cs` | UPDATE | `SplendidCRM/_code/SearchBuilder.cs` | Replace `System.Web` dependencies |
-| `src/SplendidCRM.Core/EmailUtils.cs` | UPDATE | `SplendidCRM/_code/EmailUtils.cs` | Replace `System.Web` → ASP.NET Core; replace `System.Data.SqlClient` → `Microsoft.Data.SqlClient` |
-| `src/SplendidCRM.Core/MimeUtils.cs` | UPDATE | `SplendidCRM/_code/MimeUtils.cs` | Replace `System.Web` dependencies |
-| `src/SplendidCRM.Core/Sql.cs` | UPDATE | `SplendidCRM/_code/Sql.cs` | Replace `System.Data.SqlClient` → `Microsoft.Data.SqlClient` |
-| `src/SplendidCRM.Core/SqlBuild.cs` | UPDATE | `SplendidCRM/_code/SqlBuild.cs` | Replace `System.Data.SqlClient` → `Microsoft.Data.SqlClient` |
-| `src/SplendidCRM.Core/DbProviderFactory.cs` | UPDATE | `SplendidCRM/_code/DbProviderFactory.cs` | Replace `System.Data.SqlClient` → `Microsoft.Data.SqlClient` |
-| `src/SplendidCRM.Core/SqlClientFactory.cs` | UPDATE | `SplendidCRM/_code/SqlClientFactory.cs` | Replace `System.Data.SqlClient` → `Microsoft.Data.SqlClient` |
-| `src/SplendidCRM.Core/*.cs` (remaining ~60 files) | UPDATE | `SplendidCRM/_code/*.cs` | Replace `System.Web` → `Microsoft.AspNetCore.*`; replace `HttpContext.Current` → `IHttpContextAccessor`; replace `Application[]` → `IMemoryCache` |
-
-**DuoUniversal (Active 2FA — Class Library):**
+**BPMN / BusinessProcesses Files (40+ files with require()):**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `src/SplendidCRM.Core/DuoUniversal/*.cs` (7 files) | UPDATE | `SplendidCRM/_code/DuoUniversal/*.cs` | Replace any `System.Web` refs; update to .NET 10 crypto APIs if needed; preserve HMAC SHA-512, certificate pinning |
+| `SplendidCRM/React/src/ModuleViews/Administration/BusinessProcesses/**/*.ts` | UPDATE | Same paths | Convert all `require()` calls to ESM `import` statements; bpmn-js plugin registration via ESM dynamic imports |
 
-**Integration Stubs (16 subdirs — compile only):**
-
-| Target File | Transformation | Source File | Key Changes |
-|---|---|---|---|
-| `src/SplendidCRM.Core/Integrations/Spring.Social.Facebook/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.Facebook/**/*.cs` | Replace `System.Web` and `Spring.Rest`/`Spring.Social.Core` with .NET 10 compatible stubs; must compile |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.Twitter/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.Twitter/**/*.cs` | Same pattern as above |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.Salesforce/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.Salesforce/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.LinkedIn/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.LinkedIn/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.Office365/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.Office365/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.HubSpot/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.HubSpot/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.PhoneBurner/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.PhoneBurner/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.QuickBooks/**/*.cs` | UPDATE | `SplendidCRM/_code/Spring.Social.QuickBooks/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/PayPal/**/*.cs` | UPDATE | `SplendidCRM/_code/PayPal/**/*.cs` | Replace .NET Framework refs; must compile |
-| `src/SplendidCRM.Core/Integrations/QuickBooks/**/*.cs` | UPDATE | `SplendidCRM/_code/QuickBooks/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Excel/**/*.cs` | UPDATE | `SplendidCRM/_code/Excel/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/OpenXML/**/*.cs` | UPDATE | `SplendidCRM/_code/OpenXML/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/FileBrowser/**/*.cs` | UPDATE | `SplendidCRM/_code/FileBrowser/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Workflow/**/*.cs` | UPDATE | `SplendidCRM/_code/Workflow/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/Workflow4/**/*.cs` | UPDATE | `SplendidCRM/_code/Workflow4/**/*.cs` | Same pattern |
-| `src/SplendidCRM.Core/Integrations/mono/**/*.cs` | UPDATE | `SplendidCRM/_code/mono/**/*.cs` | Same pattern |
-
-**Documentation:**
+**Components with require() (2 files):**
 
 | Target File | Transformation | Source File | Key Changes |
 |---|---|---|---|
-| `README.md` | UPDATE | `README.md` | Update build/run instructions for `dotnet` CLI; update architecture description; document .NET 10 requirements |
+| `SplendidCRM/React/src/components/ProcessButtons.tsx` | UPDATE | Same path | Convert `require()` to ESM `import` |
+| `SplendidCRM/React/src/components/UserDropdown.tsx` | UPDATE | Same path | Convert `require()` to ESM `import` |
+
+**react-pose Dependent Files (53 files):**
+
+The `react-pose` library (4.0.10) is deprecated and unmaintained. It must be evaluated for React 19 compatibility. If incompatible, replace with a lightweight CSS transition approach or `framer-motion` (which is the successor to `react-pose`). All 53 files using `posed` animations must be updated:
+
+| Target File Pattern | Transformation | Key Changes |
+|---|---|---|
+| `SplendidCRM/React/src/components/Collapsable.tsx` | UPDATE | Replace `posed` collapse animation with React 19-compatible alternative |
+| `SplendidCRM/React/src/ThemeComponents/*/SubPanelHeaderButtons.tsx` | UPDATE | Replace `posed` animation (6 theme variants) |
+| `SplendidCRM/React/src/views/AccessView.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/views/DetailViewRelationships.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/views/SubPanelStreamView.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/views/SubPanelView.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/ModuleViews/Administration/**/*.tsx` | UPDATE | Replace `posed` animation (~30 admin files) |
+| `SplendidCRM/React/src/ModuleViews/Campaigns/*.tsx` | UPDATE | Replace `posed` animation (3 files) |
+| `SplendidCRM/React/src/ModuleViews/ChatChannels/ChatMessages.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/ModuleViews/Documents/DocumentRevisions.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/ModuleViews/Users/*.tsx` | UPDATE | Replace `posed` animation (4 files) |
+| `SplendidCRM/React/src/ModuleViews/Invoices/Payments.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/ModuleViews/Surveys/*.tsx` | UPDATE | Replace `posed` animation |
+| `SplendidCRM/React/src/ModuleViews/SurveyPages/SurveyQuestions.tsx` | UPDATE | Replace `posed` animation |
+
+**react-lifecycle-appear Dependent Files (83 files):**
+
+The `react-lifecycle-appear` library provides an `Appear` component for lifecycle hooks. It must be evaluated for React 19 compatibility. If incompatible, replace with a lightweight `useEffect`-based equivalent or `IntersectionObserver` pattern. All 83 files importing `Appear` must be updated:
+
+| Target File Pattern | Transformation | Key Changes |
+|---|---|---|
+| `SplendidCRM/React/src/Dashlets/*.tsx` | UPDATE | Replace Appear component (17 dashlet files) |
+| `SplendidCRM/React/src/SurveyComponents/*.tsx` | UPDATE | Replace Appear component (18 survey files) |
+| `SplendidCRM/React/src/ModuleViews/Administration/**/*.tsx` | UPDATE | Replace Appear component (~30 admin files) |
+| `SplendidCRM/React/src/ModuleViews/Campaigns/*.tsx` | UPDATE | Replace Appear component (3 files) |
+| `SplendidCRM/React/src/ModuleViews/Users/*.tsx` | UPDATE | Replace Appear component (4 files) |
+| `SplendidCRM/React/src/views/*.tsx` | UPDATE | Replace Appear component (4 view files) |
+| `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | UPDATE | Update Appear registry for runtime compilation |
+| `SplendidCRM/React/src/ModuleViews/ChatChannels/ChatMessages.tsx` | UPDATE | Replace Appear component |
+| `SplendidCRM/React/src/ModuleViews/Documents/DocumentRevisions.tsx` | UPDATE | Replace Appear component |
+| `SplendidCRM/React/src/ModuleViews/Invoices/Payments.tsx` | UPDATE | Replace Appear component |
+| `SplendidCRM/React/src/ModuleViews/Surveys/SurveyPages.tsx` | UPDATE | Replace Appear component |
+| `SplendidCRM/React/src/ModuleViews/SurveyPages/SurveyQuestions.tsx` | UPDATE | Replace Appear component |
+
+**React Bootstrap Dependent Files (73 files):**
+
+| Target File Pattern | Transformation | Key Changes |
+|---|---|---|
+| `SplendidCRM/React/src/**/*.tsx` (73 files) | UPDATE | Upgrade react-bootstrap to React 19-compatible version; verify API compatibility |
+
+**react-bootstrap-table-next Dependent Files (9 files):**
+
+| Target File Pattern | Transformation | Key Changes |
+|---|---|---|
+| `SplendidCRM/React/src/components/SplendidGrid.tsx` | UPDATE | Verify react-bootstrap-table-next React 19 compat; replace if unmaintained |
+| `SplendidCRM/React/src/components/SplendidStream.tsx` | UPDATE | Same as above |
+| `SplendidCRM/React/src/views/AuditView.tsx` | UPDATE | Same |
+| `SplendidCRM/React/src/views/PersonalInfoView.tsx` | UPDATE | Same |
+| `SplendidCRM/React/src/ModuleViews/Administration/DataPrivacy/PopupMarkFields.tsx` | UPDATE | Same |
+| `SplendidCRM/React/src/ModuleViews/SurveyPages/SurveyQuestions.tsx` | UPDATE | Same |
+| `SplendidCRM/React/src/SurveyComponents/ResultsPaginateResponses.tsx` | UPDATE | Same |
+| `SplendidCRM/React/src/index.tsx` | UPDATE | Bootstrap table imports |
+| `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | UPDATE | Module registry update |
+
+**Documentation and Validation Deliverables:**
+
+| Target File | Transformation | Source File | Key Changes |
+|---|---|---|---|
+| `docs/environment-setup.md` | CREATE | — | Full-stack setup guide: Node 20, .NET 10 SDK, SQL Server, step-by-step |
+| `scripts/build-and-run.sh` | CREATE | — | Automated setup: prereq checks, build, start, health check |
+| `validation/screenshots/` | CREATE | — | E2E test evidence directory |
+| `validation/database-changes.md` | CREATE | — | Schema change log (empty if no changes) |
+| `validation/backend-changes.md` | CREATE | — | Backend change log (empty if no changes) |
+
+**CKEditor Custom Build (PRESERVE):**
+
+| Target File | Transformation | Source File | Key Changes |
+|---|---|---|---|
+| `SplendidCRM/React/ckeditor5-custom-build/` | REFERENCE | Same path | Preserve entire directory; CKEditor's own Webpack build is independent. Referenced as local file: dependency in package.json |
 
 ### 0.5.2 Cross-File Dependencies
 
 **Import Statement Updates:**
 
-- FROM: `using System.Web;` → TO: `using Microsoft.AspNetCore.Http;` (and related ASP.NET Core namespaces)
-- FROM: `using System.Web.SessionState;` → TO: removed (ASP.NET Core session via `ISession`)
-- FROM: `using System.Data.SqlClient;` → TO: `using Microsoft.Data.SqlClient;`
-- FROM: `using System.ServiceModel;` / `using System.ServiceModel.Web;` / `using System.ServiceModel.Activation;` → TO: removed (replaced by `[ApiController]` attributes)
-- FROM: `using System.Web.Optimization;` → TO: removed (bundling handled by frontend toolchain)
-- FROM: `using Microsoft.AspNet.SignalR;` → TO: `using Microsoft.AspNetCore.SignalR;`
-- FROM: `using Microsoft.Owin;` / `using Microsoft.Owin.Security;` → TO: removed (replaced by ASP.NET Core middleware)
+- FROM: `import { ... } from 'react-router-dom'` → TO: `import { ... } from 'react-router'` (5 files)
+- FROM: `import { RouterStore, syncHistoryWithStore } from 'mobx-react-router'` → TO: Verify compatibility with `react-router` v7 or replace with direct MobX store + `useNavigate` pattern (4 files)
+- FROM: `import posed from 'react-pose'` → TO: CSS transition replacement or `framer-motion` equivalent (53 files)
+- FROM: `import { Appear } from 'react-lifecycle-appear'` → TO: Custom `useEffect`-based Appear hook or equivalent (83 files)
+- FROM: `const x = require('module')` → TO: `import x from 'module'` (44 files)
+- FROM: `module.exports = ...` → TO: `export default ...` (1 file)
+- FROM: `import * as signalR from '@microsoft/signalr'` → TO: Same (version 10.0.0 compatible API)
+- FROM: `@types/react-router-dom` → REMOVE from package.json (v7 has built-in types)
+- FROM: `@types/signalr` → REMOVE (legacy signalr types no longer needed)
 
-**Configuration Reference Updates:**
+**Configuration Updates for New Structure:**
 
-- FROM: `ConfigurationManager.AppSettings["key"]` → TO: `IConfiguration["key"]`
-- FROM: `ConfigurationManager.ConnectionStrings["SplendidCRM"]` → TO: `IConfiguration.GetConnectionString("SplendidCRM")`
-- FROM: `WebConfigurationManager.*` → TO: `IConfiguration` injected via DI
-
-**Static Access Pattern Updates:**
-
-- FROM: `HttpContext.Current.Session["key"]` → TO: `_httpContextAccessor.HttpContext.Session.GetString("key")`
-- FROM: `HttpContext.Current.Application["key"]` → TO: `_memoryCache.Get<T>("key")`
-- FROM: `HttpRuntime.Cache["key"]` → TO: `_memoryCache.Get<T>("key")`
-- FROM: `HttpContext.Current.Request.*` → TO: `_httpContextAccessor.HttpContext.Request.*`
-- FROM: `HttpContext.Current.Response.*` → TO: `_httpContextAccessor.HttpContext.Response.*`
+- `package.json` scripts: `"build": "vite build"`, `"dev": "vite"`, `"preview": "vite preview"`, `"typecheck": "tsc --noEmit"`
+- `tsconfig.json`: target, module, moduleResolution, jsx fields updated
+- Dev proxy: API calls to `http://localhost:5000` via Vite dev server proxy
+- Public directory: Vite serves from `public/` (config.json, manifest.json, favicon)
 
 ### 0.5.3 Wildcard Patterns
 
-All wildcard patterns use trailing patterns only:
+Wildcard patterns are used sparingly and only with trailing patterns:
 
-- `src/SplendidCRM.Core/*.cs` — All core business logic files (UPDATE)
-- `src/SplendidCRM.Core/DuoUniversal/*.cs` — All DuoUniversal files (UPDATE)
-- `src/SplendidCRM.Core/Integrations/Spring.Social.*/**/*.cs` — All 8 Spring.Social stub directories (UPDATE)
-- `src/SplendidCRM.Core/Integrations/PayPal/*.cs` — PayPal stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/QuickBooks/*.cs` — QuickBooks stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/Excel/*.cs` — Excel stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/OpenXML/*.cs` — OpenXML stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/FileBrowser/*.cs` — FileBrowser stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/Workflow/*.cs` — Workflow stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/Workflow4/*.cs` — Workflow4 stubs (UPDATE)
-- `src/SplendidCRM.Core/Integrations/mono/*.cs` — Mono compat stubs (UPDATE)
-- `src/SplendidCRM.Web/Controllers/*.cs` — All API controllers (CREATE)
-- `src/SplendidCRM.Web/Services/*.cs` — All hosted services (CREATE)
-- `src/SplendidCRM.Web/Soap/*.cs` — All SOAP service files (CREATE)
-- `src/SplendidCRM.Web/Hubs/*.cs` — All SignalR hubs (CREATE)
-- `src/SplendidCRM.Web/SignalR/*.cs` — All SignalR manager files (UPDATE)
-- `src/SplendidCRM.Web/Authentication/*.cs` — All auth setup files (CREATE)
-- `src/SplendidCRM.Web/Authorization/*.cs` — All authorization handlers (CREATE)
-- `src/SplendidCRM.Web/Middleware/*.cs` — All middleware files (CREATE)
-- `src/SplendidCRM.Web/Configuration/*.cs` — All config providers (CREATE)
-- `src/SplendidCRM.Web/appsettings*.json` — All JSON config files (CREATE)
+- `SplendidCRM/React/src/**/*.ts` | UPDATE — ESM conversion, React 19 compat across all TypeScript files
+- `SplendidCRM/React/src/**/*.tsx` | UPDATE — ESM conversion, React 19 compat across all TSX component files
+- `SplendidCRM/React/src/scripts/*.ts` | UPDATE — Infrastructure scripts ESM conversion
+- `SplendidCRM/React/src/SignalR/*Core.ts` | UPDATE — SignalR Core hub files with runtime config
+- `SplendidCRM/React/src/SignalR/!(*.Core).ts` | REMOVE — Legacy SignalR files (non-Core)
+- `SplendidCRM/React/src/ModuleViews/Administration/BusinessProcesses/**/*.ts` | UPDATE — BPMN require() → import
+- `SplendidCRM/React/src/styles/**/*.css` | PRESERVE — CSS files unchanged
+- `SplendidCRM/React/configs/webpack/*.js` | REMOVE — All Webpack configs
 
 ### 0.5.4 One-Phase Execution
 
-The entire refactor is executed by Blitzy in **ONE phase**. All files listed in sections 0.5.1 through 0.5.3 are included in a single transformation pass. There is no phased rollout, no incremental migration, and no coexistence period. The source codebase transitions from .NET Framework 4.8 to .NET 10 ASP.NET Core in a single atomic operation.
+The entire refactor is executed by Blitzy in **ONE phase**. All files listed above — configuration, source code, build tooling, documentation, and validation artifacts — are created, updated, or removed in a single execution pass. There is no multi-phase split.
 
 ## 0.6 Dependency Inventory
 
 ### 0.6.1 Key Private and Public Packages
 
-The following table maps every manually managed DLL reference in the current codebase to its NuGet equivalent or framework-included replacement. All versions are verified from NuGet.org or the .NET 10 framework manifest.
+The following table documents all key packages involved in this migration, with exact current versions from `SplendidCRM/React/package.json` and target versions based on React 19 / Node 20 / Vite compatibility requirements.
 
-**Third-Party DLL → NuGet Package Mappings (from BackupBin2012/):**
+**Core Framework Dependencies (Production):**
 
-| Registry | Current DLL | NuGet Package | Version | Purpose | Action |
-|---|---|---|---|---|---|
-| NuGet | `AjaxControlToolkit.dll` (v3.0) | — | — | WebForms toolkit | **REMOVE** — WebForms only, not used in backend API |
-| NuGet | `Antlr3.Runtime.dll` | — | — | Parser generator runtime | **REMOVE** — dependency of WebGrease/bundling |
-| NuGet | `BouncyCastle.Crypto.dll` | `BouncyCastle.Cryptography` | 2.5.1 | Cryptographic operations (MailKit dependency) | Replace with NuGet |
-| NuGet | `CKEditor.NET.dll` (v3.6.6.2) | — | — | Rich text editor server control | **REMOVE** — WebForms only |
-| NuGet | `Common.Logging.dll` (v2.0) | — | — | Logging abstraction | **REMOVE** — replace with `Microsoft.Extensions.Logging` |
-| NuGet | `DocumentFormat.OpenXml.dll` (v2.0) | `DocumentFormat.OpenXml` | 3.3.0 | OpenXML document manipulation | Replace with NuGet |
-| NuGet | `ICSharpCode.SharpZLib.dll` (v0.84) | `SharpZipLib` | 1.4.2 | ZIP/compression | Replace with NuGet |
-| NuGet | `MailKit.dll` | `MailKit` | 4.15.0 | SMTP/IMAP/POP3 email client | Replace with NuGet |
-| NuGet | `Microsoft.AspNet.SignalR.Core.dll` (v1.2.2) | `Microsoft.AspNetCore.SignalR` | Framework-included | Real-time hubs | **REMOVE** DLL — use framework package |
-| NuGet | `Microsoft.AspNet.SignalR.SystemWeb.dll` (v1.2.2) | — | — | SignalR IIS hosting | **REMOVE** — ASP.NET Core SignalR is self-hosted |
-| NuGet | `Microsoft.Owin.dll` | — | — | OWIN middleware | **REMOVE** — replaced by ASP.NET Core middleware |
-| NuGet | `Microsoft.Owin.Host.SystemWeb.dll` (v1.0) | — | — | OWIN-IIS bridge | **REMOVE** — Kestrel hosting |
-| NuGet | `Microsoft.Owin.Security.dll` | — | — | OWIN security | **REMOVE** — ASP.NET Core Identity |
-| NuGet | `Microsoft.Web.Infrastructure.dll` (v1.0) | — | — | Web infrastructure | **REMOVE** — .NET Framework only |
-| NuGet | `MimeKit.dll` | `MimeKit` | 4.15.0 | MIME message library | Replace with NuGet |
-| NuGet | `Owin.dll` (v1.0) | — | — | OWIN interface | **REMOVE** — no OWIN in ASP.NET Core |
-| NuGet | `RestSharp.dll` (v104.2) | `RestSharp` | 112.1.0 | REST HTTP client (integration stubs) | Replace with NuGet |
-| NuGet | `Spring.Rest.dll` (v1.1) | — | — | Spring REST framework | **REMOVE** — replace with `HttpClient` in stubs |
-| NuGet | `Spring.Social.Core.dll` (v1.0) | — | — | Spring Social framework | **REMOVE** — replace with stub interfaces |
-| NuGet | `TweetinCore.dll` | — | — | Twitter client library | **REMOVE** — integration stub; replace with stub interface |
-| NuGet | `WebGrease.dll` | — | — | CSS/JS minification | **REMOVE** — frontend bundling out of scope |
-| NuGet | `System.Web.Optimization.dll` | — | — | Bundling/minification | **REMOVE** — frontend toolchain handles this |
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `react` | 18.2.0 | 19.1.0 | Core React framework |
+| npm | `react-dom` | 18.2.0 | 19.1.0 | React DOM rendering |
+| npm | `react-router` | 6.22.1 | 7.6.1 | Client-side routing (replaces react-router-dom) |
+| npm | `react-router-dom` | 6.22.1 | REMOVE | Consolidated into react-router in v7 |
+| npm | `typescript` | 5.3.3 | 5.8.3 | Type-safe development (devDependency) |
+| npm | `mobx` | 6.12.0 | 6.15.0 | Observable state management |
+| npm | `mobx-react` | 9.1.0 | 9.2.1 | MobX-React bindings (React 19 support) |
+| npm | `mobx-react-router` | 5.0.3 | 5.0.3 | MobX router integration — verify react-router v7 compat |
+| npm | `history` | 5.3.0 | 5.3.0 | Browser history management |
+| npm | `bootstrap` | 5.3.2 | 5.3.6 | CSS framework |
+| npm | `react-bootstrap` | 2.10.1 | 2.10.9 | React Bootstrap components |
 
-**Third-Party DLL → NuGet Package Mappings (from BackupBin2022/):**
+**SignalR Dependencies:**
 
-| Registry | Current DLL | NuGet Package | Version | Purpose | Action |
-|---|---|---|---|---|---|
-| NuGet | `Newtonsoft.Json.dll` (redirect → v13.0) | `Newtonsoft.Json` | 13.0.3 | JSON serialization fallback | Replace with NuGet |
-| NuGet | `Twilio.dll` (v6.0.1) | `Twilio` | 7.7.1 | Twilio SMS/Voice API | Replace with NuGet |
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `@microsoft/signalr` | 8.0.0 | 10.0.0 | ASP.NET Core SignalR client |
+| npm | `signalr` | 2.4.3 | REMOVE | Legacy jQuery SignalR — no longer needed |
+| npm | `@types/signalr` | 2.4.3 | REMOVE | Types for legacy signalr package |
 
-**Third-Party DLL → NuGet/Framework Mappings (from BackupBin2025/):**
+**Rich Content and Visualization Dependencies:**
 
-| Registry | Current DLL | NuGet Package | Version | Purpose | Action |
-|---|---|---|---|---|---|
-| NuGet | `Microsoft.IdentityModel.Abstractions.dll` (v6.34) | `Microsoft.IdentityModel.Abstractions` | 8.7.0 | Identity model base | Replace with NuGet |
-| NuGet | `Microsoft.IdentityModel.JsonWebTokens.dll` (v6.34) | `Microsoft.IdentityModel.JsonWebTokens` | 8.7.0 | JWT handling | Replace with NuGet |
-| NuGet | `Microsoft.IdentityModel.Logging.dll` (v6.34) | `Microsoft.IdentityModel.Logging` | 8.7.0 | Identity logging | Replace with NuGet |
-| NuGet | `Microsoft.IdentityModel.Tokens.dll` (v6.34) | `Microsoft.IdentityModel.Tokens` | 8.7.0 | Token validation | Replace with NuGet |
-| NuGet | `Microsoft.Bcl.AsyncInterfaces.dll` (v5.0) | — | — | Async interfaces | **REMOVE** — included in .NET 10 |
-| Framework | `System.Buffers.dll` (v4.0.3) | — | — | Buffer primitives | **REMOVE** — included in .NET 10 |
-| Framework | `System.Memory.dll` (v4.0.1.1) | — | — | Memory/Span | **REMOVE** — included in .NET 10 |
-| Framework | `System.Net.Http.Json.dll` (v5.0) | — | — | HTTP JSON extensions | **REMOVE** — included in .NET 10 |
-| Framework | `System.Numerics.Vectors.dll` (v4.0) | — | — | SIMD vectors | **REMOVE** — included in .NET 10 |
-| Framework | `System.Runtime.CompilerServices.Unsafe.dll` (v5.0) | — | — | Unsafe utilities | **REMOVE** — included in .NET 10 |
-| Framework | `System.Text.Encodings.Web.dll` (v5.0) | — | — | HTML/URL encoding | **REMOVE** — included in .NET 10 |
-| Framework | `System.Text.Json.dll` (v5.0) | — | — | JSON serialization | **REMOVE** — included in .NET 10 (System.Text.Json 10.0) |
-| Framework | `System.Threading.Tasks.Extensions.dll` (v4.2) | — | — | ValueTask | **REMOVE** — included in .NET 10 |
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `ckeditor5-custom-build` | file:./ckeditor5-custom-build | file:./ckeditor5-custom-build | Custom CKEditor 5 build (local) |
+| npm | `@ckeditor/ckeditor5-build-classic` | ^22.0.0 | REMOVE or update | Evaluate if still needed alongside custom build |
+| npm | `@amcharts/amcharts4` | 4.10.38 | 4.10.38 | Charts — no major upgrade, preserve exact version |
+| npm | `bpmn-js` | 1.3.3 | 1.3.3 | BPMN workflow diagrams — preserve |
+| npm | `bpmn-js-properties-panel` | 0.13.1 | 0.13.1 | BPMN properties — preserve |
+| npm | `camunda-bpmn-moddle` | 3.2.0 | 3.2.0 | BPMN model extensions — preserve |
+| npm | `diagram-js` | 2.6.1 | 2.6.1 | Diagram foundation — preserve |
+| npm | `diagram-js-direct-editing` | 1.6.4 | 1.6.4 | Diagram editing — preserve |
+| npm | `react-big-calendar` | 1.10.1 | 1.17.1 | Calendar component — latest React 19 compatible |
+| npm | `react-signature-canvas` | 1.0.6 | 1.0.7 | Signature capture — latest |
+| npm | `react-dnd` | 16.0.1 | 16.0.1 | Drag-and-drop — verify React 19 compat |
+| npm | `react-dnd-html5-backend` | 16.0.1 | 16.0.1 | DnD HTML5 backend — verify React 19 compat |
+| npm | `react-dnd-touch-backend` | 16.0.1 | 16.0.1 | DnD touch backend — for Cordova |
+| npm | `react-select` | 5.8.0 | 5.9.0 | Enhanced select component |
+| npm | `react-datetime` | 3.2.0 | 3.2.0 | Date/time picker — verify React 19 compat |
+| npm | `fullcalendar-reactwrapper` | ^1.0.7 | ^1.0.7 | FullCalendar wrapper — verify React 19 compat |
 
-**New NuGet Packages Required:**
+**UI and Utility Dependencies:**
 
-| Registry | Package | Version | Purpose |
-|---|---|---|---|
-| NuGet | `SoapCore` | 1.2.1.12 | SOAP middleware for ASP.NET Core (replacing soap.asmx.cs) |
-| NuGet | `Microsoft.Data.SqlClient` | 6.1.4 | SQL Server data access (replacing System.Data.SqlClient) |
-| NuGet | `Microsoft.Extensions.Caching.StackExchangeRedis` | 10.0.0 | Redis distributed session option |
-| NuGet | `Microsoft.Extensions.Caching.SqlServer` | 10.0.0 | SQL Server distributed session option |
-| NuGet | `AWSSDK.SecretsManager` | 3.7.405.5 | AWS Secrets Manager config provider |
-| NuGet | `AWSSDK.SSM` | 3.7.405.5 | AWS Systems Manager Parameter Store config provider |
-| NuGet | `DuoUniversal` | 1.3.0 | DuoUniversal 2FA (replacing embedded implementation) |
-| NuGet | `Microsoft.AspNetCore.Authentication.Negotiate` | 10.0.0 | Windows Authentication (Negotiate/NTLM) |
-| NuGet | `Microsoft.AspNetCore.Authentication.OpenIdConnect` | 10.0.0 | OIDC SSO middleware |
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `@fortawesome/fontawesome-svg-core` | 6.5.1 | 6.7.2 | FontAwesome core |
+| npm | `@fortawesome/free-regular-svg-icons` | 6.5.1 | 6.7.2 | FontAwesome regular icons |
+| npm | `@fortawesome/free-solid-svg-icons` | 6.5.1 | 6.7.2 | FontAwesome solid icons |
+| npm | `@fortawesome/react-fontawesome` | 0.2.0 | 0.2.2 | FontAwesome React bindings |
+| npm | `jquery` | 3.7.1 | 3.7.1 | DOM manipulation (preserve — used by BPMN/supporting) |
+| npm | `lodash` | 3.10.1 | 4.17.21 | Utility functions — security upgrade required |
+| npm | `moment` | 2.30.1 | 2.30.1 | Date handling — preserve (migration to date-fns out of scope) |
+| npm | `query-string` | 8.2.0 | 9.1.1 | URL query string parsing |
+| npm | `fast-xml-parser` | 3.21.1 | 3.21.1 | XML parsing — preserve minor version |
+| npm | `idb` | 8.0.0 | 8.0.1 | IndexedDB wrapper |
+| npm | `@babel/standalone` | 7.22.20 | 7.27.1 | Runtime in-browser TSX compilation (PRODUCTION dep) |
+| npm | `react-pose` | 4.0.10 | REPLACE | Deprecated — replace with framer-motion or CSS transitions |
+| npm | `react-lifecycle-appear` | ^1.1.2 | REPLACE | Unmaintained — replace with useEffect-based alternative |
+| npm | `react-bootstrap-table-next` | ^4.0.3 | ^4.0.3 | Data table — verify React 19 compat |
+| npm | `react-bootstrap-table2-paginator` | ^2.0.7 | ^2.0.7 | Table pagination — verify React 19 compat |
+| npm | `react-autocomplete` | ^1.8.1 | ^1.8.1 | Autocomplete — verify React 19 compat |
+| npm | `react-treeview` | ^0.4.7 | ^0.4.7 | Tree view component — verify React 19 compat |
+| npm | `react-router6-redirect` | ^1.0.1 | REMOVE or REPLACE | Likely not needed with react-router v7 |
+| npm | `inherits` | 2.0.4 | 2.0.4 | Prototype chain helper — preserve |
+| npm | `min-dom` | 4.1.0 | 4.1.0 | Minimal DOM helpers (bpmn-js dep) |
+| npm | `process` | 0.11.10 | 0.11.10 | Process polyfill for browser — may be replaced by Vite define |
+
+**TypeScript Type Dependencies:**
+
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `@types/react` | 18.2.56 | 19.1.2 | React type definitions |
+| npm | `@types/react-dom` | 18.2.19 | 19.1.3 | React DOM type definitions |
+| npm | `@types/react-router` | 5.1.20 | REMOVE | Built-in types in react-router v7 |
+| npm | `@types/react-router-dom` | ^5.1.5 | REMOVE | Consolidated into react-router |
+
+**Build Tool Dependencies (Dev):**
+
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `vite` | — | 6.3.5 | Build tool (NEW) |
+| npm | `@vitejs/plugin-react` | — | 4.5.2 | Vite React plugin with Babel support (NEW) |
+| npm | `sass` | — | 1.89.0 | Dart Sass compiler (replaces node-sass) (NEW) |
+| npm | `webpack` | 5.90.2 | REMOVE | Replaced by Vite |
+| npm | `webpack-cli` | 5.1.4 | REMOVE | Replaced by Vite |
+| npm | `webpack-dev-server` | 4.15.1 | REMOVE | Replaced by Vite dev server |
+| npm | `webpack-merge` | 5.10.0 | REMOVE | No longer needed |
+| npm | `webpack-dev-middleware` | 7.0.0 | REMOVE | No longer needed |
+| npm | `webpack-pwa-manifest` | 4.3.0 | REMOVE | Replaced by vite-plugin-pwa or manual manifest |
+| npm | `html-webpack-plugin` | 5.6.0 | REMOVE | Replaced by Vite HTML entry |
+| npm | `ts-loader` | 9.5.1 | REMOVE | Vite handles TS natively |
+| npm | `thread-loader` | 4.0.2 | REMOVE | No longer needed |
+| npm | `fork-ts-checker-webpack-plugin` | 9.0.2 | REMOVE | Replaced by `tsc --noEmit` script |
+| npm | `css-loader` | 6.10.0 | REMOVE | Vite handles CSS natively |
+| npm | `style-loader` | 3.3.4 | REMOVE | Vite handles CSS natively |
+| npm | `postcss-loader` | 8.1.0 | REMOVE | Vite has built-in PostCSS |
+| npm | `sass-loader` | 14.1.0 | REMOVE | Vite uses sass directly |
+| npm | `node-sass` | 9.0.0 | REMOVE | Replaced by sass (Dart Sass) |
+| npm | `svg-inline-loader` | ^0.8.2 | REMOVE | Vite ?inline import suffix |
+| npm | `file-loader` | 6.2.0 | REMOVE | Vite built-in asset handling |
+| npm | `url-loader` | 4.1.1 | REMOVE | Vite built-in asset handling |
+
+**Cordova Dependencies (PRESERVE but not actively modified):**
+
+| Registry | Package | Current Version | Target Version | Purpose |
+|---|---|---|---|---|
+| npm | `cordova` | 12.0.0 | 12.0.0 | Mobile framework — out of scope but preserved in package.json |
+| npm | `cordova-android` | 12.0.1 | 12.0.1 | Android platform — preserved |
+| npm | `cordova-ios` | 7.0.1 | 7.0.1 | iOS platform — preserved |
+| npm | `cordova-plugin-*` | Various | Various | Cordova plugins — preserved |
 
 ### 0.6.2 Dependency Updates
 
-**Import Refactoring — Files Requiring Import Updates:**
+**Import Refactoring:**
 
-| File Pattern | Import Change | Count |
-|---|---|---|
-| `src/SplendidCRM.Core/*.cs` | `System.Web` → `Microsoft.AspNetCore.Http` | 65 files |
-| `src/SplendidCRM.Core/*.cs` | `System.Data.SqlClient` → `Microsoft.Data.SqlClient` | 5 files |
-| `src/SplendidCRM.Core/*.cs` | `HttpContext.Current` → `IHttpContextAccessor` injection | 31 files |
-| `src/SplendidCRM.Core/*.cs` | `Application[` → `IMemoryCache` injection | 36 files |
-| `src/SplendidCRM.Core/*.cs` | `HttpRuntime.Cache` → `IMemoryCache` injection | 5 files |
-| `src/SplendidCRM.Core/*.cs` | `Session[` → distributed session via `IHttpContextAccessor` | 20 files |
-| `src/SplendidCRM.Web/SignalR/*.cs` | `Microsoft.AspNet.SignalR` → `Microsoft.AspNetCore.SignalR` | 10 files |
-| `src/SplendidCRM.Core/Integrations/Spring.Social.*/**/*.cs` | `Spring.Rest`/`Spring.Social.Core` → stub interfaces | 334 files |
+Files requiring import updates (by pattern):
 
-**Import Transformation Rules:**
+- `SplendidCRM/React/src/**/*.ts` — Update all internal imports for ESM compatibility
+- `SplendidCRM/React/src/**/*.tsx` — Update all component imports for ESM and React 19
+- `SplendidCRM/React/src/scripts/*.ts` — Infrastructure script ESM imports
+- `SplendidCRM/React/src/SignalR/*.ts` — SignalR import updates
 
-- Old: `using System.Web;` → New: `using Microsoft.AspNetCore.Http;`
-- Old: `using System.Web.SessionState;` → New: removed
-- Old: `using System.Web.Caching;` → New: `using Microsoft.Extensions.Caching.Memory;`
-- Old: `using System.Web.Configuration;` → New: `using Microsoft.Extensions.Configuration;`
-- Old: `using System.Data.SqlClient;` → New: `using Microsoft.Data.SqlClient;`
-- Old: `using System.ServiceModel;` → New: removed (WCF endpoints converted)
-- Old: `using System.ServiceModel.Web;` → New: removed
-- Old: `using System.ServiceModel.Activation;` → New: removed
-- Old: `using Microsoft.AspNet.SignalR;` → New: `using Microsoft.AspNetCore.SignalR;`
-- Old: `using Microsoft.Owin;` → New: removed
-- Old: `using Spring.Rest.Client;` → New: `using System.Net.Http;` (stubs)
-- Old: `using Spring.Social.OAuth2;` → New: stub interface or removed
-- Apply to: All files matching the patterns in the table above
+Import transformation rules:
+
+- Old: `import { ... } from 'react-router-dom'` → New: `import { ... } from 'react-router'` (apply to all 5 files containing this import)
+- Old: `const module = require('package')` → New: `import module from 'package'` (apply to 44 files with require())
+- Old: `module.exports = value` → New: `export default value` (apply to 1 file: `adal.ts`)
+- Old: `import posed from 'react-pose'` → New: Replacement animation import (apply to 53 files)
+- Old: `import { Appear } from 'react-lifecycle-appear'` → New: Custom Appear component or useEffect hook (apply to 83 files)
 
 **External Reference Updates:**
 
-| File Pattern | Update Description |
-|---|---|
-| `src/SplendidCRM.Web/appsettings*.json` | All configuration previously in `Web.config` |
-| `src/SplendidCRM.Core/SplendidCRM.Core.csproj` | NuGet `<PackageReference>` entries replacing all manual DLLs |
-| `src/SplendidCRM.Web/SplendidCRM.Web.csproj` | NuGet references + `<ProjectReference>` to Core |
-| `README.md` | Updated build instructions, runtime requirements, dependency list |
+- `SplendidCRM/React/package.json` — Complete dependency rewrite
+- `SplendidCRM/React/tsconfig.json` — Module and target updates
+- `SplendidCRM/React/vite.config.ts` — New build configuration
+- `SplendidCRM/React/index.html` — New Vite entry point
+- `docs/environment-setup.md` — New documentation
+- `scripts/build-and-run.sh` — New automation script
 
-**Eliminated Configuration Files:**
+### 0.6.3 lodash 3.x → 4.x Migration Notes
 
-| File | Status |
-|---|---|
-| `SplendidCRM/Web.config` | **ELIMINATED** — all content migrated to `appsettings*.json` + env vars + Secrets Manager + Parameter Store |
-| `SplendidCRM/SplendidCRM7_VS2017.csproj` | **REPLACED** — by two SDK-style `.csproj` files |
-| All `<assemblyBinding>` redirects | **ELIMINATED** — NuGet dependency resolution handles versioning |
-| All `<system.serviceModel>` WCF config | **ELIMINATED** — ASP.NET Core middleware pipeline |
-| All `<system.webServer>` IIS config | **ELIMINATED** — Kestrel self-hosting |
+The upgrade from `lodash` 3.10.1 to 4.17.21 introduces breaking API changes that must be addressed:
 
-## 0.7 Special Analysis
+- `_.pluck(collection, property)` → `_.map(collection, property)` — `_.pluck` was removed in lodash 4
+- `_.first(array)` → `_.head(array)` — `_.first` was renamed
+- `_.rest(array)` → `_.tail(array)` — `_.rest` was renamed
+- `_.contains(collection, value)` → `_.includes(collection, value)` — `_.contains` was renamed
+- `_.object(keys, values)` → `_.zipObject(keys, values)` — `_.object` was renamed
+- `_.merge` behavior change — lodash 4 `_.merge` no longer mutates primitive values in the same way
+- `_.defaults` behavior change — minor differences in how undefined properties are handled
 
-### 0.7.1 Cross-Cutting Concern: HttpContext.Current Replacement
+All files importing `lodash` must be scanned for deprecated method usage and updated accordingly.
 
-The most pervasive migration challenge is the replacement of `HttpContext.Current` static access, which is used throughout the codebase as the primary mechanism for accessing session state, request/response data, and application state. This pattern does not exist in ASP.NET Core.
+## 0.7 Refactoring Rules
 
-**Impact Analysis:**
+### 0.7.1 Refactoring-Specific Rules from User
 
-| Access Pattern | File Count | Replacement Strategy |
-|---|---|---|
-| `HttpContext.Current.Session["key"]` | 20 files | Constructor-injected `IHttpContextAccessor` → `HttpContext.Session` |
-| `HttpContext.Current.Application["key"]` | 36 files | Constructor-injected `IMemoryCache` with equivalent cache keys |
-| `HttpContext.Current.Request.*` | 15+ files | Constructor-injected `IHttpContextAccessor` → `HttpContext.Request` |
-| `HttpContext.Current.Response.*` | 10+ files | Controller action `HttpContext.Response` or `IHttpContextAccessor` |
-| `HttpContext.Current.Server.MapPath()` | 5+ files | `IWebHostEnvironment.ContentRootPath` / `WebRootPath` |
+The following rules are explicitly emphasized by the user and must be strictly observed:
 
-**Critical files requiring deep refactoring:**
+- **Minimal Change Clause:** Make only the changes necessary for the React 18→19, Webpack→Vite, and hosting decoupling transitions. Preserve all component logic, rendering behavior, and user interactions exactly as-is.
+- **Visual Parity Requirement:** The React 19 SPA must render all module list views, detail views, edit views, dashboards, and admin panels with 100% visual and functional parity to the current React 18 build. No redesign, no layout rearrangement, no visual style changes.
+- **No State Management Migration:** MobX stays. No Redux, Zustand, or other state management library conversion.
+- **No Date Library Migration:** `moment` stays at 2.x. No migration to `date-fns` or Temporal.
+- **No Class-to-Function Component Conversion:** Do not convert class components to function components unless React 19 forces deprecation of a specific pattern.
+- **No New Features:** Do not add new components, screens, or features. Do not add UI/UX improvements.
+- **Preserve File Structure:** Preserve original file structure and component organization where possible. The `src/` directory hierarchy (scripts/, SignalR/, views/, components/, ModuleViews/, types/, styles/, ThemeComponents/, Dashlets/, etc.) is immutable.
+- **lodash Upgrade Exception:** The `lodash` 3.x→4.x upgrade is permitted solely to address security vulnerabilities. Verify and fix API breaking changes only.
+- **Backend/Schema Change Last Resort:** Backend C# code changes and SQL Server schema changes are permitted ONLY as a last resort when an E2E test failure is directly caused by a backend/schema issue that cannot be resolved by a frontend change. Documentation in `validation/backend-changes.md` and `validation/database-changes.md` is mandatory.
+- **`@babel/standalone` Must Stay in Production deps:** This is a runtime dependency, not a dev dependency. It must remain importable and functional in the Vite production build, not excluded by tree-shaking or dead code elimination.
+- **MobX Decorator Support is Non-Negotiable:** `experimentalDecorators: true` must be preserved in `tsconfig.json`. The Vite Babel plugin must include decorator transpilation configuration. Without this, all MobX-decorated classes will fail silently at runtime.
+- **Linux Build Mandate:** The frontend MUST build via `npm run build` on Linux with zero Windows dependencies. No Windows-only tools or paths.
 
-- `Security.cs` (1,388 lines) — Session-backed static properties (`USER_ID`, `USER_LOGIN_ID`, `TEAM_ID`, `FULL_NAME`, `IS_ADMIN`, etc.) all read from `HttpContext.Current.Session`. Each property getter must be refactored to receive `IHttpContextAccessor` via constructor injection while preserving the identical property contract.
-- `SplendidCache.cs` (11,582 lines) — Uses `HttpRuntime.Cache`, `Application[]`, and `Session[]` extensively. Every cache retrieval method must be converted to `IMemoryCache` injection while preserving identical cache keys and return types.
-- `SplendidInit.cs` (~900 lines) — `InitApp` uses `Application` lock and `Application[]` for one-time initialization. Must be converted to a thread-safe singleton initialization pattern using `SemaphoreSlim` or `Lazy<T>`.
-- `RestUtil.cs` (~800 lines) — REST serialization helper uses `HttpContext.Current` for timezone resolution and ACL-aware table selection. Must receive context via DI.
+### 0.7.2 Special Instructions and Constraints
 
-**Transformation Pattern:**
+**Runtime Configuration Injection (Critical Architectural Requirement):**
 
-The fundamental transformation converts static-access classes to DI-friendly services:
+- The build output MUST NOT contain any environment-specific values (API URLs, feature flags, environment names)
+- `/config.json` is loaded at application initialization BEFORE rendering
+- The same build artifact MUST function correctly when `/config.json` contains Dev values and when it contains Production values, with zero rebuilds
+- A development mode MUST support a local `public/config.json` with localhost defaults for `npm run dev`
 
-```csharp
-// BEFORE (.NET Framework 4.8)
-public static Guid USER_ID { get { return Sql.ToGuid(HttpContext.Current.Session["USER_ID"]); } }
-// AFTER (.NET 10 ASP.NET Core)
-public Guid USER_ID { get { return Sql.ToGuid(_httpContextAccessor.HttpContext?.Session.GetString("USER_ID")); } }
+User Example — config.json schema:
+```json
+{
+  "API_BASE_URL": "http://localhost:5000",
+  "SIGNALR_URL": "",
+  "ENVIRONMENT": "development"
+}
 ```
 
-### 0.7.2 Cross-Cutting Concern: Application State to IMemoryCache Migration
+**SignalR Hub Path Breaking Change (Confirmed from Prompt 1):**
 
-The `Application[]` dictionary (ASP.NET global state) is used in 36 files as a shared in-memory store. ASP.NET Core does not provide an `Application` object.
+- Legacy OWIN SignalR at `/signalr` is GONE
+- New ASP.NET Core SignalR hub endpoints:
+  - `/hubs/chat` (ChatHub)
+  - `/hubs/twilio` (TwilioHub)
+  - `/hubs/phoneburner` (PhoneBurnerHub)
+- All hub connection initialization MUST use these new paths
 
-**Migration Strategy:**
-
-- All `Application["key"]` reads → `IMemoryCache.TryGetValue<T>("key", out var value)`
-- All `Application["key"] = value` writes → `IMemoryCache.Set("key", value, cacheOptions)`
-- The `SplendidCache.cs` class becomes the primary consumer, wrapping `IMemoryCache` with the same key structure
-- Cache invalidation via `vwSYSTEM_EVENTS` monitoring is preserved in `CacheInvalidationService.cs` (a background service that periodically queries the SQL view and evicts stale cache entries)
-
-**Key Cache Key Families (must be preserved identically):**
-
-| Cache Key Pattern | Source Method | Purpose |
-|---|---|---|
-| `vwMODULES_*` | `SplendidCache.Modules()` | Module metadata |
-| `vwTERMINOLOGY_*` | `SplendidCache.Terminology()` | Localization strings |
-| `vwGRIDVIEWS_*` / `vwDETAILVIEWS_*` / `vwEDITVIEWS_*` | `SplendidCache.GridViews()` etc. | Dynamic layout metadata |
-| `vwDYNAMIC_BUTTONS_*` | `SplendidCache.DynamicButtons()` | Button configurations |
-| `CONFIG_*` | `SplendidCache.Config()` | System configuration |
-| `vwTIMEZONES` | `SplendidCache.TimeZones()` | Timezone list |
-| `vwCURRENCIES` | `SplendidCache.Currencies()` | Currency list |
-
-### 0.7.3 Cross-Cutting Concern: WCF-to-Web-API Endpoint Mapping
-
-The monolithic `Rest.svc.cs` (8,369 lines) contains 152 WCF operations decorated with `[WebInvoke]` attributes. Each must be mapped to an equivalent ASP.NET Core controller action.
-
-**WCF Pattern → ASP.NET Core Pattern:**
-
-| WCF Attribute | ASP.NET Core Equivalent |
-|---|---|
-| `[ServiceContract]` | `[ApiController]` on class |
-| `[AspNetCompatibilityRequirements]` | Removed — not needed |
-| `[WebInvoke(Method="POST", BodyStyle=WebMessageBodyStyle.WrappedRequest, ...)]` | `[HttpPost("Rest.svc/{OperationName}")]` |
-| `[WebInvoke(Method="GET", ...)]` | `[HttpGet("Rest.svc/{OperationName}")]` |
-| `[OperationContract]` | Method is public on controller |
-| `WebOperationContext.Current.OutgoingResponse` | `HttpContext.Response` |
-| `WebOperationContext.Current.IncomingRequest` | `HttpContext.Request` |
-
-**Route Preservation Strategy:**
-
-The current WCF REST URL pattern is `/Rest.svc/{Operation}`. To maintain backward compatibility with the React SPA and any external integrations, the ASP.NET Core controllers must register compatibility routes:
-
-- `[Route("Rest.svc")]` on the main REST controller
-- `[Route("Administration/Rest.svc")]` on the admin REST controller
-- Individual action methods: `[HttpPost("{Operation}")]` where `{Operation}` matches the WCF operation name exactly
-
-**OData-Style Query Parameters:**
-
-The existing `Rest.svc.cs` implements custom OData-style query parameter parsing for `$filter`, `$select`, `$orderby`, and `$groupby`. This is NOT standard OData — it is custom parsing logic in `SearchBuilder.cs` and `RestUtil.cs`. The migration must preserve this custom parsing exactly, not introduce Microsoft OData middleware.
-
-### 0.7.4 Cross-Cutting Concern: Spring.Social Dependency Removal
-
-The 8 Spring.Social integration directories (334 files) depend on `Spring.Rest.dll` and `Spring.Social.Core.dll` — both are discontinued .NET libraries with no .NET Core/.NET 10 equivalent. These DLLs cannot be replaced with NuGet packages.
-
-**Removal Strategy:**
-
-- Create minimal stub interfaces that satisfy the compilation requirements:
-  - `IRestOperations` (REST client interface used by Spring.Social providers)
-  - `IOAuth2Operations` (OAuth 2.0 flow interface)
-  - `IApiBinding` (base API binding interface)
-- Replace `using Spring.Rest.Client;` with `using System.Net.Http;` where possible
-- Replace `using Spring.Social.OAuth2;` with stub interface references
-- All 334 files must compile but are NOT expected to execute — they are dormant Enterprise Edition stubs
-- The stubs preserve public class signatures and interface contracts for future Enterprise Edition activation
-
-### 0.7.5 Cross-Cutting Concern: Session Serialization Compatibility
-
-The migration from InProc session to distributed session (Redis or SQL Server) requires all session data to be serializable. InProc session can store any .NET object reference; distributed session requires explicit serialization.
-
-**Session Usage Audit:**
-
-| Session Key Pattern | Data Type | Serialization Impact |
-|---|---|---|
-| `USER_ID` | `Guid` (stored as string) | Compatible — `GetString`/`SetString` |
-| `USER_LOGIN_ID` | `Guid` | Compatible |
-| `TEAM_ID` | `Guid` | Compatible |
-| `FULL_NAME` | `string` | Compatible |
-| `IS_ADMIN` | `bool` (stored as string) | Compatible |
-| `IS_ADMIN_DELEGATE` | `bool` | Compatible |
-| `USER_EXTENSION` | `string` | Compatible |
-| Module ACL data | `DataTable` | **REQUIRES serialization adapter** — must convert to JSON/binary |
-| Field ACL data | `DataTable` | **REQUIRES serialization adapter** |
-
-The `Security.cs` class stores ACL data as `DataTable` objects in session. Distributed session requires these to be serialized. The migration must implement a session serialization adapter that converts `DataTable` ACL structures to a serializable format (JSON strings) on write and deserializes on read, while maintaining the identical API contract visible to consuming code.
-
-### 0.7.6 Cross-Cutting Concern: TLS and Cookie Security Migration
-
-**TLS Enforcement:**
-
-- Current: `ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;` in `Global.asax.cs Application_Start`
-- Target: Kestrel HTTPS configuration in `Program.cs` enforcing TLS 1.2+ at the transport level
-- `ServicePointManager` is not available/needed in ASP.NET Core; Kestrel handles TLS natively
-
-**Cookie Security:**
-
-- Current: Manual `SameSite` and `Secure` flag hardening in `Global.asax.cs Session_Start` via cookie iteration
-- Target: `CookiePolicyOptions` middleware in `Program.cs`:
-
-```csharp
-builder.Services.Configure<CookiePolicyOptions>(o => {
-    o.MinimumSameSitePolicy = SameSiteMode.Lax;
-});
+User Example — Vite dev proxy:
+```
+server.proxy: {
+  '/Rest.svc': 'http://localhost:5000',
+  '/Administration/Rest.svc': 'http://localhost:5000',
+  '/hubs': 'http://localhost:5000',
+  '/api': 'http://localhost:5000'
+}
 ```
 
-**P3P Header:**
+**Vite Bundle Output Change:**
 
-- Current: `Response.AddHeader("p3p", ...)` in `Global.asax.cs Application_BeginRequest`
-- Target: Intentionally dropped. Document as removed — P3P was legacy IE iframe compatibility, no modern browsers support it
+- The legacy `SteviaCRM.js` single-bundle pattern is abandoned
+- Vite produces hashed, chunked output (e.g., `index-[hash].js`, vendor chunks)
+- A proper `index.html` at the project root serves as Vite's entry point
+- The Nginx `try_files` SPA fallback serves this `index.html` for all routes
 
-## 0.8 Refactoring Rules
+**CommonJS → ESM Transition:**
 
-### 0.8.1 Refactoring-Specific Rules
+- Update `tsconfig.json` module system to ESM-compatible target
+- Convert all 44 files with `require()` calls to `import` statements
+- Convert `module.exports` to `export default` (1 file)
+- Configure Vite's `optimizeDeps` to pre-bundle CJS-only dependencies
+- Test that no runtime `require is not defined` errors occur in the browser
 
-The following rules are explicitly emphasized by the user and MUST be observed throughout all migration work:
+**Defensive JSON Parsing:**
 
-**Minimal Change Clause:**
-- Make ONLY the changes necessary for the .NET Framework 4.8 → .NET 10 ASP.NET Core transition
-- Preserve all business logic, validation rules, and data processing exactly as-is
-- Do NOT optimize, refactor, or "improve" code patterns beyond what the framework migration requires
-- Do NOT add features, modules, or capabilities
-- Do NOT modify SQL Server schema, stored procedures, views, functions, or triggers
-- Preserve original code structure and organization where possible; isolate new implementations in dedicated files when framework patterns diverge
-- When multiple migration approaches exist, choose the one requiring the least modification to existing logic
+- Backend JSON serialization uses Newtonsoft.Json 13.0.3 alongside System.Text.Json
+- Edge-case drift in `DateTime` formatting, `null` handling, and `DataTable` serialization has not been verified
+- Frontend parsing should be defensive: handle both formats gracefully
 
-**Immutable Interfaces (contract preservation):**
-- REST API endpoint paths, HTTP methods, request/response JSON schemas, OData query parameters (`$filter`, `$select`, `$orderby`, `$groupby`) — 100% response parity
-- SOAP WSDL contract, `sugarsoap` namespace, all data carriers — zero contract changes, WSDL byte-comparable
-- SQL Server stored procedure signatures and view definitions — zero DDL changes
-- SignalR hub method signatures — wire protocol may upgrade but method names and parameters preserved
-- 4-tier ACL model: Module → Team → Field → Record — `Security.Filter` produces identical SQL predicates
-- Cookie/session token names and authentication flow sequences visible to external clients
-- Scheduler job names and behavior: `CleanSystemLog`, `pruneDatabase`, `BackupDatabase`, `BackupTransactionLog`, `CheckVersion`, `RunAllArchiveRules`, `RunExternalArchive`
+### 0.7.3 Immutable Frontend Contracts
 
-**Security Preservation:**
-- MD5 password hashing MUST be preserved as-is for SugarCRM backward compatibility
-- Add inline comment: `// TECHNICAL DEBT: MD5 hash preserved for SugarCRM backward compatibility. Do not modify.`
-- Address security vulnerabilities ONLY if critical (CVSS > 7.0) or introduced by the migration itself
+The following behaviors and interfaces are immutable and must be preserved exactly:
 
-**Integration Stubs:**
-- All 16 integration subdirectories MUST compile on .NET 10 but MUST NOT be activated or tested beyond compilation
-- Preserve all public interfaces and class signatures for Enterprise Edition upgrade path
+- Module list view, detail view, and edit view component structure and rendered output
+- MobX store interfaces and observable property names consumed by components
+- All admin panel layout editor drag-and-drop behavior
+- Dashboard widget rendering and configuration
+- CKEditor 5 custom build toolbar and plugin configuration
+- amCharts 4 chart types and configuration patterns
+- Calendar event rendering and interaction patterns
+- All keyboard shortcuts and accessibility behaviors
+- URL routing structure (react-router path patterns)
 
-**Documentation Requirements:**
-- Document all technology-specific changes with clear comments referencing the migration
-- P3P header intentionally dropped — document as removed (legacy IE iframe compatibility)
-- Document any SignalR client-facing endpoint path changes for Prompt 2
+### 0.7.4 Validation Framework
 
-### 0.8.2 Special Instructions and Constraints
+**Required E2E Test Workflows:**
 
-**Configuration Externalization:**
-- Zero configuration values that vary per environment MUST be hardcoded in source
-- Application MUST validate all required configuration at startup in `Program.cs`
-- If any Secrets Manager key or required environment variable is missing or empty, application MUST log the specific missing variable name and exit with non-zero code
-- Application MUST NOT start with null or empty connection strings
-
-**Provider Hierarchy (highest priority wins):**
-1. AWS Secrets Manager — secrets
-2. Environment variables — runtime overrides
-3. AWS Systems Manager Parameter Store — environment-specific non-secret config
-4. `appsettings.{Environment}.json` — environment defaults
-5. `appsettings.json` — base defaults
-
-**Required Environment Variables (18 total):**
-
-| Variable | Source | Required |
+| Workflow | Steps | Pass Criteria |
 |---|---|---|
-| `ConnectionStrings__SplendidCRM` | Secrets Manager | Yes — fail-fast if missing |
-| `ASPNETCORE_ENVIRONMENT` | Env var | Yes |
-| `SPLENDID_JOB_SERVER` | Env var | Yes — scheduler job election |
-| `SCHEDULER_INTERVAL_MS` | Parameter Store | Default: 60000 |
-| `EMAIL_POLL_INTERVAL_MS` | Parameter Store | Default: 60000 |
-| `ARCHIVE_INTERVAL_MS` | Parameter Store | Default: 300000 |
-| `SESSION_PROVIDER` | Parameter Store | Required: `Redis` or `SqlServer` |
-| `SESSION_CONNECTION` | Secrets Manager | Yes — fail-fast if missing |
-| `AUTH_MODE` | Parameter Store | Required: `Windows` / `Forms` / `SSO` |
-| `SSO_AUTHORITY` | Parameter Store | Required if AUTH_MODE=SSO |
-| `SSO_CLIENT_ID` | Secrets Manager | Required if AUTH_MODE=SSO |
-| `SSO_CLIENT_SECRET` | Secrets Manager | Required if AUTH_MODE=SSO |
-| `DUO_INTEGRATION_KEY` | Secrets Manager | Optional — 2FA |
-| `DUO_SECRET_KEY` | Secrets Manager | Optional — 2FA |
-| `DUO_API_HOSTNAME` | Parameter Store | Optional — 2FA |
-| `SMTP_CREDENTIALS` | Secrets Manager | Optional — email sending |
-| `LOG_LEVEL` | Env var | Default: Information |
-| `CORS_ORIGINS` | Parameter Store | Required — allowed API origins |
+| Authentication | Navigate → login → submit → session | User lands on home/dashboard |
+| Sales CRUD | Accounts → create → view detail → edit → save → verify list | Record persists across all views |
+| Support CRUD | Cases → create → assign → update status → save | Case lifecycle completes |
+| Marketing | Campaigns → view list → open detail | Campaign data renders correctly |
+| Dashboard | Load dashboard → verify widgets | All widgets render with data |
+| Admin Panel | Admin → Users → view list → open detail | Admin navigation functional |
+| Rich Text | Email compose/note editor → type → save | CKEditor 5 toolbar and save work |
+| SignalR | Verify connection to /hubs/chat | Hub shows connected |
+| Metadata Views | Module Builder/Dynamic Layout Editor → verify fields render | @babel/standalone runtime compilation works |
 
-**Performance Constraint:**
-- All REST endpoints must respond with ≤10% latency variance at 95th percentile versus .NET Framework 4.8 baseline
+**Screenshot Evidence Required:**
 
-**Build Constraint:**
-- Backend MUST build and run via `dotnet restore && dotnet build && dotnet run` on Linux with zero Windows dependencies
-- Zero reliance on Visual Studio, MSBuild from Windows SDK, or IIS
+- Successful login and post-login dashboard
+- Module list view with data rows
+- Module detail view with populated fields
+- Edit/create form with successful save
+- Dashboard with rendered widgets
+- Admin panel with user list or settings
+- Dynamic Layout Editor showing metadata-driven rendering
+- Browser console showing zero critical errors
 
-**Scheduler Constraint:**
-- All 7 scheduler jobs must execute on configured intervals with reentrancy guards preventing concurrent execution
-- Machine-name-based job election using `SPLENDID_JOB_SERVER` env var must be preserved
+### 0.7.5 Success Criteria Summary
 
-### 0.8.3 Validation Criteria
+- `npm install && npm run build` completes on Node 20 / Linux with zero errors
+- All 9 E2E workflows pass
+- Screenshots captured in `validation/screenshots/`
+- Build time ≤ current Webpack build time
+- No unexpected bundle size increase >15% vs Webpack baseline
+- Application reads `API_BASE_URL` from `/config.json` at runtime
+- Same build artifact works with Dev and Prod config values
+- SignalR connects to `/hubs/chat`, `/hubs/twilio`, `/hubs/phoneburner`
+- MobX decorators transpile and execute correctly
+- Zero `require is not defined` runtime errors
+- `@babel/standalone` loads in production build
+- All CRM modules render with visual and functional parity
 
-| Test Type | Scope | Pass Criteria |
-|---|---|---|
-| API Contract | All REST endpoints | 100% response parity with .NET Framework baseline |
-| SOAP Contract | Full WSDL + data carriers | Zero contract changes, WSDL byte-comparable |
-| Auth Flows | Windows, Forms, SSO, DuoUniversal 2FA | All mechanisms authenticate and authorize identically |
-| ACL Enforcement | Module, Team, Field, Record level | `Security.Filter` produces identical SQL predicates |
-| Scheduler | All 7 named jobs + 3 hosted services | Execute on intervals, reentrancy guards prevent overlap |
-| Cache Parity | All SplendidCache metadata queries | `IMemoryCache` returns identical payloads |
-| Data Access | All stored procedure calls | `Microsoft.Data.SqlClient` produces identical results |
-| Configuration | Missing secrets, missing env vars | Fail-fast on missing config; correct override hierarchy |
-| Build | `dotnet restore && dotnet build && dotnet publish` | Zero Windows/VS dependencies, clean Linux build |
-| Performance | Key API endpoints under load | ≤10% latency variance at P95 versus baseline |
+## 0.8 References
 
-## 0.9 References
+### 0.8.1 Repository Files and Folders Searched
 
-### 0.9.1 Repository Files and Folders Searched
+The following files and folders were comprehensively searched across the codebase to derive the conclusions in this Agent Action Plan:
 
-The following files and folders were inspected during codebase analysis to derive the conclusions in this Agent Action Plan:
-
-**Root-Level Exploration:**
+**Root Level:**
 
 | Path | Type | Purpose |
 |---|---|---|
-| `/` (repository root) | Folder | Identified top-level structure: LICENSE, README.md, BackupBin2012/, SQL Scripts Community/, SplendidCRM/ |
-| `BackupBin2012/` | Folder | Documented 22 third-party DLL XML IntelliSense files; confirmed DLL dependency inventory |
-| `SplendidCRM/` | Folder | Main application directory — identified ~60+ module folders, _code/, Administration/, React/, Angular/, html5/ |
+| `SplendidCRM/` | Folder | Main application root — multi-frontend ASP.NET hybrid |
+| `SplendidCRM/React/` | Folder | React SPA workspace — primary migration target |
+| `SQL Scripts Community/` | Folder | Database schema SQL scripts |
+| `README.md` | File | Project overview |
+| `LICENSE` | File | AGPLv3 license |
 
-**Core Backend Files (read in full):**
+**React SPA — Configuration and Build:**
 
-| File Path | Lines | Analysis Purpose |
+| Path | Type | Purpose |
 |---|---|---|
-| `SplendidCRM/Global.asax.cs` | 400 | Application lifecycle analysis — timer setup, session handling, TLS enforcement, P3P headers, React URL rewriting |
-| `SplendidCRM/Web.config` | 196 | Configuration audit — appSettings, connectionStrings, authentication mode, session state, WCF serviceModel, binding redirects |
-| `SplendidCRM/SplendidCRM7_VS2017.csproj` | 250+ | DLL reference inventory, framework version, project type, compile items |
-| `SplendidCRM/Rest.svc.cs` | 120 (head) | WCF REST service contract, endpoint structure, operation patterns |
-| `SplendidCRM/soap.asmx.cs` | 120 (head) | SOAP service contract, DTO definitions, namespace declaration |
+| `SplendidCRM/React/package.json` | File | Complete dependency manifest — 81 deps analyzed (v15.2.9366) |
+| `SplendidCRM/React/tsconfig.json` | File | TypeScript configuration — target ES5, CommonJS modules |
+| `SplendidCRM/React/configs/webpack/common.js` | File | Shared Webpack config — 117 lines, loaders, plugins, externals |
+| `SplendidCRM/React/configs/webpack/dev_local.js` | File | Dev server config → localhost:80 |
+| `SplendidCRM/React/configs/webpack/dev_remote.js` | File | Dev server config → training.splendidcrm.com |
+| `SplendidCRM/React/configs/webpack/mobile.js` | File | Cordova Webpack build |
+| `SplendidCRM/React/configs/webpack/prod.js` | File | Production build config |
+| `SplendidCRM/React/configs/webpack/prod_minimize.js` | File | Minified production build |
 
-**Core Business Logic (summaries retrieved):**
+**React SPA — Source Code:**
 
-| File Path | Purpose |
-|---|---|
-| `SplendidCRM/_code/Security.cs` | Security façade — session-backed properties, MD5 hashing, ACL model, Filter() overloads |
-| `SplendidCRM/_code/SplendidCache.cs` | Caching hub — HttpRuntime.Cache, React helpers, cache invalidation |
-| `SplendidCRM/_code/SplendidInit.cs` | Application bootstrap — InitApp, InitSession, LoginUser |
-| `SplendidCRM/_code/SchedulerUtils.cs` | Scheduler — cron parsing, OnTimer, OnArchiveTimer, reentrancy guards |
-
-**Folder Structure Analysis:**
-
-| Folder Path | Children Found | Analysis Purpose |
+| Path | Type | Purpose |
 |---|---|---|
-| `SplendidCRM/_code/` | 74 root .cs files + 18 subdirs | Core business logic inventory |
-| `SplendidCRM/_code/SignalR/` | 10 .cs files | SignalR hub and manager inventory |
-| `SplendidCRM/_code/DuoUniversal/` | 7 .cs files | DuoUniversal 2FA component inventory |
-| `SplendidCRM/Administration/` | 13 root .cs files + 47+ subdirs | Admin REST and WCF service discovery |
+| `SplendidCRM/React/src/` | Folder | Source root — 763 TS/TSX files |
+| `SplendidCRM/React/src/index.tsx` | File | App entry point — createRoot, createBrowserRouter, MobX Provider |
+| `SplendidCRM/React/src/index.html.ejs` | File | Webpack HTML template |
+| `SplendidCRM/React/src/App.tsx` | File | Root application component |
+| `SplendidCRM/React/src/PrivateRoute.tsx` | File | Auth-guarded route wrapper |
+| `SplendidCRM/React/src/PublicRouteFC.tsx` | File | Public route wrapper |
+| `SplendidCRM/React/src/routes.tsx` | File | Route definitions |
+| `SplendidCRM/React/src/Router5.tsx` | File | Legacy router component |
+| `SplendidCRM/React/src/scripts/` | Folder | 44 infrastructure modules |
+| `SplendidCRM/React/src/scripts/SplendidRequest.ts` | File | HTTP request abstraction — dual Cordova/fetch paths |
+| `SplendidCRM/React/src/scripts/Credentials.ts` | File | Auth state store with MobX @observable decorators |
+| `SplendidCRM/React/src/scripts/DynamicLayout_Compile.ts` | File | Runtime TSX compilation via @babel/standalone — 44+ require() calls |
+| `SplendidCRM/React/src/scripts/adal.ts` | File | Azure AD auth — sole module.exports |
+| `SplendidCRM/React/src/SignalR/` | Folder | 14 SignalR hub files (7 Core + 7 legacy) |
+| `SplendidCRM/React/src/SignalR/SignalRCoreStore.ts` | File | Core SignalR orchestration with jQuery helpers |
+| `SplendidCRM/React/src/SignalR/ChatCore.ts` | File | Chat hub using @microsoft/signalr HubConnection |
+| `SplendidCRM/React/src/views/` | Folder | 30+ high-level view components |
+| `SplendidCRM/React/src/components/` | Folder | 22 shared UI components |
+| `SplendidCRM/React/src/ModuleViews/` | Folder | 48 CRM module view folders |
+| `SplendidCRM/React/src/ModuleViews/Administration/BusinessProcesses/` | Folder | 40+ files with BPMN require() patterns |
+| `SplendidCRM/React/src/types/` | Folder | 42 TypeScript type definitions |
+| `SplendidCRM/React/src/styles/` | Folder | Theme CSS (Arctic, Atlantic, Seven, Six, gentelella, mobile) |
+| `SplendidCRM/React/src/ThemeComponents/` | Folder | 7 theme implementations + factories |
+| `SplendidCRM/React/src/Dashlets/` | Folder | Dashboard widget components |
+| `SplendidCRM/React/src/DashboardComponents/` | Folder | Dashboard infrastructure |
+| `SplendidCRM/React/src/DynamicLayoutComponents/` | Folder | Layout editor components |
+| `SplendidCRM/React/src/ModuleBuilder/` | Folder | Module builder interface |
+| `SplendidCRM/React/src/ReportDesigner/` | Folder | Report builder components |
+| `SplendidCRM/React/src/SurveyComponents/` | Folder | Survey module components |
+| `SplendidCRM/React/src/CustomViewsJS/` | Folder | Custom view implementations |
+| `SplendidCRM/React/src/DetailComponents/` | Folder | Detail view building blocks |
+| `SplendidCRM/React/src/EditComponents/` | Folder | Edit view building blocks |
+| `SplendidCRM/React/src/GridComponents/` | Folder | Grid/list building blocks |
 
-**Quantitative Analyses (bash commands):**
+**CKEditor Custom Build:**
 
-| Analysis | Command | Result |
+| Path | Type | Purpose |
 |---|---|---|
-| Integration subdirectories | `ls -d SplendidCRM/_code/Spring.Social.* ...` | 18 total (16 stubs + 2 active) |
-| Integration root files | `ls SplendidCRM/_code/{ExchangeSync,...}.cs` | 9 integration utility files |
-| System.Web usage | `grep -rl "System\.Web" SplendidCRM/_code/*.cs` | 65 files |
-| HttpContext.Current usage | `grep -rl "HttpContext\.Current" ...` | 31 files |
-| System.Data.SqlClient usage | `grep -rl "System\.Data\.SqlClient" ...` | 5 files |
-| Application[] state usage | `grep -rl "Application\[" ...` | 36 files |
-| HttpRuntime.Cache usage | `grep -rl "HttpRuntime\.Cache" ...` | 5 files |
-| Session[] usage | `grep -rl "Session\[" ...` | 20 files |
-| WCF attribute locations | `grep -rl "ServiceContract\|WebInvoke" ...` | 3 files (Rest.svc.cs, Admin/Rest.svc.cs, Admin/Impersonation.svc.cs) |
-| REST endpoint count | `grep -c "WebInvoke\|OperationContract" Rest.svc.cs` | 152 main + 65 admin = 217 total |
-| SOAP method count | `grep -c "WebMethod\|SoapRpcMethod" soap.asmx.cs` | 84 methods |
-| HintPath DLLs | `grep -oP "HintPath>..." SplendidCRM7_VS2017.csproj` | 37 DLL references across BackupBin2012/2022/2025 |
-| _controls file count | `ls SplendidCRM/_controls/*.cs \| wc -l` | 44 files |
-| _devtools file count | `ls SplendidCRM/_devtools/*.cs \| wc -l` | 8 files |
-| Total .cs in _code | `find SplendidCRM/_code -name "*.cs" \| wc -l` | 443 files |
-| Admin .cs root files | `ls SplendidCRM/Administration/*.cs` | 12 files |
-| Root .cs files | `ls SplendidCRM/*.cs` | 10 files |
+| `SplendidCRM/React/ckeditor5-custom-build/` | Folder | Custom CKEditor 5 ClassicEditor build |
+| `SplendidCRM/React/ckeditor5-custom-build/package.json` | File | CKEditor build manifest |
+| `SplendidCRM/React/ckeditor5-custom-build/webpack.config.js` | File | CKEditor's own Webpack config |
+| `SplendidCRM/React/ckeditor5-custom-build/build/` | Folder | Pre-compiled CKEditor output |
+| `SplendidCRM/React/ckeditor5-custom-build/src/ckeditor.ts` | File | Plugin configuration |
+
+**Static Assets:**
+
+| Path | Type | Purpose |
+|---|---|---|
+| `SplendidCRM/React/www/` | Folder | Current Webpack output directory |
+| `SplendidCRM/React/www/index.html` | File | SPA shell — loads SteviaCRM.js |
+| `SplendidCRM/React/www/index.css` | File | Global theme overrides |
+| `SplendidCRM/React/www/manifest.json` | File | PWA manifest configuration |
 
 **Tech Spec Sections Retrieved:**
 
 | Section | Purpose |
 |---|---|
-| 3.1 PROGRAMMING LANGUAGES | Confirmed .NET Framework 4.8 target, C# backend, TypeScript frontend, T-SQL database |
+| 7.1 CORE UI TECHNOLOGIES | Multi-frontend architecture, React SPA technology stack, all dependency versions |
+| 3.2 FRAMEWORKS & LIBRARIES | Complete framework inventory across all 4 frontend clients + Cordova |
 
-### 0.9.2 Web Research Conducted
+### 0.8.2 Codebase Pattern Analysis Commands
 
-| Search Query | Key Finding |
+The following bash commands were executed to derive quantitative analysis:
+
+- `find SplendidCRM/React/src -name "*.ts" -o -name "*.tsx" | wc -l` — 763 TS/TSX files
+- `grep -rl "require(" SplendidCRM/React/src` — 44 files with CommonJS require()
+- `grep -rl "module\.exports" SplendidCRM/React/src` — 1 file (adal.ts)
+- `grep -rl "defaultProps" SplendidCRM/React/src` — 0 files (React 19 ready)
+- `grep -rl "ReactDOM.render" SplendidCRM/React/src` — 0 files (already createRoot)
+- `grep -rl "forwardRef" SplendidCRM/React/src` — 0 files
+- `grep -rl "createRoot" SplendidCRM/React/src` — 1 file (index.tsx)
+- `grep -rl "@observable\|@action\|@computed" SplendidCRM/React/src` — 7 instances
+- `grep -rl "react-router-dom" SplendidCRM/React/src` — 5 files
+- `grep -rl "react-pose" SplendidCRM/React/src` — 53 files
+- `grep -rl "react-lifecycle-appear" SplendidCRM/React/src` — 83 files
+- `grep -rl "react-bootstrap-table" SplendidCRM/React/src` — 9 files
+- `grep -rl "react-bootstrap" SplendidCRM/React/src` — 73 files
+- `grep -rl "mobx-react-router" SplendidCRM/React/src` — 4 files
+- `grep -rl "from.*'history'" SplendidCRM/React/src` — 15 files
+- `find SplendidCRM/React/src -name "*.scss" | wc -l` — 1 SCSS file
+- `find SplendidCRM/React/src -name "*.css" | wc -l` — 17 CSS files
+
+### 0.8.3 Web Research Conducted
+
+| Topic | Key Findings |
 |---|---|
-| `.NET 10 release date LTS 2025` | .NET 10 released November 11, 2025 as LTS; supported until November 2028; ships with C# 14 and ASP.NET Core 10 |
-| `SoapCore NuGet latest version 2025` | SoapCore 1.2.1.12 (December 11, 2025) — SOAP middleware for ASP.NET Core; supports endpoint routing; `[ServiceContract]`/`[OperationContract]` attributes compatible |
-| `Microsoft.Data.SqlClient NuGet latest version 2025` | Microsoft.Data.SqlClient 6.1.4 — drop-in replacement for System.Data.SqlClient; identical API surface (SqlConnection, SqlCommand, SqlDataReader, SqlDataAdapter) |
-| `MailKit NuGet latest version 2025` | MailKit 4.15.0 — cross-platform .NET mail client; SMTP/IMAP/POP3 with full async support |
+| React 19 Upgrade Guide (react.dev) | PropTypes silently ignored; defaultProps removed on function components; forwardRef simplified; legacy context removed; StrictMode improvements; codemods available |
+| Vite Releases (vite.dev) | Vite 6.x is latest proven stable for Node 20; Vite 7 requires Node 20.19+; Vite 8 uses Rolldown bundler |
+| React Router v6→v7 Migration (reactrouter.com) | v7 has no breaking changes if future flags enabled; react-router-dom consolidated into react-router; createBrowserRouter/RouterProvider preserved |
+| @microsoft/signalr npm (npmjs.com) | Latest stable: 10.0.0; HubConnectionBuilder API unchanged from 8.x |
+| MobX React 19 Support (github.com/mobxjs) | React 19 support added in mobx-react@9.2.0 and mobx-react-lite@4.1.0; mobx@6.15.0 compatible |
+| MobX Installation Guide (mobx.js.org) | Babel decorator configuration required: @babel/plugin-proposal-decorators + @babel/plugin-proposal-class-properties |
 
-### 0.9.3 Attachments and External References
+### 0.8.4 Attachments and External References
 
-- **No Figma URLs provided** — This is a backend-only migration with no UI design components
-- **No file attachments provided** — All analysis derived from repository inspection and web research
-- **User Prompt:** Prompt 1 of 3 in SplendidCRM modernization series
-  - Prompt 1 (this): Backend modernization and toolchain decoupling
-  - Prompt 2 (future): Frontend modernization — React 19 + Vite
-  - Prompt 3 (future): Containerization, AWS infrastructure, and deployment
+**No file attachments** were provided for this project.
+
+**No Figma URLs** were specified.
+
+**External URLs Referenced in User Prompt:**
+
+| URL | Context |
+|---|---|
+| ASP.NET Core documentation (implied) | Backend SignalR hub configuration from Prompt 1 |
+| npm registry (npmjs.com) | Package version verification for all dependencies |
+
+**Environment Variables Available:**
+
+| Variable | Purpose |
+|---|---|
+| `ConnectionStrings__SplendidCRM` | Database connection string (backend use) |
+| `SQL_PASSWORD` | SQL Server SA password (secret) |
+
+**Environment Setup Script Provided:**
+
+The user provided a bash setup script for Environment 1 that installs .NET SDK, Docker, and SQL Server Express. This script is for the backend environment and is referenced in the `docs/environment-setup.md` deliverable for full-stack setup guidance.
 

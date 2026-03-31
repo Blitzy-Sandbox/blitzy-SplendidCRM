@@ -10,6 +10,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
+import type { JSX } from 'react';
 import { FontAwesomeIcon }                   from '@fortawesome/react-fontawesome';
 // 2. Store and Types. 
 import { DetailComponent }                   from '../types/DetailComponent'      ;
@@ -337,7 +338,7 @@ export default class SplendidDynamic_DetailView
 					{
 						// 10/27/2020 Paul.  Need to force a break using flex.  Requires that the container be allowed to wrap. 
 						// https://tobiasahlin.com/blog/flexbox-break-to-new-row/
-						let divSeparator = React.createElement('div', { style: {flexBasis: '100%', height: 0} });
+						let divSeparator = React.createElement('div', { key: 'separator_' + nLayoutIndex, style: {flexBasis: '100%', height: 0} });
 						// 04/16/20222 Paul.  Separator needs to be added to fragment (same as tblMain), otherwise it goes into the table in an invalid position. 
 						fragmentChildren.push(divSeparator);
 					}
@@ -411,7 +412,7 @@ export default class SplendidDynamic_DetailView
 				// 04/20/2021 Paul.  We want to match the old system so keep the style. 
 				//if ( FIELD_TYPE == 'Header' )
 				//	sGridLabel = null;
-				let tdLabelProps: any = { id: sLabelID, className: sGridLabel, style: { width: LABEL_WIDTH } };
+				let tdLabelProps: any = { id: sLabelID, key: sLabelID, className: sGridLabel, style: { width: LABEL_WIDTH } };
 				// 04/16/2022 Paul.  need to move colSpan to prevent it from being attached to div tag. 
 				let tdFieldProps: any = { className: sGridInput, id: sFieldID, key: sFieldID, style: { width: FIELD_WIDTH } };
 				// 04/19/2021 Paul.  Manually calculate responsive features. 
@@ -421,7 +422,7 @@ export default class SplendidDynamic_DetailView
 					tdLabelProps.style = {};
 					tdFieldProps.style = {};
 					let tdStackChildren = [];
-					let tdStackProps: any = { style: {} };
+					let tdStackProps: any = { key: sLabelID + '_Stack', style: {} };
 					if ( bStackedTheme )
 					{
 						tdStackProps.className = 'tabStackedDetailViewDF';
@@ -492,7 +493,7 @@ export default class SplendidDynamic_DetailView
 								// 03/19/2020 Paul.  Make sure that tag exists, otherwise labels will not be aligned right. 
 								if ( txt.indexOf('</span>') >= 0 )
 								{
-									let html = React.createElement('span', { dangerouslySetInnerHTML: { __html: txt } });
+									let html = React.createElement('span', { key: 'labelHtml', dangerouslySetInnerHTML: { __html: txt } });
 									tdLabelChildren.push(html);
 								}
 								else
@@ -525,21 +526,21 @@ export default class SplendidDynamic_DetailView
 								{
 									sTOOL_TIP = L10n.Term(TOOL_TIP);
 								}
-								let text = React.createElement('span', {className: 'reactTooltipText'}, sTOOL_TIP   );
+								let text = React.createElement('span', {key: 'tipText', className: 'reactTooltipText'}, sTOOL_TIP   );
 								// 10/28/2020 Paul.  A customer preferred the old icons instead of the new fontawesome icons. 
 								let icon = null;
 								if ( legacyIcons )
-									icon = React.createElement('img', {src: (themeURL + 'tooltip_inline.gif')}, null        );
+									icon = React.createElement('img', {key: 'tipIcon', src: (themeURL + 'tooltip_inline.gif')}, null        );
 								else
-									icon = React.createElement(FontAwesomeIcon, {icon: 'question' }, null        );
-								let tip  = React.createElement('span', {className: 'reactTooltip'    }, [icon, text]);
+									icon = React.createElement(FontAwesomeIcon, {key: 'tipIcon', icon: 'question' }, null        );
+								let tip  = React.createElement('span', {key: 'tooltip', className: 'reactTooltip'    }, [icon, text]);
 								tdLabelChildren.push(tip);
 							}
 						}
 						// 04/15/2022 Paul.  Stacked layout needs nbsp for label. 
 						else if ( bStackedLayout )
 						{
-							let nbsp = React.createElement('span', {}, ['\u00a0']);
+							let nbsp = React.createElement('span', {key: 'nbsp'}, ['\u00a0']);
 							tdLabelChildren.push(nbsp);
 						}
 					}
@@ -878,7 +879,7 @@ export default class SplendidDynamic_DetailView
 					
 					// 10/27/2020 Paul.  Need to force a break using flex.  Requires that the container be allowed to wrap. 
 					// https://tobiasahlin.com/blog/flexbox-break-to-new-row/
-					let divSeparator = React.createElement('div', { style: {flexBasis: '100%', height: 0} });
+					let divSeparator = React.createElement('div', { key: 'separator_' + nLayoutIndex, style: {flexBasis: '100%', height: 0} });
 					tblMainChildren.push(divSeparator);
 					
 					tblBodyChildren = [];
@@ -939,7 +940,7 @@ export default class SplendidDynamic_DetailView
 				// 10/29/2020 Paul.  Can't seem to override the class once the element is created. 
 				if ( FIELD_TYPE == 'Header' )
 					sGridLabel = null;
-				let tdLabelProps: any = { id: sLabelID, className: sGridLabel, style: { width: LABEL_WIDTH } };
+				let tdLabelProps: any = { id: sLabelID, key: sLabelID, className: sGridLabel, style: { width: LABEL_WIDTH } };
 
 				// 11/12/2019 Paul.  Default top align looks terrible. 
 				// 12/17/2019 Paul.  Baseline looks better than center, especially for multi-line controls such as Teams and Tags. 
@@ -989,7 +990,7 @@ export default class SplendidDynamic_DetailView
 								// 03/19/2020 Paul.  Make sure that tag exists, otherwise labels will not be aligned right. 
 								if ( txt.indexOf('</span>') >= 0 )
 								{
-									let html = React.createElement('span', { dangerouslySetInnerHTML: { __html: txt } });
+									let html = React.createElement('span', { key: 'labelHtml', dangerouslySetInnerHTML: { __html: txt } });
 									tdLabelChildren.push(html);
 								}
 								else
@@ -1022,14 +1023,14 @@ export default class SplendidDynamic_DetailView
 								{
 									sTOOL_TIP = L10n.Term(TOOL_TIP);
 								}
-								let text = React.createElement('span', {className: 'reactTooltipText'}, sTOOL_TIP   );
+								let text = React.createElement('span', {key: 'tipText', className: 'reactTooltipText'}, sTOOL_TIP   );
 								// 10/28/2020 Paul.  A customer preferred the old icons instead of the new fontawesome icons. 
 								let icon = null;
 								if ( legacyIcons )
-									icon = React.createElement('img', {src: (themeURL + 'tooltip_inline.gif')}, null        );
+									icon = React.createElement('img', {key: 'tipIcon', src: (themeURL + 'tooltip_inline.gif')}, null        );
 								else
-									icon = React.createElement(FontAwesomeIcon, {icon: 'question' }, null        );
-								let tip  = React.createElement('span', {className: 'reactTooltip'    }, [icon, text]);
+									icon = React.createElement(FontAwesomeIcon, {key: 'tipIcon', icon: 'question' }, null        );
+								let tip  = React.createElement('span', {key: 'tooltip', className: 'reactTooltip'    }, [icon, text]);
 								tdLabelChildren.push(tip);
 							}
 						}

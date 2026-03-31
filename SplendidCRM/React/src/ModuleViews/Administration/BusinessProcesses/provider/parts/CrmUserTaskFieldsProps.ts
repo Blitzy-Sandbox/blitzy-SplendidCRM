@@ -11,14 +11,13 @@ import Sql           from '../../../../../scripts/Sql' ;
 import L10n          from '../../../../../scripts/L10n';
 import SplendidCache from  '../../../../../scripts/SplendidCache';
 
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var getExtensionElements  = require('bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper').getExtensionElements;
-var extensionElements     = require('bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/ExtensionElements');
-var properties            = require('bpmn-js-properties-panel/lib/provider/camunda/parts//implementation/Properties');
-var elementHelper         = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
-var find                  = require('lodash/collection/find');
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
+import { getExtensionElements } from 'bpmn-js-properties-panel/lib/helper/ExtensionElementsHelper';
+import extensionElements from 'bpmn-js-properties-panel/lib/provider/camunda/parts/implementation/ExtensionElements';
+import properties from 'bpmn-js-properties-panel/lib/provider/camunda/parts//implementation/Properties';
+import elementHelper from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import cmdHelper from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import find from 'lodash/find';
 import readOnlyFields     from './factory/ReadOnlyFields';
 import requiredFields     from './factory/RequiredFields';
 

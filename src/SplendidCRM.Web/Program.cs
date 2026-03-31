@@ -509,6 +509,31 @@ app.UseMiddleware<SpaRedirectMiddleware>();
 // Serve static files (wwwroot/).
 app.UseStaticFiles();
 
+// Serve legacy SplendidCRM theme assets (App_Themes, Include) needed by the React SPA.
+// In the original ASP.NET WebForms architecture these were served automatically from the content root.
+// In the decoupled .NET 10 + React 19 architecture the frontend fetches theme images
+// (blank.gif, more.gif, previous_off.gif, module icons, etc.) and include assets
+// from these paths.
+string sSplendidRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "SplendidCRM"));
+if ( Directory.Exists(Path.Combine(sSplendidRoot, "App_Themes")) )
+{
+	app.UseStaticFiles(new StaticFileOptions
+	{
+		FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+			Path.Combine(sSplendidRoot, "App_Themes")),
+		RequestPath = "/App_Themes"
+	});
+}
+if ( Directory.Exists(Path.Combine(sSplendidRoot, "Include")) )
+{
+	app.UseStaticFiles(new StaticFileOptions
+	{
+		FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+			Path.Combine(sSplendidRoot, "Include")),
+		RequestPath = "/Include"
+	});
+}
+
 // Routing (enables attribute routing for controllers).
 app.UseRouting();
 

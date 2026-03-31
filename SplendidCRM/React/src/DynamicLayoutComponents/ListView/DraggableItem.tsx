@@ -144,7 +144,7 @@ const DraggableItem: FC<IDraggableItemProps> = memo(function DraggableItem(props
 		}
 	}
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				draggable
 				className='grab'
 				style={{ ...style, opacity, flexBasis: `${100 / rowTotal}%` }}

@@ -2127,8 +2127,7 @@ namespace SplendidCRM
 		{
 			if ( IsSQLServer(cmd) )
 			{
-				// SQL Server 2012+: OFFSET/FETCH
-				int nOffset = nPageSize * (nCurrentPage - 1);
+				// SQL Server 2012+: OFFSET/FETCH — skip pagination when nPageSize <= 0 (return all rows)
 				StringBuilder sb = new StringBuilder();
 				sb.Append(sSQL);
 				sb.Append(ControlChars.CrLf);
@@ -2136,7 +2135,11 @@ namespace SplendidCRM
 					sb.Append(sOrderBy + ControlChars.CrLf);
 				else
 					sb.Append("order by 1" + ControlChars.CrLf);
-				sb.Append("OFFSET " + nOffset.ToString() + " ROWS FETCH NEXT " + nPageSize.ToString() + " ROWS ONLY" + ControlChars.CrLf);
+				if ( nPageSize > 0 )
+				{
+					int nOffset = nPageSize * (nCurrentPage - 1);
+					sb.Append("OFFSET " + nOffset.ToString() + " ROWS FETCH NEXT " + nPageSize.ToString() + " ROWS ONLY" + ControlChars.CrLf);
+				}
 				return sb.ToString();
 			}
 			else if ( IsMySQL(cmd) )

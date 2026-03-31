@@ -174,7 +174,7 @@ const DraggableRow: FC<IDraggableRowProps> = memo(function DraggableRow(props: I
 	let themeURL: string = Credentials.RemoteServer + 'App_Themes/' + SplendidCache.UserTheme + '/images/';
 	const opacity = collect.isDragging ? 0 : 1;
 	return (
-			<tr ref={ (node) => connectDragSource(connectDropTarget(node)) }
+			<tr ref={ (node) => { connectDragSource(connectDropTarget(node)); } }
 				className={ 'hiddenHoverContainer ' + className }
 				style={ { height: '28px', opacity } }>
 				<td style={ {...style} }>

@@ -21,7 +21,6 @@ import { HTML5Backend }                    from 'react-dnd-html5-backend'       
 // 2. Store and Types. 
 // 3. Scripts. 
 import { isTouchDevice }                   from './scripts/utility'                ;
-import SignalRStore                        from './SignalR/SignalRStore'           ;
 import SignalRCoreStore                    from './SignalR/SignalRCoreStore'       ;
 // 4. Components and Views. 
 
@@ -60,7 +59,6 @@ export default class App extends React.Component<IAppProps, IAppState>
 	async componentDidMount()
 	{
 		//console.log(this.constructor.name + '.componentDidMount', window.history);
-		SignalRStore.SetHistory(window.history);
 		// 06/19/2023 Paul.  Separate implementation for SignalR on ASP.NET Core. 
 		SignalRCoreStore.SetHistory(window.history);
 	}

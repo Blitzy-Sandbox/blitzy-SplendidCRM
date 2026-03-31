@@ -19,6 +19,8 @@ import Aes                   from '../scripts/aes'             ;
 import SplendidCache         from '../scripts/SplendidCache'   ;
 import { Crm_Config }        from '../scripts/Crm'             ;
 import { FromJsonDate }      from '../scripts/Formatting'      ;
+// 4. Runtime configuration for decoupled frontend hosting.
+import { getConfig }         from '../config'                   ;
 
 function IsMobileClient()
 {
@@ -193,11 +195,22 @@ class CredentialsStore
 	// 12/09/2014 Paul.  Remote Server is on the background page of the browser extensions. 
 	get RemoteServer()
 	{
-		if ( this.sREMOTE_SERVER == null )
+		if ( this.sREMOTE_SERVER == null || this.sREMOTE_SERVER === '' )
 		{
 			if ( window.location.pathname == '/android_asset/www/index.html' )
 			{
 				this.sREMOTE_SERVER = './';
+			}
+			else
+			{
+				// 03/25/2026 Fix.  In the decoupled SPA architecture, static assets
+				// (App_Themes images, Include/images, company logos) must be served from
+				// the SAME ORIGIN as the React application — NOT from the backend API.
+				// Using '/' ensures relative URLs that route through the Vite dev proxy
+				// in development, and through Nginx in production.
+				// API calls in SplendidRequest.ts use getConfig().API_BASE_URL directly
+				// (not RemoteServer), so this change does NOT affect API communication.
+				this.sREMOTE_SERVER = '/';
 			}
 		}
 		return this.sREMOTE_SERVER;
@@ -365,6 +378,13 @@ class CredentialsStore
 
 	UserLanguageUpdated()
 	{
+		// 03/26/2026 Fix.  Guard against null/undefined sUSER_LANG.
+		// Admin_GetReactState returns USER_PROFILE with USER_LANG: null,
+		// causing TypeError: Cannot read properties of null (reading 'substring').
+		if ( !this.sUSER_LANG )
+		{
+			return;
+		}
 		let options =
 		{
 			monthNames     : L10n.GetListTerms('month_names_dom'      ),
@@ -456,45 +476,52 @@ class CredentialsStore
 	
 	SetUserProfile(obj)
 	{
-		this.sUSER_ID                       = obj.USER_ID                     ;
-		this.sUSER_NAME                     = obj.USER_NAME                   ;
-		this.sFULL_NAME                     = obj.FULL_NAME                   ;
-		this.sEXCHANGE_ALIAS                = obj.EXCHANGE_ALIAS              ;
+		// 03/26/2026 Fix.  Admin_GetReactState returns a minimal USER_PROFILE
+		// (only USER_ID, IS_ADMIN, USER_NAME, etc.) without many fields.
+		// Only overwrite properties that are present and non-null in the incoming object
+		// to avoid clobbering previously set values from the regular GetReactState.
+		this.sUSER_ID                       = obj.USER_ID    || this.sUSER_ID  ;
+		this.sUSER_NAME                     = obj.USER_NAME  || this.sUSER_NAME;
+		this.sFULL_NAME                     = obj.FULL_NAME  ?? this.sFULL_NAME;
+		this.sEXCHANGE_ALIAS                = obj.EXCHANGE_ALIAS ?? this.sEXCHANGE_ALIAS;
 		// 01/22/2021 Paul.  Exchange Email is used to control some access. 
-		this.sEXCHANGE_EMAIL                = obj.EXCHANGE_EMAIL              ;
+		this.sEXCHANGE_EMAIL                = obj.EXCHANGE_EMAIL ?? this.sEXCHANGE_EMAIL;
 		// 11/25/2014 Paul.  sUSER_PICTURE is used by the ChatDashboard. 
-		this.sPICTURE                       = obj.PICTURE                     ;
-		this.sTEAM_ID                       = obj.TEAM_ID                     ;
-		this.sTEAM_NAME                     = obj.TEAM_NAME                   ;
-		this.sUSER_LANG                     = obj.USER_LANG                   ;
+		this.sPICTURE                       = obj.PICTURE    ?? this.sPICTURE  ;
+		this.sTEAM_ID                       = obj.TEAM_ID    ?? this.sTEAM_ID  ;
+		this.sTEAM_NAME                     = obj.TEAM_NAME  ?? this.sTEAM_NAME;
+		this.sUSER_LANG                     = obj.USER_LANG  || this.sUSER_LANG || 'en-US';
 		this.UserLanguageUpdated();
 		// 04/23/2013 Paul.  The HTML5 Offline Client now supports Atlantic theme. 
-		this.sUSER_THEME                    = obj.USER_THEME                   ;
-		this.SetUSER_DATE_FORMAT(obj.USER_DATE_FORMAT);
-		this.SetUSER_TIME_FORMAT(obj.USER_TIME_FORMAT);
-		this.sUSER_CURRENCY_ID              = obj.USER_CURRENCY_ID             ;
-		this.sUSER_TIMEZONE_ID              = obj.USER_TIMEZONE_ID             ;
+		// 03/26/2026 Fix.  Preserve existing values when admin profile returns null for optional fields.
+		this.sUSER_THEME                    = obj.USER_THEME           ?? this.sUSER_THEME          ;
+		if ( obj.USER_DATE_FORMAT != null ) this.SetUSER_DATE_FORMAT(obj.USER_DATE_FORMAT);
+		if ( obj.USER_TIME_FORMAT != null ) this.SetUSER_TIME_FORMAT(obj.USER_TIME_FORMAT);
+		this.sUSER_CURRENCY_ID              = obj.USER_CURRENCY_ID     ?? this.sUSER_CURRENCY_ID    ;
+		this.sUSER_TIMEZONE_ID              = obj.USER_TIMEZONE_ID     ?? this.sUSER_TIMEZONE_ID    ;
 		// 10/28/2021 Paul.  This is our indicator to redirect to User Wizard. 
-		this.sORIGINAL_TIMEZONE_ID          = obj.ORIGINAL_TIMEZONE_ID         ;
+		this.sORIGINAL_TIMEZONE_ID          = obj.ORIGINAL_TIMEZONE_ID ?? this.sORIGINAL_TIMEZONE_ID;
 		// 12/01/2014 Paul.  Add SignalR fields. 
 		// 12/09/2014 Paul.  Can't use Sql.ToString as it will not be defined for browser extensions. 
-		this.sUSER_EXTENSION                = obj.USER_EXTENSION               ;
-		this.sUSER_FULL_NAME                = obj.USER_FULL_NAME               ;
-		this.sUSER_PHONE_WORK               = obj.USER_PHONE_WORK              ;
-		this.sUSER_SMS_OPT_IN               = obj.USER_SMS_OPT_IN              ;
-		this.sUSER_PHONE_MOBILE             = obj.USER_PHONE_MOBILE            ;
-		this.sUSER_TWITTER_TRACKS           = obj.USER_TWITTER_TRACKS          ;
-		this.sUSER_CHAT_CHANNELS            = obj.USER_CHAT_CHANNELS           ;
+		this.sUSER_EXTENSION                = obj.USER_EXTENSION       ?? this.sUSER_EXTENSION     ;
+		this.sUSER_FULL_NAME                = obj.USER_FULL_NAME       ?? this.sUSER_FULL_NAME     ;
+		this.sUSER_PHONE_WORK               = obj.USER_PHONE_WORK      ?? this.sUSER_PHONE_WORK    ;
+		this.sUSER_SMS_OPT_IN               = obj.USER_SMS_OPT_IN      ?? this.sUSER_SMS_OPT_IN    ;
+		this.sUSER_PHONE_MOBILE             = obj.USER_PHONE_MOBILE    ?? this.sUSER_PHONE_MOBILE   ;
+		this.sUSER_TWITTER_TRACKS           = obj.USER_TWITTER_TRACKS  ?? this.sUSER_TWITTER_TRACKS ;
+		this.sUSER_CHAT_CHANNELS            = obj.USER_CHAT_CHANNELS   ?? this.sUSER_CHAT_CHANNELS  ;
 		// 09/17/2020 Paul.  Add PhoneBurner SignalR support. 
-		this.dtPHONEBURNER_TOKEN_EXPIRES_AT = FromJsonDate(obj.PHONEBURNER_TOKEN_EXPIRES_AT);
+		if ( obj.PHONEBURNER_TOKEN_EXPIRES_AT != null )
+			this.dtPHONEBURNER_TOKEN_EXPIRES_AT = FromJsonDate(obj.PHONEBURNER_TOKEN_EXPIRES_AT);
 		// 02/26/2016 Paul.  Use values from C# NumberFormatInfo. 
-		this.sUSER_CurrencyDecimalDigits    = obj.USER_CurrencyDecimalDigits   ;
-		this.sUSER_CurrencyDecimalSeparator = obj.USER_CurrencyDecimalSeparator;
-		this.sUSER_CurrencyGroupSeparator   = obj.USER_CurrencyGroupSeparator  ;
-		this.sUSER_CurrencyGroupSizes       = obj.USER_CurrencyGroupSizes      ;
-		this.sUSER_CurrencyNegativePattern  = obj.USER_CurrencyNegativePattern ;
-		this.sUSER_CurrencyPositivePattern  = obj.USER_CurrencyPositivePattern ;
-		this.sUSER_CurrencySymbol           = obj.USER_CurrencySymbol          ;
+		// 03/26/2026 Fix.  Preserve existing values when admin profile omits currency fields.
+		this.sUSER_CurrencyDecimalDigits    = obj.USER_CurrencyDecimalDigits    ?? this.sUSER_CurrencyDecimalDigits   ;
+		this.sUSER_CurrencyDecimalSeparator = obj.USER_CurrencyDecimalSeparator ?? this.sUSER_CurrencyDecimalSeparator;
+		this.sUSER_CurrencyGroupSeparator   = obj.USER_CurrencyGroupSeparator   ?? this.sUSER_CurrencyGroupSeparator  ;
+		this.sUSER_CurrencyGroupSizes       = obj.USER_CurrencyGroupSizes       ?? this.sUSER_CurrencyGroupSizes      ;
+		this.sUSER_CurrencyNegativePattern  = obj.USER_CurrencyNegativePattern  ?? this.sUSER_CurrencyNegativePattern ;
+		this.sUSER_CurrencyPositivePattern  = obj.USER_CurrencyPositivePattern  ?? this.sUSER_CurrencyPositivePattern ;
+		this.sUSER_CurrencySymbol           = obj.USER_CurrencySymbol           ?? this.sUSER_CurrencySymbol          ;
 		// 10/16/2021 Paul.  Add support for user currency. 
 		this.bUSER_CurrencyUSDollars        = true;
 		this.dUSER_CurrencyCONVERSION_RATE  = 1.0;
@@ -523,7 +550,11 @@ class CredentialsStore
 		// 05/28/2019 Paul.  Set the profile last so that any obserable on bIsAuthenticated will fire after state completely set. 
 		this.bIsAuthenticated               = !Sql.IsEmptyString(this.sUSER_ID);
 		// 12/16/2019 Paul.  Menu needs to know if logout should be displayed. 
-		this.sAUTHENTICATION                = obj.AUTHENTICATION               ;
+		// 03/26/2026 Fix.  The admin GetReactState USER_PROFILE does not include AUTHENTICATION.
+		// Using ?? preserves the previously-set value (e.g. 'CRM' from login) when the admin
+		// profile omits this field, preventing ValidateCredentials from returning false and
+		// causing all admin sub-route navigations to redirect to login.
+		this.sAUTHENTICATION                = obj.AUTHENTICATION ?? this.sAUTHENTICATION;
 		// 03/29/2021 Paul.  Allow display of impersonation state. 
 		this.USER_IMPERSONATION             = Sql.ToBoolean(obj.USER_IMPERSONATION);
 		this.UserLanguageUpdated();

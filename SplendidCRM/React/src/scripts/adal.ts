@@ -1938,13 +1938,6 @@ var AuthenticationContext = (function () {
      * Returns a reference of Authentication Context as a result of a require call.
      * @ignore
      */
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = AuthenticationContext;
-        module.exports.inject = function (conf) {
-            return new AuthenticationContext(conf);
-        };
-    }
-
     return AuthenticationContext;
 
 }());

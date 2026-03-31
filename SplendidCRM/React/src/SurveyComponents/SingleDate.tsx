@@ -13,7 +13,6 @@ import * as React from 'react';
 import moment from 'moment';
 import DateTime from 'react-datetime';
 import 'react-datetime/css/react-datetime.css';
-import { Appear }                                  from 'react-lifecycle-appear'       ;
 // 2. Store and Types. 
 import ISurveyQuestionProps                        from '../types/ISurveyQuestionProps';
 import SurveyQuestion                              from './SurveyQuestion'             ;
@@ -27,6 +26,20 @@ import { ListView_LoadTable }                      from '../scripts/ListView'   
 // 4. Components and Views. 
 import ErrorComponent                              from '../components/ErrorComponent' ;
 import ResultsPaginateResponses                    from './ResultsPaginateResponses'   ;
+
+// Local replacement for deprecated react-lifecycle-appear Appear component (React 19 compatible).
+function Appear({ onAppearOnce, children }: { onAppearOnce?: (el: HTMLDivElement) => void; children?: React.ReactNode }): React.JSX.Element
+{
+	const ref = React.useRef<HTMLDivElement>(null);
+	React.useEffect(() =>
+	{
+		if ( onAppearOnce && ref.current )
+		{
+			onAppearOnce(ref.current);
+		}
+	}, []);
+	return <div ref={ref}>{children}</div>;
+}
 
 interface ISingleDateState
 {

@@ -125,7 +125,7 @@ class BusinessProcessesLogListView extends React.Component<IAdminReadOnlyListVie
 			MODULE_NAME         ,
 			error               : null,
 			detailsOpen         : false,
-			BUSINESS_PROCESS_INSTANCE_ID: null,,
+			BUSINESS_PROCESS_INSTANCE_ID: null,
 			showSearchView        ,
 		};
 	}

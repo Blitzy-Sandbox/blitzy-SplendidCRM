@@ -10,11 +10,9 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed from 'react-pose';
 import { RouteComponentProps, withRouter }    from '../Router5'                 ;
 import { observer }                           from 'mobx-react'                       ;
 import { FontAwesomeIcon }                    from '@fortawesome/react-fontawesome'   ;
-import { Appear }                             from 'react-lifecycle-appear'           ;
 // 2. Store and Types. 
 import { SubPanelHeaderButtons }              from '../types/SubPanelHeaderButtons'   ;
 // 3. Scripts. 
@@ -34,18 +32,6 @@ import DynamicButtons                         from '../components/DynamicButtons
 import SearchView                             from '../views/SearchView'              ;
 import EditView                               from '../views/EditView'                ;
 import SubPanelButtonsFactory                 from '../ThemeComponents/SubPanelButtonsFactory';
-
-const Content = posed.div(
-{
-	open:
-	{
-		height: '100%'
-	},
-	closed:
-	{
-		height: 0
-	}
-});
 
 interface ISubPanelStreamViewProps extends RouteComponentProps<any>
 {
@@ -117,6 +103,7 @@ class SubPanelStreamView extends React.Component<ISubPanelStreamViewProps, ISubP
 	async componentDidMount()
 	{
 		this._isMounted = true;
+		this.setState({ subPanelVisible: true });
 		try
 		{
 			let status = await AuthenticatedMethod(this.props, this.constructor.name + '.componentDidMount');
@@ -372,13 +359,13 @@ class SubPanelStreamView extends React.Component<ISubPanelStreamViewProps, ISubP
 			// 07/30/2021 Paul.  Load when the panel appears. 
 			return (
 				<React.Fragment>
-					<Appear onAppearOnce={ (ioe) => this.setState({ subPanelVisible: true }) }>
+					<div>
 						{ headerButtons
 						? React.createElement(headerButtons, { MODULE_NAME: 'ActivityStream', ID: null, MODULE_TITLE, CONTROL_VIEW_NAME, error, ButtonStyle: 'ListHeader', VIEW_NAME: 'ActivityStream.Subpanel', row: item, Page_Command: this.Page_Command, showButtons: !showInlineEdit, onToggle: this.onToggleCollapse, isPrecompile: this.props.isPrecompile, history: this.props.history, location: this.props.location, match: this.props.match, ref: this.headerButtons })
 						: null
 						}
-					</Appear>
-					<Content pose={ open ? 'open' : 'closed' } style={ {overflow: (open ? 'visible' : 'hidden')} }>
+					</div>
+					<div style={ {overflow: (open ? 'visible' : 'hidden')} }>
 						{ open && subPanelVisible
 						? <React.Fragment>
 							<div style={ cssSearch }>
@@ -459,7 +446,7 @@ class SubPanelStreamView extends React.Component<ISubPanelStreamViewProps, ISubP
 						</React.Fragment>
 						: null
 						}
-					</Content>
+					</div>
 				</React.Fragment>
 			);
 		}

@@ -96,7 +96,7 @@ const SourceSeparator: FC<ISourceSeparatorProps> = memo(function SourceSeparator
 	);
 	//console.log((new Date()).toISOString() + ' ' + 'SourceHeader' + ' collected', collect, dropCollect);
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DynamicLayoutComponents-Shared-SourceSeparator'
 				style={ { ...style } }>
 				{ TITLE }

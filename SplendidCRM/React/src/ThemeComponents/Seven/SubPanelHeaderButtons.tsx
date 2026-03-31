@@ -10,7 +10,7 @@
 
 // 1. React and fabric. 
 import * as React from 'react';
-import posed from 'react-pose';
+import { motion } from 'framer-motion';
 import { FontAwesomeIcon }                   from '@fortawesome/react-fontawesome' ;
 // 2. Store and Types. 
 // 3. Scripts. 
@@ -23,19 +23,6 @@ import { isMobileDevice, isMobileLandscape } from '../../scripts/utility'       
 // 4. Components and Views. 
 import DynamicButtons                        from '../../components/DynamicButtons';
 import { ISubPanelHeaderButtonsProps, SubPanelHeaderButtons} from '../../types/SubPanelHeaderButtons';
-
-const Toggle = posed.i(
-{
-	pressable: true,
-	open:
-	{
-		rotate: '180deg',
-	},
-	closed:
-	{
-		rotate: '0deg'
-	}
-});
 
 export default class SevenSubPanelHeaderButtons extends SubPanelHeaderButtons
 {
@@ -218,9 +205,9 @@ export default class SevenSubPanelHeaderButtons extends SubPanelHeaderButtons
 								}
 							</td>
 							<td style={ {verticalAlign: 'center', textAlign: 'right', paddingTop: 3, paddingLeft: 5, width: '20px'} }>
-								<Toggle onClick={ this.toggle } pose={ open ? 'open' : 'closed' } style={ {marginRight: '0.5em', cursor: 'pointer'} }>
+								<motion.i onClick={ this.toggle } animate={{ rotate: open ? 180 : 0 }} transition={{ type: 'tween' }} style={ {marginRight: '0.5em', cursor: 'pointer'} }>
 									<FontAwesomeIcon icon={ open ? 'chevron-up' : 'chevron-down' } />
-								</Toggle>
+								</motion.i>
 							</td>
 							<td style={ {verticalAlign: 'center', width: '40px'} }>
 								{ showButtons

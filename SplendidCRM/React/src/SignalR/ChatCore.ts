@@ -11,6 +11,7 @@
 // 1. React and fabric. 
 import * as H         from 'history'                 ;
 import * as signalR   from "@microsoft/signalr"      ;
+import { getConfig }  from '../config'                ;
 // 2. Store and Types. 
 import MODULE         from '../types/MODULE'         ;
 // 3. Scripts. 
@@ -126,7 +127,7 @@ export class ChatServerCore
 export function ChatCreateHub(history: H.History, sUSER_CHAT_CHANNELS: string): ChatServerCore
 {
 	const hub: signalR.HubConnection = new signalR.HubConnectionBuilder()
-		.withUrl("/signalr_chathub")
+		.withUrl((getConfig().SIGNALR_URL || getConfig().API_BASE_URL) + '/hubs/chat')
 		//.configureLogging(signalR.LogLevel.Debug)  // https://learn.microsoft.com/en-us/aspnet/core/signalr/diagnostics?view=aspnetcore-5.0
 		.withAutomaticReconnect()
 		.build();

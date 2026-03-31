@@ -1,10 +1,11 @@
 import BpmnRules from './BpmnRules';
+import rulesModule from 'diagram-js/lib/features/rules';
 
 let def: any =
 {
 	__depends__:
 	[
-		require('diagram-js/lib/features/rules')
+		rulesModule
 	],
 	__init__: [ 'bpmnRules' ],
 	bpmnRules: [ 'type', BpmnRules ]

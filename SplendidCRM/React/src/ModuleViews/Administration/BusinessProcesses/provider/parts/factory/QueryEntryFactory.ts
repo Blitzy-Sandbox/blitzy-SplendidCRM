@@ -11,11 +11,10 @@ import Sql               from '../../../../../../scripts/Sql' ;
 import L10n              from '../../../../../../scripts/L10n';
 import { BindArguments } from '../../../../../../scripts/utility';
 
-var cmdHelper             = require('bpmn-js-properties-panel/lib/helper/CmdHelper');
-var elementHelper         = require('bpmn-js-properties-panel/lib/helper/ElementHelper');
-var getBusinessObject     = require('bpmn-js/lib/util/ModelUtil').getBusinessObject;
-var is                    = require('bpmn-js/lib/util/ModelUtil').is;
-var forEach               = require('lodash/collection/forEach');
+import cmdHelper                    from 'bpmn-js-properties-panel/lib/helper/CmdHelper';
+import elementHelper                from 'bpmn-js-properties-panel/lib/helper/ElementHelper';
+import { getBusinessObject, is }    from 'bpmn-js/lib/util/ModelUtil';
+import forEach                      from 'lodash/forEach';
 
 function ensureNotNull(prop)
 {

@@ -160,7 +160,7 @@ const DraggableItem: FC<IDraggableItemProps> = memo(function DraggableItem(props
 
 	const opacity = id == draggingId ? 0 : 1;
 	return (
-			<div ref={ (node) => connectDragSource(connectDropTarget(node)) }
+			<div ref={ (node) => { connectDragSource(connectDropTarget(node)); } }
 				draggable
 				className='grab'
 				style={{ ...style, opacity, flexBasis: `${100 / rowTotal}%` }}>

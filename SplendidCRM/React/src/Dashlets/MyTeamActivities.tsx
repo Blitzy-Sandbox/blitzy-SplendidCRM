@@ -12,7 +12,6 @@
 import * as React from 'react';
 import moment from 'moment';
 import { FontAwesomeIcon }                          from '@fortawesome/react-fontawesome';
-import { Appear }                                   from 'react-lifecycle-appear'        ;
 // 2. Store and Types. 
 import ACL_FIELD_ACCESS                             from '../types/ACL_FIELD_ACCESS'     ;
 import IDashletProps                                from '../types/IDashletProps'        ;
@@ -105,6 +104,7 @@ export default class MyTeamActivities extends React.Component<IDashletProps, IMy
 
 	componentDidMount()
 	{
+		this.setState({ dashletVisible: true });
 	}
 
 	private GetThroughDate = (THROUGH: string) =>
@@ -600,57 +600,55 @@ export default class MyTeamActivities extends React.Component<IDashletProps, IMy
 		return (
 		<div style={ {display: 'flex', flexGrow: 1} }>
 			<div className="card" style={ {flexGrow: 1, margin: '.5em', overflowX: 'auto'} }>
-				<Appear onAppearOnce={ (ioe) => this.setState({ dashletVisible: true }) }>
-					<div className="card-body DashletHeader" style={ {display: 'flex'} }>
-						<h3 style={ {flexGrow: 1, float: 'left'} }>
-							{ L10n.Term(TITLE) }
-						</h3>
-						<span style={ {flexGrow: 2} }>
-							{ L10n.Term('Activities.LBL_TODAY') }
-							&nbsp;
-							<select
-								id='lstTHROUGH'
-								onChange={ this._onTHROUGH_Change }
-								value={ THROUGH }
-								style={ {width: 'auto', margin: 2} }
-								>
+				<div className="card-body DashletHeader" style={ {display: 'flex'} }>
+					<h3 style={ {flexGrow: 1, float: 'left'} }>
+						{ L10n.Term(TITLE) }
+					</h3>
+					<span style={ {flexGrow: 2} }>
+						{ L10n.Term('Activities.LBL_TODAY') }
+						&nbsp;
+						<select
+							id='lstTHROUGH'
+							onChange={ this._onTHROUGH_Change }
+							value={ THROUGH }
+							style={ {width: 'auto', margin: 2} }
+							>
+							{
+								lstTHROUGH.map((item, index) => 
 								{
-									lstTHROUGH.map((item, index) => 
-									{
-										return (<option key={ '_lstTHROUGH_' + index.toString() } id={ '_lstTHROUGH' + index.toString() } value={ item }>{ L10n.ListTerm('appointment_filter_dom', item) }</option>);
-									})
-								}
-							</select>
-							&nbsp;
-							{ txtTHROUGH }
-							&nbsp;
-							{ !Sql.IsEmptyString(error)
-							? <span className='error'>{ error }</span>
-							: null
+									return (<option key={ '_lstTHROUGH_' + index.toString() } id={ '_lstTHROUGH' + index.toString() } value={ item }>{ L10n.ListTerm('appointment_filter_dom', item) }</option>);
+								})
+							}
+						</select>
+						&nbsp;
+						{ txtTHROUGH }
+						&nbsp;
+						{ !Sql.IsEmptyString(error)
+						? <span className='error'>{ error }</span>
+						: null
+						}
+					</span>
+					<span style={ {flexGrow: 1} }>
+						<span
+							style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
+							onClick={ (e) => this._onRefresh(e) }
+						>
+							{ this.legacyIcons
+							? <img src={ this.themeURL + 'refresh.gif'} style={ {borderWidth: '0px'} } />
+							: <FontAwesomeIcon icon="sync" size="lg" />
 							}
 						</span>
-						<span style={ {flexGrow: 1} }>
-							<span
-								style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
-								onClick={ (e) => this._onRefresh(e) }
-							>
-								{ this.legacyIcons
-								? <img src={ this.themeURL + 'refresh.gif'} style={ {borderWidth: '0px'} } />
-								: <FontAwesomeIcon icon="sync" size="lg" />
-								}
-							</span>
-							<span
-								style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
-								onClick={ () => this.setState({ optionsVisible: !optionsVisible }) }
-							>
-								{ this.legacyIcons
-								? <img src={ this.themeURL + 'edit.gif'} style={ {borderWidth: '0px'} } />
-								: <FontAwesomeIcon icon="cog" size="lg" />
-								}
-							</span>
+						<span
+							style={ {cursor: 'pointer', float: 'right', textDecoration: 'none', marginLeft: '.5em'} }
+							onClick={ () => this.setState({ optionsVisible: !optionsVisible }) }
+						>
+							{ this.legacyIcons
+							? <img src={ this.themeURL + 'edit.gif'} style={ {borderWidth: '0px'} } />
+							: <FontAwesomeIcon icon="cog" size="lg" />
+							}
 						</span>
-					</div>
-				</Appear>
+					</span>
+				</div>
 				{ dashletVisible
 				? <div style={ {clear: 'both'} }>
 					<hr />

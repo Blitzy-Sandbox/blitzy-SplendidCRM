@@ -82,7 +82,7 @@ const SouceItem: FC<ISouceItemProps> = memo(function SouceItem(props: ISouceItem
 	//console.log((new Date()).toISOString() + ' ' + 'SouceItem' + ' collected', collect, dropCollect);
 	// 03/14/2020 Paul.  When field is in use, we must hide it instead of not creating it as failure to create would prevent endDrag from firing. 
 	return (
-			<div ref={ (node) => connectDragSource(node) }
+			<div ref={ (node) => { connectDragSource(node); } }
 				className='grab DynamicLayoutComponents-Shared-SourceItem'
 				style={ { ...style, display: (isFieldInUse ? 'none' : null) } }
 				>

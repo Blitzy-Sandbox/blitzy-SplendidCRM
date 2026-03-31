@@ -14,6 +14,7 @@
 import Sql            from '../scripts/Sql'        ;
 import Credentials    from '../scripts/Credentials';
 import { StartsWith } from '../scripts/utility'    ;
+import { getConfig  } from '../config'             ;
 
 class CordovaHttpResponse
 {
@@ -65,7 +66,7 @@ class CordovaHttpResponse
 
 function CordovaHttpRequest(sPath: string, sMethod?: string, sContentType?: string, sBody?: string): Promise<any>
 {
-	let url = Credentials.RemoteServer + sPath;
+	let url = (getConfig().API_BASE_URL ? getConfig().API_BASE_URL + '/' : Credentials.RemoteServer) + sPath;
 	//console.log((new Date()).toISOString() + ' CordovaHttpRequest: ' + sMethod + ' ' + url, sBody);
 	return new Promise((resolve, reject) =>
 	{
@@ -169,6 +170,14 @@ export async function CreateSplendidRequest(sPath: string, sMethod?: string, sCo
 	{
 		sContentType = 'application/json; charset=utf-8';
 	}
+	// 03/25/2026 Fix.  The .NET 10 backend rejects 'application/octet-stream' with HTTP 415
+	// Unsupported Media Type. All POST/PUT payloads in this application are JSON-encoded strings,
+	// so 'application/json' is the correct Content-Type. This central intercept avoids modifying
+	// 40+ individual call sites across ListView.ts, ModuleUpdate.ts, ProcessButtons.ts, etc.
+	if ( sContentType === 'application/octet-stream' )
+	{
+		sContentType = 'application/json; charset=utf-8';
+	}
 	// 11/16/2020 Paul.  iOS will not allow json requests due to CORS.  Instead, use cordova-plugin-http. 
 	if ( window.cordova && (window.cordova.platformId == 'ios' || window.cordova.platformId == 'android') && window.cordova.plugin && window.cordova.plugin.http )
 	{
@@ -197,7 +206,7 @@ export async function CreateSplendidRequest(sPath: string, sMethod?: string, sCo
 		let body: any = sBody;
 		// toUTF8Array
 		// https://gist.github.com/joni/3760795
-		let url = Credentials.RemoteServer;
+		let url = getConfig().API_BASE_URL ? getConfig().API_BASE_URL + '/' : Credentials.RemoteServer;
 		//console.log((new Date()).toISOString() + ' ' + sMethod + ' ' + url + sPath, sBody);
 		let xhr = null;
 		try

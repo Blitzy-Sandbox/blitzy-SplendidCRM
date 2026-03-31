@@ -726,7 +726,8 @@ namespace SplendidCRM.Web.Controllers
 					da.Fill(dt);
 					if (!dt.Columns.Contains("MODULE_ACLACCESS" )) dt.Columns.Add("MODULE_ACLACCESS" , typeof(string));
 					if (!dt.Columns.Contains("TARGET_ACLACCESS" )) dt.Columns.Add("TARGET_ACLACCESS" , typeof(string));
-					bool bHasTargetModule = dt.Columns.Contains("TARGET_MODULE");
+					// 03/25/2026 Paul.  Use TARGET_NAME column (not TARGET_MODULE which does not exist in vwDYNAMIC_BUTTONS).
+					bool bHasTargetModule = dt.Columns.Contains("TARGET_NAME");
 					string sLAST_VIEW_NAME = String.Empty;
 					List<Dictionary<string, object>> layout = null;
 					foreach (DataRow row in dt.Rows)
@@ -738,8 +739,9 @@ namespace SplendidCRM.Web.Controllers
 						if (!lstWithAdmin.Contains(sMODULE_NAME)) continue;
 						int nMODULE_ACLACCESS = _security.GetUserAccess(sMODULE_NAME, "edit");
 						row["MODULE_ACLACCESS"] = nMODULE_ACLACCESS.ToString();
-						string sTARGET_MODULE = bHasTargetModule ? Sql.ToString(row["TARGET_MODULE"]) : String.Empty;
-						int nTARGET_ACLACCESS = Sql.IsEmptyString(sTARGET_MODULE) ? -1 : _security.GetUserAccess(sTARGET_MODULE, "edit");
+						// 03/25/2026 Paul.  Read TARGET_NAME; when empty use 0 (neutral) instead of -1 (denied).
+						string sTARGET_MODULE = bHasTargetModule ? Sql.ToString(row["TARGET_NAME"]) : String.Empty;
+						int nTARGET_ACLACCESS = Sql.IsEmptyString(sTARGET_MODULE) ? 0 : _security.GetUserAccess(sTARGET_MODULE, "edit");
 						row["TARGET_ACLACCESS"] = nTARGET_ACLACCESS.ToString();
 						if (sLAST_VIEW_NAME != sVIEW_NAME)
 						{
@@ -766,7 +768,7 @@ namespace SplendidCRM.Web.Controllers
 			return objs;
 		}
 
-		private Dictionary<string, object> GetAllTerminologyInternal(List<string> lstMODULES, bool bAdmin)
+		private Dictionary<string, object> GetAllTerminologyInternal(List<string> lstMODULES, bool bAdmin, bool bAllowAnonymous = false)
 		{
 			string sModuleList = String.Join(",", lstMODULES.ToArray());
 			string sCacheKey   = "vwTERMINOLOGY.ReactClient." + sModuleList + (bAdmin ? ".Admin" : "");
@@ -775,9 +777,9 @@ namespace SplendidCRM.Web.Controllers
 			objs = new Dictionary<string, object>();
 			try
 			{
-				if (_security.IsAuthenticated())
+				if (_security.IsAuthenticated() || bAllowAnonymous)
 				{
-					string sCulture = GetUserCulture();
+					string sCulture = bAllowAnonymous && !_security.IsAuthenticated() ? (_configuration["default_language"] ?? "en-US") : GetUserCulture();
 					using IDbConnection con = _dbProviderFactories.CreateConnection();
 					con.Open();
 					using IDbCommand cmd = con.CreateCommand();
@@ -813,7 +815,7 @@ namespace SplendidCRM.Web.Controllers
 			return objs;
 		}
 
-		private Dictionary<string, object> GetAllTerminologyListsInternal(bool bAdmin)
+		private Dictionary<string, object> GetAllTerminologyListsInternal(bool bAdmin, bool bAllowAnonymous = false)
 		{
 			string sCacheKey = "vwTERMINOLOGY_LISTS.ReactClient" + (bAdmin ? ".Admin" : "");
 			var objs = _memoryCache.Get<Dictionary<string, object>>(sCacheKey);
@@ -821,9 +823,9 @@ namespace SplendidCRM.Web.Controllers
 			objs = new Dictionary<string, object>();
 			try
 			{
-				if (_security.IsAuthenticated())
+				if (_security.IsAuthenticated() || bAllowAnonymous)
 				{
-					string sCulture = GetUserCulture();
+					string sCulture = bAllowAnonymous && !_security.IsAuthenticated() ? (_configuration["default_language"] ?? "en-US") : GetUserCulture();
 					using IDbConnection con = _dbProviderFactories.CreateConnection();
 					con.Open();
 					using IDbCommand cmd = con.CreateCommand();
@@ -2500,8 +2502,8 @@ namespace SplendidCRM.Web.Controllers
 				var result = new Dictionary<string, object>();
 				result["loginConfig"         ] = _splendidCache.GetLoginConfig();
 				// Use the login-module subset of terminology for the unauthenticated login screen
-				result["loginTerminology"    ] = GetAllTerminologyInternal(new List<string> { "Users", "Login", "Errors" }, false);
-				result["loginTerminologyLists"] = GetAllTerminologyListsInternal(false);
+				result["loginTerminology"    ] = GetAllTerminologyInternal(new List<string> { "Users", "Login", "Errors", "Administration", "Teams" }, false, bAllowAnonymous: true);
+				result["loginTerminologyLists"] = GetAllTerminologyListsInternal(false, bAllowAnonymous: true);
 				result["SingleSignOnSettings"] = GetSingleSignOnSettingsInternal();
 				bool bDUO_ENABLED = !Sql.IsEmptyString(_configuration["DUO_INTEGRATION_KEY"]);
 				result["DuoEnabled"] = bDUO_ENABLED;
@@ -2878,7 +2880,14 @@ namespace SplendidCRM.Web.Controllers
 				da.Fill(dt);
 				if (dt.Rows.Count == 0)
 					return NotFound(new { error = ModuleName + " record not found: " + ID });
-				var d = _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n);
+				var toJsonResult = _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n);
+				// 03/26/2026 Fix.  The original WCF REST service returned single items wrapped in
+				// { d: { results: { ...item data... } } }.  The .NET Core ToJson helper only wraps
+				// in { d: itemData } (missing the "results" key) and the controller was double-wrapping
+				// with new { d }.  Unwrap the inner "d" key and re-wrap correctly so the React
+				// frontend's DetailView_LoadItem → d.results chain works.
+				var dRow = toJsonResult.ContainsKey("d") ? toJsonResult["d"] : (object)toJsonResult;
+				var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { { "results", dRow } };
 				// 04/28/2019 Paul.  Add tracker for React client.
 				if ( dt.Columns.Contains("NAME") )
 				{
@@ -3937,12 +3946,20 @@ namespace SplendidCRM.Web.Controllers
 				StringBuilder sbDumpSQL = new StringBuilder();
 				string sAUDIT_TABLE = sTableName + "_AUDIT";
 				DataTable dt = _restUtil.GetTable(HttpContext, sAUDIT_TABLE, 0, 1, String.Empty, "AUDIT_ID eq '" + AUDIT_ID.ToString() + "'", String.Empty, null, null, ref nTotalCount, null, AccessMode.list, false, null, sbDumpSQL);
-				Dictionary<string, object> d = new Dictionary<string, object>();
+				// 03/26/2026 Fix.  Unwrap ToJson's inner "d" and re-wrap with "results" to match
+				// the original WCF response format expected by the React frontend.
+				Dictionary<string, object> d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 				if (dt.Rows.Count > 0)
-					d.Add("d", _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n));
+				{
+					var toJsonResult = _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n);
+					var dRow = toJsonResult.ContainsKey("d") ? toJsonResult["d"] : (object)toJsonResult;
+					d.Add("results", dRow);
+				}
 				else
-					d.Add("d", new Dictionary<string, object>());
-				return JsonContent(d);
+				{
+					d.Add("results", new Dictionary<string, object>());
+				}
+				return JsonContent(new { d });
 			}
 			catch (Exception ex)
 			{
@@ -3964,12 +3981,20 @@ namespace SplendidCRM.Web.Controllers
 				long nTotalCount = 0;
 				StringBuilder sbDumpSQL = new StringBuilder();
 				DataTable dt = _restUtil.GetTable(HttpContext, sTableName, 0, 1, String.Empty, "ID eq '" + ID.ToString() + "'", String.Empty, null, null, ref nTotalCount, null, AccessMode.view, false, null, sbDumpSQL);
-				Dictionary<string, object> d = new Dictionary<string, object>();
+				// 03/26/2026 Fix.  Unwrap ToJson's inner "d" and re-wrap with "results" to match
+				// the original WCF response format expected by the React frontend.
+				Dictionary<string, object> d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 				if (dt.Rows.Count > 0)
-					d.Add("d", _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n));
+				{
+					var toJsonResult = _restUtil.ToJson(sBaseURI, ModuleName, dt.Rows[0], T10n);
+					var dRow = toJsonResult.ContainsKey("d") ? toJsonResult["d"] : (object)toJsonResult;
+					d.Add("results", dRow);
+				}
 				else
-					d.Add("d", new Dictionary<string, object>());
-				return JsonContent(d);
+				{
+					d.Add("results", new Dictionary<string, object>());
+				}
+				return JsonContent(new { d });
 			}
 			catch (Exception ex)
 			{
