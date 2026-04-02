@@ -1,0 +1,117 @@
+# =============================================================================
+# Dockerfile.frontend — Multi-Stage React 19 / Nginx Frontend Docker Image
+# =============================================================================
+#
+# Build context: Repository root (not SplendidCRM/React/)
+# Target image size: ≤100MB
+#
+# Stage 1 (build): node:20-alpine — installs dependencies, builds the React 19
+#   SPA with Vite 6.x, and deletes source maps from the output.
+# Stage 2 (runtime): nginx:alpine — serves the built static assets through
+#   Nginx with SPA fallback routing, security headers, and runtime config
+#   injection via docker-entrypoint.sh.
+#
+# Guardrails enforced:
+#   G3  — docker-entrypoint.sh copied with chmod +x and set as ENTRYPOINT
+#   G4  — NODE_OPTIONS=--max-old-space-size=4096 prevents OOM during Vite build
+#   G5  — Source maps deleted from image AND blocked by Nginx configuration
+#   G11 — ckeditor5-custom-build copied BEFORE npm install for file: resolution
+#
+# Layer caching strategy (most stable → most volatile):
+#   1. ckeditor5-custom-build (changes rarely)
+#   2. package.json + package-lock.json (changes on dependency updates)
+#   3. npm ci (cached unless lockfile changes)
+#   4. Source files (changes on code changes)
+#   5. Vite build (rebuilds when source changes)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: Build — Node.js 20 Alpine
+# ---------------------------------------------------------------------------
+FROM node:20-alpine AS build
+
+# Set working directory for the frontend build
+WORKDIR /app
+
+# G4: OOM Protection — The Vite build with 763+ TSX files, amcharts4, and
+# CKEditor can exhaust the default Node.js V8 heap limit (~1.5GB). Setting
+# the max old space size to 4GB prevents out-of-memory crashes during the
+# production build.
+ENV NODE_OPTIONS=--max-old-space-size=4096
+
+# G11: CKEditor Custom Build — MUST be copied BEFORE package.json and npm install.
+# The package.json references "ckeditor5-custom-build": "file:./ckeditor5-custom-build"
+# which resolves during npm install. If this directory is not present when npm ci
+# runs, the file: dependency resolution will fail silently or error out.
+COPY SplendidCRM/React/ckeditor5-custom-build/ ./ckeditor5-custom-build/
+
+# Copy dependency manifests for layer-optimized caching.
+# Changes to source code will NOT invalidate the npm ci cache layer.
+COPY SplendidCRM/React/package.json SplendidCRM/React/package-lock.json ./
+
+# Copy .npmrc for npm configuration (may be empty; copied for safety to ensure
+# any npm registry or configuration settings are preserved).
+COPY SplendidCRM/React/.npmrc ./.npmrc
+
+# Install dependencies using npm ci for reproducible builds from the lockfile.
+# --legacy-peer-deps handles peer dependency conflicts in older CKEditor and
+# BPMN packages that have not updated their peer dependency declarations for
+# React 19.
+RUN npm ci --legacy-peer-deps
+
+# Copy all frontend source files (src/, public/, index.html, vite.config.ts,
+# tsconfig.json, configs/, www/). The node_modules directory is already
+# populated from npm ci above; this overlay adds the application source.
+COPY SplendidCRM/React/ ./
+
+# Execute the production build via Vite (defined as "build": "vite build"
+# in package.json). This produces the dist/ directory with hashed ESM chunks,
+# vendor/mobx code-split bundles, and static assets.
+RUN npm run build
+
+# G5: Source Map Deletion — Defense-in-depth strategy. Vite builds with
+# sourcemap: 'hidden' which generates .map files but does not reference them
+# in the bundle output files. We delete all .map files from the build output
+# to ensure they never exist in the final Docker image. Nginx also blocks
+# *.map requests as a secondary safeguard.
+RUN find /app/dist -name '*.map' -delete
+
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime — Nginx Alpine
+# ---------------------------------------------------------------------------
+FROM nginx:alpine
+
+# Remove the default Nginx server configuration to prevent conflicts with
+# our custom SPA-optimized configuration.
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy custom Nginx configuration for SPA serving. This configuration provides:
+#   - try_files SPA fallback routing (all non-file paths → index.html)
+#   - Security headers (X-Content-Type-Options, X-Frame-Options)
+#   - Source map blocking (*.map → HTTP 404)
+#   - Static asset caching (1-year immutable for hashed chunks)
+#   - Health check endpoint (/health → HTTP 200 "ok")
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy the Vite build output from the build stage to the Nginx document root.
+# This includes index.html, hashed JS/CSS chunks, config-loader.js, and all
+# static assets from the public/ directory.
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# G3: Copy the runtime configuration injection entrypoint script from the
+# repository root. This script generates /usr/share/nginx/html/config.json
+# from environment variables (API_BASE_URL, SIGNALR_URL, ENVIRONMENT) at
+# container startup, then exec's nginx.
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Expose port 80 for HTTP traffic. The ALB routes default path (/*) traffic
+# to this port. Frontend containers do not handle HTTPS — TLS termination
+# occurs at the ALB.
+EXPOSE 80
+
+# Use ENTRYPOINT (not CMD) in JSON array form so the entrypoint script
+# receives signals directly (SIGTERM for graceful shutdown). The script
+# writes config.json from environment variables, then exec's nginx to
+# replace the shell process with the Nginx master process.
+ENTRYPOINT ["/docker-entrypoint.sh"]
