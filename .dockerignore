@@ -1,0 +1,123 @@
+# =============================================================================
+# .dockerignore — Docker Build Context Exclusions for SplendidCRM
+# =============================================================================
+# Reduces image build time and prevents sensitive or irrelevant content
+# from being included in Docker build contexts.
+#
+# IMPORTANT: Both Dockerfile.backend and Dockerfile.frontend use the
+# repository root as their build context. This file applies to both.
+#
+# Files that MUST remain in the build context:
+#   - SplendidCRM.sln            (dotnet restore)
+#   - src/                        (dotnet restore + publish)
+#   - SplendidCRM/App_Themes/    (backend static assets)
+#   - SplendidCRM/Include/       (backend static assets)
+#   - SplendidCRM/React/         (frontend build context)
+#   - nginx.conf                  (frontend Nginx config)
+#   - docker-entrypoint.sh        (frontend runtime entrypoint)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Phase 1: Core Exclusions
+# -----------------------------------------------------------------------------
+
+# Version control history — large, not needed in builds
+.git/
+
+# Node modules — reinstalled during Docker build via npm install
+**/node_modules/
+
+# .NET build artifacts — rebuilt during Docker build via dotnet restore/publish
+**/bin/
+**/obj/
+
+# -----------------------------------------------------------------------------
+# Phase 2: Repository Artifacts Not Needed in Containers
+# -----------------------------------------------------------------------------
+
+# Historical XML API docs — explicitly out of scope
+BackupBin2012/
+
+# Test projects — not needed in production containers
+tests/
+
+# Migration documentation — not needed in containers
+blitzy/
+
+# Terraform IaC — not needed in application containers
+infrastructure/
+
+# Migration governance artifacts — not needed in containers
+validation/
+
+# Build output directory — rebuilt during Docker build
+dist/
+
+# SQL schema scripts — not needed in application containers
+SQL Scripts Community/
+
+# Operational scripts — not copied into Docker images
+scripts/
+
+# Documentation directory — not needed in containers
+docs/
+
+# -----------------------------------------------------------------------------
+# Phase 3: Build Artifacts and Temp Files
+# -----------------------------------------------------------------------------
+
+# Generated SQL concatenation file
+Build.sql
+
+# Markdown documentation files (not needed in containers)
+*.md
+# Exception: keep README.md for reference
+!README.md
+
+# Files from .gitignore — build artifacts and legacy files
+Manifest.xml
+Parameters.xml
+CreateLogin.sql
+checkin.bat
+
+# License file — not needed in runtime containers
+LICENSE
+
+# -----------------------------------------------------------------------------
+# Phase 4: Docker-Specific Exclusions
+# -----------------------------------------------------------------------------
+
+# Docker Compose files (defensive — if any are ever added)
+docker-compose*.yml
+docker-compose*.yaml
+
+# This file itself
+.dockerignore
+
+# Dockerfiles themselves — not needed inside containers for COPY operations
+Dockerfile*
+
+# -----------------------------------------------------------------------------
+# Phase 5: IDE and OS Files
+# -----------------------------------------------------------------------------
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Git configuration files
+.gitignore
+.gitattributes
