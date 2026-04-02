@@ -58,12 +58,16 @@ set -e
 # SIGNALR_URL defaults to empty string — the frontend config.ts falls back
 # to API_BASE_URL when SIGNALR_URL is empty (see config.ts line 117).
 #
-# ENVIRONMENT defaults to "development" — matches the default in both
-# config-loader.js (line 24) and config.ts (line 63).
+# ENVIRONMENT defaults to "production" — the safe default ensures that if
+# this variable is accidentally omitted from an ECS task definition, the
+# container behaves conservatively (production-mode logging, no debug
+# features). In practice, ECS always injects ENVIRONMENT explicitly via
+# the task definition environment block, so this default only applies to
+# local Docker runs where -e ENVIRONMENT is not specified.
 # ---------------------------------------------------------------------------
 API_BASE_URL="${API_BASE_URL:-}"
 SIGNALR_URL="${SIGNALR_URL:-}"
-ENVIRONMENT="${ENVIRONMENT:-development}"
+ENVIRONMENT="${ENVIRONMENT:-production}"
 
 # ---------------------------------------------------------------------------
 # Phase 1b: JSON string escaping function

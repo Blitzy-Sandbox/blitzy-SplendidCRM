@@ -663,11 +663,21 @@ test_11_no_secrets_in_history() {
 # =============================================================================
 # Test 12: End-to-end reachability test
 # =============================================================================
-# Best-effort connectivity verification:
-#   1. Backend responds on /api/health (HTTP 200 or 503 — both mean Kestrel is alive)
-#   2. Frontend serves the SPA (HTML response on /)
-# This is NOT a full login test — it verifies that both services are reachable
-# and responding to HTTP requests after container startup.
+# Best-effort reachability verification — confirms both containers are running
+# and responding to HTTP requests. This is NOT a full database connectivity or
+# login test; it is a container reachability check.
+#
+# Acceptance criteria:
+#   1. Backend responds on /api/health with HTTP 200 (DB connected) or HTTP 503
+#      (DB not connected). Both codes confirm Kestrel is alive and processing
+#      requests. Connection refused or timeout = FAIL.
+#   2. Frontend serves HTML on / (Nginx + SPA fallback working). No HTML or
+#      connection refused = FAIL.
+#
+# NOTE: HTTP 503 is accepted from the backend because SESSION_PROVIDER=Memory
+# means no database provisioning is performed in this local validation context.
+# Full database connectivity is validated separately by validate-infra-localstack.sh
+# (Docker SQL Server tests 16-19) and by deploy-schema.sh.
 
 test_12_e2e_reachability() {
   local backend_ok=false
@@ -732,7 +742,11 @@ for tool in docker curl grep; do
   fi
 done
 
-info "SA_PASSWORD is ${SA_PASSWORD:+set (hidden)}${SA_PASSWORD:-not set, using default}."
+if [ -n "${SA_PASSWORD:-}" ]; then
+  info "SA_PASSWORD is set (hidden)."
+else
+  info "SA_PASSWORD is not set, using default."
+fi
 info "Starting validation suite..."
 
 # ─────────────────────────────────────────────────────────────────────────────

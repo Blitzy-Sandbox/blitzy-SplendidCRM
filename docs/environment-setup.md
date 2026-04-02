@@ -849,7 +849,7 @@ scripts/validate-docker-local.sh
 | 9 | Source maps blocked | `GET /*.map` → HTTP 404 |
 | 10 | No `*.map` files in frontend image | `docker run ... find / -name '*.map'` returns empty |
 | 11 | No secrets in Docker image history | `docker history` shows no connection strings or passwords |
-| 12 | End-to-end connectivity test | Frontend → Backend API call succeeds |
+| 12 | End-to-end reachability test | Both backend and frontend containers respond to HTTP requests |
 
 > **CRITICAL:** ALL 12 tests must pass before any ECR push. The `build-and-push.sh` script enforces this automatically.
 

@@ -196,6 +196,13 @@ readonly FRONTEND_LOCAL_TAG="${FRONTEND_REPO}:${IMAGE_TAG}"
 readonly BACKEND_ECR_URI="${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG}"
 readonly FRONTEND_ECR_URI="${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG}"
 
+# ECR image URIs with "latest" tag — pushed alongside IMAGE_TAG per CI/CD
+# convention. The latest tag provides a stable reference for manual pulls
+# and quick rollback identification while IMAGE_TAG provides immutable
+# version-specific references for ECS task definitions.
+readonly BACKEND_ECR_LATEST="${ECR_REGISTRY}/${BACKEND_REPO}:latest"
+readonly FRONTEND_ECR_LATEST="${ECR_REGISTRY}/${FRONTEND_REPO}:latest"
+
 # =============================================================================
 # Script Banner
 # =============================================================================
@@ -370,27 +377,35 @@ echo ""
 info "Phase 7: Tagging and pushing images to ECR..."
 echo ""
 
-# ---- Backend: Tag and Push ----
+# ---- Backend: Tag and Push (IMAGE_TAG + latest) ----
 info "Tagging backend: ${BACKEND_LOCAL_TAG} → ${BACKEND_ECR_URI}"
 docker tag "${BACKEND_LOCAL_TAG}" "${BACKEND_ECR_URI}"
-success "Backend image tagged."
+info "Tagging backend: ${BACKEND_LOCAL_TAG} → ${BACKEND_ECR_LATEST}"
+docker tag "${BACKEND_LOCAL_TAG}" "${BACKEND_ECR_LATEST}"
+success "Backend image tagged (${IMAGE_TAG} + latest)."
 
 info "Pushing backend: ${BACKEND_ECR_URI}"
 docker push "${BACKEND_ECR_URI}"
-success "Backend image pushed to ECR."
+info "Pushing backend: ${BACKEND_ECR_LATEST}"
+docker push "${BACKEND_ECR_LATEST}"
+success "Backend image pushed to ECR (${IMAGE_TAG} + latest)."
 echo ""
 
-# ---- Frontend: Tag and Push ----
+# ---- Frontend: Tag and Push (IMAGE_TAG + latest) ----
 info "Tagging frontend: ${FRONTEND_LOCAL_TAG} → ${FRONTEND_ECR_URI}"
 docker tag "${FRONTEND_LOCAL_TAG}" "${FRONTEND_ECR_URI}"
-success "Frontend image tagged."
+info "Tagging frontend: ${FRONTEND_LOCAL_TAG} → ${FRONTEND_ECR_LATEST}"
+docker tag "${FRONTEND_LOCAL_TAG}" "${FRONTEND_ECR_LATEST}"
+success "Frontend image tagged (${IMAGE_TAG} + latest)."
 
 info "Pushing frontend: ${FRONTEND_ECR_URI}"
 docker push "${FRONTEND_ECR_URI}"
-success "Frontend image pushed to ECR."
+info "Pushing frontend: ${FRONTEND_ECR_LATEST}"
+docker push "${FRONTEND_ECR_LATEST}"
+success "Frontend image pushed to ECR (${IMAGE_TAG} + latest)."
 echo ""
 
-success "Both images pushed to ECR."
+success "Both images pushed to ECR (${IMAGE_TAG} + latest)."
 echo ""
 
 # =============================================================================
@@ -402,7 +417,7 @@ echo ""
 
 info "Phase 8: Verifying pushed images in ECR..."
 
-# ---- Backend Verification ----
+# ---- Backend Verification (IMAGE_TAG) ----
 info "Verifying backend image in ECR: ${BACKEND_REPO}:${IMAGE_TAG}"
 if aws ecr describe-images \
     --repository-name "${BACKEND_REPO}" \
@@ -413,7 +428,18 @@ else
   error "Backend image NOT found in ECR after push. Verify repository '${BACKEND_REPO}' exists and push succeeded."
 fi
 
-# ---- Frontend Verification ----
+# ---- Backend Verification (latest) ----
+info "Verifying backend image in ECR: ${BACKEND_REPO}:latest"
+if aws ecr describe-images \
+    --repository-name "${BACKEND_REPO}" \
+    --image-ids imageTag="latest" \
+    --region "${AWS_REGION}" >/dev/null 2>&1; then
+  success "Backend latest tag verified in ECR: ${BACKEND_ECR_LATEST}"
+else
+  error "Backend 'latest' tag NOT found in ECR after push. Verify repository '${BACKEND_REPO}' exists and push succeeded."
+fi
+
+# ---- Frontend Verification (IMAGE_TAG) ----
 info "Verifying frontend image in ECR: ${FRONTEND_REPO}:${IMAGE_TAG}"
 if aws ecr describe-images \
     --repository-name "${FRONTEND_REPO}" \
@@ -424,8 +450,19 @@ else
   error "Frontend image NOT found in ECR after push. Verify repository '${FRONTEND_REPO}' exists and push succeeded."
 fi
 
+# ---- Frontend Verification (latest) ----
+info "Verifying frontend image in ECR: ${FRONTEND_REPO}:latest"
+if aws ecr describe-images \
+    --repository-name "${FRONTEND_REPO}" \
+    --image-ids imageTag="latest" \
+    --region "${AWS_REGION}" >/dev/null 2>&1; then
+  success "Frontend latest tag verified in ECR: ${FRONTEND_ECR_LATEST}"
+else
+  error "Frontend 'latest' tag NOT found in ECR after push. Verify repository '${FRONTEND_REPO}' exists and push succeeded."
+fi
+
 echo ""
-success "Both images verified in ECR."
+success "Both images verified in ECR (${IMAGE_TAG} + latest)."
 echo ""
 
 # =============================================================================
@@ -440,7 +477,9 @@ printf '%b================================================%b\n' "${GREEN}" "${NC
 echo ""
 info "Pushed images:"
 info "  Backend:  ${BACKEND_ECR_URI}"
+info "  Backend:  ${BACKEND_ECR_LATEST}"
 info "  Frontend: ${FRONTEND_ECR_URI}"
+info "  Frontend: ${FRONTEND_ECR_LATEST}"
 echo ""
 info "Image sizes:"
 info "  Backend:  ${BACKEND_SIZE_MB}MB"

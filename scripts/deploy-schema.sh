@@ -154,6 +154,13 @@ readonly DB_PORT="${DB_PORT:-1433}"
 readonly DB_NAME="${DB_NAME:-SplendidCRM}"
 readonly DB_USER="${DB_USER:-sa}"
 
+# Validate DB_NAME format — alphanumeric and underscores only. Prevents
+# accidental SQL injection from a misconfigured environment variable since
+# DB_NAME is interpolated into SQL statements (e.g., WHERE name='${DB_NAME}').
+if [[ ! "${DB_NAME}" =~ ^[a-zA-Z0-9_]+$ ]]; then
+  error "DB_NAME contains invalid characters: '${DB_NAME}'. Only alphanumeric characters and underscores are allowed."
+fi
+
 # Build.sql output directory
 readonly SQL_ARTIFACT_DIR="./dist/sql"
 

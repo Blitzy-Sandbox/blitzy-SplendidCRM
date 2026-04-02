@@ -202,6 +202,64 @@ cleanup() {
 
 trap cleanup EXIT
 
+# =============================================================================
+# Usage / Help
+# =============================================================================
+# Provides interactive --help support for consistency with deploy-schema.sh and
+# build-and-push.sh. Mirrors the header documentation in a user-friendly format.
+
+usage() {
+  cat << 'HELPEOF'
+Usage: ./scripts/validate-infra-localstack.sh [--help]
+
+Validates the entire Terraform infrastructure against LocalStack Pro and tests
+database schema provisioning against a Docker SQL Server container.
+
+Test Suite (19 tests):
+  Tests  1-15   LocalStack AWS resource verification (via AWS CLI)
+  Tests 16-19   Docker SQL Server schema provisioning and validation
+
+Additional Validation Phases (not counted in test total):
+  - Terraform idempotency check (terraform plan -detailed-exitcode)
+  - Terraform destroy verification (clean teardown)
+
+Prerequisites:
+  - Terraform >= 1.12.0           - AWS CLI (v1 or v2)
+  - Docker Engine (running)       - curl >= 7.0
+  - jq >= 1.6                     - sqlcmd (mssql-tools18)
+  - LocalStack Pro running on http://localhost:4566
+
+Environment Variables:
+  SA_PASSWORD   (required for Docker SQL tests) SQL Server admin password
+  SQL_PASSWORD  (fallback) Used if SA_PASSWORD is not set
+
+Exit Codes:
+  0 — All 19 tests passed
+  1 — One or more tests failed, or a prerequisite check failed
+
+Examples:
+  # Run full validation suite
+  ./scripts/validate-infra-localstack.sh
+
+  # Run with explicit SA_PASSWORD
+  SA_PASSWORD='YourP@ssw0rd' ./scripts/validate-infra-localstack.sh
+HELPEOF
+}
+
+# Parse command-line arguments (--help) BEFORE any heavy operations, so help
+# works even when prerequisites like LocalStack are not running.
+for arg in "$@"; do
+  case "$arg" in
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      error "Unknown option: ${arg}. Use --help for usage information."
+      ;;
+  esac
+done
+
 # Navigate to repository root for consistent relative path resolution
 cd "${REPO_ROOT}"
 
