@@ -46,7 +46,7 @@
 #                           aws_secretsmanager_secret.duo_integration_key.arn,
 #                           aws_secretsmanager_secret.duo_secret_key.arn,
 #                           aws_secretsmanager_secret.smtp_credentials.arn
-#     data.tf            → data.aws_region.current.name
+#     data.tf            → data.aws_region.current.region
 #     variables.tf       → var.name_prefix, var.environment, var.container_port,
 #                           var.task_cpu, var.task_memory, var.task_ephemeral_gb,
 #                           var.min_tasks, var.max_tasks, var.app_subnet_ids
@@ -122,7 +122,7 @@ resource "aws_ecs_cluster" "main" {
 # The container_definitions JSON includes:
 #   - Container image from ECR (local.backend_image)
 #   - Port mapping: containerPort 8080 (var.container_port)
-#   - Health check: curl GET /api/health (HealthCheckController.cs)
+#   - Health check: wget --spider GET /api/health (HealthCheckController.cs)
 #   - Log configuration: awslogs driver → CloudWatch log group
 #   - 7 secrets (Secrets Manager ARN valueFrom per G7)
 #   - 7 environment variables (literal values)
@@ -171,12 +171,15 @@ resource "aws_ecs_task_definition" "backend" {
       ]
 
       # ECS container health check — separate from ALB health check.
-      # Uses curl to probe the HealthCheckController endpoint.
+      # Uses wget (BusyBox default in Alpine) to probe the HealthCheckController
+      # endpoint. curl is NOT installed in the aspnet:10.0-alpine runtime image;
+      # using curl would cause exit code 127 (command not found), permanently
+      # marking containers UNHEALTHY and triggering infinite ECS task restart loops.
       # startPeriod of 60s allows time for .NET startup, configuration
       # provider initialization (Secrets Manager, Parameter Store), and
       # SplendidInit.InitApp() database schema validation.
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}/api/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${var.container_port}/api/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -262,6 +265,15 @@ resource "aws_ecs_task_definition" "backend" {
       #
       # ASPNETCORE_URLS sets Kestrel's listen address to port 8080 (G2).
       # Cors__AllowedOrigins is empty for same-origin ALB deployment (G8).
+      #
+      # Configuration Hierarchy Note:
+      #   Session__Provider, Authentication__Mode, and Cors__AllowedOrigins
+      #   are INTENTIONALLY set here as defaults even though the same keys
+      #   exist in SSM Parameter Store (read by AwsParameterStoreProvider.cs).
+      #   In .NET configuration hierarchy, environment variables take
+      #   precedence over Parameter Store. SSM serves as an emergency
+      #   override mechanism — operators can change SSM values and restart
+      #   tasks to override these defaults without a new deployment.
       # -----------------------------------------------------------------
       environment = [
         {
@@ -281,6 +293,8 @@ resource "aws_ecs_task_definition" "backend" {
           value = "Forms"
         },
         {
+          # Legacy key: read by SplendidCRM.Core background services via
+          # Environment.GetEnvironmentVariable("SPLENDID_JOB_SERVER").
           name  = "SPLENDID_JOB_SERVER"
           value = "true"
         },
@@ -289,6 +303,11 @@ resource "aws_ecs_task_definition" "backend" {
           value = ""
         },
         {
+          # Modern key: read by ASP.NET Core configuration hierarchy via
+          # IConfiguration["Scheduler:JobServer"]. Both SPLENDID_JOB_SERVER
+          # and Scheduler__JobServer are set because the application reads
+          # both keys in different code paths — the legacy key for direct
+          # environment variable access and the modern key for IConfiguration.
           name  = "Scheduler__JobServer"
           value = "true"
         }
@@ -357,9 +376,11 @@ resource "aws_ecs_task_definition" "frontend" {
 
       # ECS container health check for the Nginx health endpoint.
       # /health is configured in nginx.conf as a stub returning 200 OK "ok".
-      # startPeriod of 15s is sufficient for Nginx (sub-second startup).
+      # Uses wget (BusyBox default in Alpine) because curl is NOT installed
+      # in the nginx:alpine runtime image. startPeriod of 15s is sufficient
+      # for Nginx (sub-second startup).
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3

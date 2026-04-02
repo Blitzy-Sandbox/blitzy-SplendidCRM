@@ -11,19 +11,16 @@
 # Data Sources:
 #   - aws_caller_identity.current — Provides the AWS account ID, ARN, and
 #     user ID of the entity executing Terraform (or the assumed role).
-#   - aws_region.current — Provides the name of the AWS region configured
-#     in the provider (e.g., "us-east-2").
+#   - aws_region.current — Provides the region identifier of the AWS region
+#     configured in the provider (e.g., "us-east-2").
 #
 # Cross-File References:
 #   - kms.tf         → data.aws_caller_identity.current.account_id
 #                       (KMS key policy root account ARN construction)
-#   - iam.tf         → data.aws_region.current.name,
+#   - iam.tf         → data.aws_region.current.region,
 #                       data.aws_caller_identity.current.account_id
 #                       (SSM Parameter Store ARN construction for IAM policies)
-#   - locals.tf      → data.aws_caller_identity.current.account_id,
-#                       data.aws_region.current.name
-#                       (Centralized computed values for naming and ARNs)
-#   - ecs-fargate.tf → data.aws_region.current.name
+#   - ecs-fargate.tf → data.aws_region.current.region
 #                       (CloudWatch awslogs-region in task definitions)
 #
 # ACME Compliance:
@@ -55,7 +52,7 @@ data "aws_caller_identity" "current" {}
 # hardcoding.
 #
 # Attributes exposed:
-#   - name        : The region name (e.g., "us-east-2")
+#   - region      : The region identifier (e.g., "us-east-2")
 #   - description : Human-readable region description
 # -----------------------------------------------------------------------------
 data "aws_region" "current" {}
