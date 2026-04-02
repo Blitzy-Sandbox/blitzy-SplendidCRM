@@ -17,11 +17,12 @@ Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 3. **SQL Server Management Studio** (for database management). Download [SSMS](https://docs.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)
 4. **Distributed session store** — Redis or SQL Server, configurable via the `SESSION_PROVIDER` environment variable
 5. **AWS credentials** (optional) — required only if using AWS Secrets Manager or AWS Systems Manager Parameter Store for configuration
+6. **Docker Engine** (latest stable) — required for containerized deployment. Download [Docker](https://docs.docker.com/get-docker/)
 
 ### Frontend (React SPA)
 
-6. **Node.js** version 16.20. Download [Node 16.20](https://nodejs.org/en/download/)
-7. **Yarn** version 1.22. Install via npm: `npm install --global yarn`
+7. **Node.js 20 LTS**. Download [Node.js 20 LTS](https://nodejs.org/en/download/)
+8. **npm** (included with Node.js) — package manager for frontend dependencies
 
 ### IDE / Editor
 
@@ -30,6 +31,12 @@ Any IDE or text editor capable of working with .NET projects:
 - **JetBrains Rider**
 - **Visual Studio 2022+**
 - Or simply the `dotnet` CLI from a terminal
+
+### Infrastructure & Deployment Tools
+
+9. **Terraform** >= 1.12.x — for infrastructure provisioning. Download [Terraform](https://www.terraform.io/downloads)
+10. **AWS CLI v2** — for ECR authentication and resource verification. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+11. **LocalStack Pro** 4.14.0 — for local infrastructure validation. Install [LocalStack](https://docs.localstack.cloud/getting-started/installation/)
 
 ## Using the Installer
 
@@ -102,6 +109,224 @@ We have designed the SQL scripts to be run to upgrade any existing database to t
 > end -- if;
 
 If you are wondering why we use "begin -- then" and "end -- if;" instead of simply "begin" and "end", it is so that we can more easily convert the code to support the Oracle PL/SQL format.
+
+## Docker
+
+SplendidCRM is packaged as two Docker containers for deployment to AWS ECS Fargate or any container orchestrator.
+
+### Docker Build
+
+```bash
+# Backend image (multi-stage: .NET 10 SDK → ASP.NET Alpine runtime, ≤500MB)
+docker build -f Dockerfile.backend -t splendidcrm-backend:latest .
+
+# Frontend image (multi-stage: Node 20 → Nginx Alpine, ≤100MB)
+docker build -f Dockerfile.frontend -t splendidcrm-frontend:latest .
+```
+
+Both Dockerfiles use multi-stage builds to minimize image size and exclude build tools from the runtime image. The Docker build context must be the repository root.
+
+### Docker Run (Local Development)
+
+```bash
+# Backend
+docker run -d --name splendidcrm-backend \
+  -p 8080:8080 \
+  -e ConnectionStrings__SplendidCRM="Server=host.docker.internal;Database=SplendidCRM;User Id=sa;Password=YourPassword;TrustServerCertificate=True" \
+  -e ASPNETCORE_ENVIRONMENT=Development \
+  -e SPLENDID_JOB_SERVER=docker \
+  -e SESSION_PROVIDER=SqlServer \
+  -e SESSION_CONNECTION="Server=host.docker.internal;Database=SplendidSession;User Id=sa;Password=YourPassword;TrustServerCertificate=True" \
+  -e AUTH_MODE=Forms \
+  -e CORS_ORIGINS="" \
+  splendidcrm-backend:latest
+
+# Frontend
+docker run -d --name splendidcrm-frontend \
+  -p 3000:80 \
+  -e API_BASE_URL="" \
+  -e SIGNALR_URL="" \
+  -e ENVIRONMENT=development \
+  splendidcrm-frontend:latest
+```
+
+The backend container runs Kestrel on port 8080. The frontend container runs Nginx on port 80, with runtime `config.json` injection from environment variables via the `docker-entrypoint.sh` script.
+
+### Local Validation
+
+```bash
+# Run all 12 Docker validation tests
+scripts/validate-docker-local.sh
+```
+
+The validation suite tests image builds, image sizes, health checks, config injection, SPA fallback routing, source map blocking, and end-to-end login flow.
+
+## Container Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Internal ALB (HTTP/HTTPS)                   │
+│                      Path-Based Routing Rules                   │
+├──────────────────────────────┬──────────────────────────────────┤
+│   Backend Paths              │   Frontend Default               │
+│   /Rest.svc/*                │   /* (all other paths)           │
+│   /Administration/Rest.svc/* │                                  │
+│   /hubs/*                    │                                  │
+│   /api/*                     │                                  │
+│   /App_Themes/*              │                                  │
+│   /Include/*                 │                                  │
+├──────────────────────────────┼──────────────────────────────────┤
+│   Backend Service            │   Frontend Service               │
+│   ASP.NET 10 Alpine          │   Nginx Alpine                   │
+│   Kestrel :8080              │   Port :80                       │
+│   App_Themes + Include       │   React SPA dist/                │
+│   static assets              │   Runtime config.json injection  │
+└──────────────┬───────────────┴──────────────────────────────────┘
+               │
+               ▼
+       ┌───────────────┐
+       │ RDS SQL Server │
+       │   Port 1433    │
+       └───────────────┘
+```
+
+### Backend Container
+
+- **Base image**: `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` with ICU and OpenSSL native dependencies
+- **Port**: Kestrel listens on port 8080 (`ASPNETCORE_URLS=http://+:8080`)
+- **Static assets**: `SplendidCRM/App_Themes/` and `SplendidCRM/Include/` are copied to `/SplendidCRM/` in the image for theme CSS, images, and shared JavaScript utilities
+- **Health check**: `GET /api/health` returns `200 OK` with JSON status payload
+- **Configuration**: All environment-specific values injected via ECS task definition environment variables and Secrets Manager references
+
+### Frontend Container
+
+- **Base image**: `nginx:alpine` serving the Vite-built React SPA from `/usr/share/nginx/html/`
+- **Port**: Nginx listens on port 80
+- **Runtime config injection**: `docker-entrypoint.sh` generates `/usr/share/nginx/html/config.json` from environment variables (`API_BASE_URL`, `SIGNALR_URL`, `ENVIRONMENT`) at container startup
+- **SPA fallback**: Nginx `try_files` directive routes all non-file paths to `index.html` for client-side routing
+- **Security**: Source maps deleted from image and blocked by Nginx (`*.map` → HTTP 404); security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`) applied to all responses
+- **Health check**: `GET /health` returns `200 OK`
+
+### Same-Origin Cookie Architecture
+
+Both backend and frontend services are deployed behind a single internal Application Load Balancer. This preserves the cookie-based session authentication by ensuring all requests share the same origin. The `API_BASE_URL` for the frontend is set to empty string (same-origin), eliminating cross-origin cookie issues.
+
+## Infrastructure (Terraform)
+
+All AWS infrastructure is provisioned via Terraform using standard `aws_*` resource blocks (LocalStack-compatible). For production deployments using ACME private Terraform modules, see the ACME module mapping documentation in the infrastructure module files.
+
+### Directory Structure
+
+```
+infrastructure/
+├── environments/
+│   ├── dev/                    Dev environment (512 CPU, 1024MB, 1–4 tasks)
+│   │   ├── versions.tf        Terraform Cloud backend + provider config
+│   │   ├── variables.tf       Variable definitions
+│   │   ├── dev.auto.tfvars    Dev-specific values
+│   │   ├── data.tf            VPC/subnet data sources
+│   │   ├── locals.tf          Dev sizing configuration
+│   │   └── main.tf            Module instantiation
+│   ├── staging/                Staging environment (1024 CPU, 2048MB, 2–6 tasks)
+│   ├── prod/                   Production environment (2048 CPU, 4096MB, 2–10 tasks)
+│   └── localstack/             LocalStack validation (local state, endpoint overrides)
+└── modules/
+    └── common/                 Shared resource definitions
+        ├── ecr.tf              2× ECR repositories (backend, frontend)
+        ├── ecs-fargate.tf      ECS cluster, 2× task definitions, 2× services
+        ├── alb.tf              Internal ALB with 7 listener rules
+        ├── rds.tf              RDS SQL Server instance
+        ├── security-groups.tf  4× security groups (ALB, Backend, Frontend, RDS)
+        ├── iam.tf              3× IAM roles with least-privilege policies
+        ├── kms.tf              KMS Customer Managed Key for secrets encryption
+        ├── secrets.tf          6× Secrets Manager + 8× Parameter Store entries
+        ├── cloudwatch.tf       CloudWatch log group and stream
+        ├── variables.tf        Module input variables
+        └── outputs.tf          10 required outputs
+```
+
+### LocalStack Validation
+
+Validate all Terraform plans against LocalStack before targeting real AWS:
+
+```bash
+# Start LocalStack
+localstack start -d
+
+# Run Terraform against LocalStack
+cd infrastructure/environments/localstack
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+# Run infrastructure validation (19 tests)
+scripts/validate-infra-localstack.sh
+```
+
+The LocalStack validation suite verifies resource creation (ECR, ECS, ALB, security groups, IAM, KMS, Secrets Manager, Parameter Store, RDS), idempotency (second `terraform plan` shows zero changes), and clean teardown (`terraform destroy` with zero orphans).
+
+### AWS Deployment
+
+```bash
+# Initialize environment
+cd infrastructure/environments/dev
+terraform init
+terraform plan -out=plan.out
+terraform apply plan.out
+```
+
+Environment-specific configurations are isolated to `*.auto.tfvars` files. The same common module is used across all environments with different sizing and scaling parameters.
+
+## Deployment
+
+### First-Time Deployment Sequence
+
+1. **Provision infrastructure** — `terraform apply` creates ECR repositories, ECS cluster (without running tasks), ALB, RDS, security groups, IAM roles, KMS key, Secrets Manager secrets, and Parameter Store parameters
+2. **Build and push images** — `scripts/build-and-push.sh` builds Docker images, runs the 12-test local validation suite, and pushes to ECR
+3. **Provision database schema** — `scripts/deploy-schema.sh` executes `Build.sql` (concatenated from `SQL Scripts Community/`) and the `SplendidSessions` DDL against the RDS instance
+4. **Start services** — `terraform apply` with `image_tag` variable set updates ECS task definitions with image URIs and starts the services
+
+### Subsequent Deployments
+
+1. Build and push new image tags:
+
+```bash
+# Build, validate, and push to ECR
+scripts/build-and-push.sh
+```
+
+2. Deploy with the new image tag:
+
+```bash
+cd infrastructure/environments/dev
+terraform apply -var="image_tag=v1.2.3"
+```
+
+This triggers an ECS rolling deployment — new tasks are started with the updated image before old tasks are drained and stopped.
+
+### Rollback
+
+Rollback is performed by applying the previous `image_tag` value via Terraform:
+
+```bash
+cd infrastructure/environments/dev
+terraform apply -var="image_tag=v1.2.2"
+```
+
+ECS deregisters the current tasks and launches the previous task definition revision. Target rollback time: under 5 minutes.
+
+### Database Schema Provisioning
+
+```bash
+# Provision schema against RDS (or local SQL Server)
+scripts/deploy-schema.sh
+```
+
+The schema deployment script:
+- Creates the `SplendidCRM` database if it does not exist
+- Executes `Build.sql` with a 600-second timeout (`sqlcmd -t 600`)
+- Applies the `SplendidSessions` DDL for ASP.NET Core distributed session support
+- Validates minimum object counts (≥218 tables, ≥583 views, ≥890 procedures)
 
 ## Configuration
 
