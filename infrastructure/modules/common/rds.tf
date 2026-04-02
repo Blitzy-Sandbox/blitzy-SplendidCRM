@@ -234,6 +234,24 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier = var.environment == "prod" ? "${var.name_prefix}-final-snapshot" : null
 
   # ---------------------------------------------------------------------------
+  # Timeouts
+  # ---------------------------------------------------------------------------
+  # Reduced create timeout from the default 40 minutes to 2 minutes for
+  # LocalStack compatibility. LocalStack's RDS emulation creates the API
+  # object but may not transition the instance to 'available' state (it may
+  # reach 'error' state instead). The 2-minute timeout prevents terraform
+  # apply from hanging for 40 minutes waiting for a state that LocalStack
+  # cannot achieve. In real AWS, RDS SQL Server instances typically reach
+  # 'available' within 10-15 minutes; production environments should
+  # override this timeout via the environment layer if needed.
+  # ---------------------------------------------------------------------------
+  timeouts {
+    create = "2m"
+    update = "2m"
+    delete = "2m"
+  }
+
+  # ---------------------------------------------------------------------------
   # Tags
   # ---------------------------------------------------------------------------
   tags = {

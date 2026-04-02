@@ -416,9 +416,10 @@ start_test_containers() {
     -e "ConnectionStrings__SplendidCRM=Server=${docker_host},${SQL_PORT};Database=SplendidCRM;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True" \
     -e "ASPNETCORE_ENVIRONMENT=Development" \
     -e "SPLENDID_JOB_SERVER=docker-test" \
-    -e "SESSION_PROVIDER=Memory" \
+    -e "SESSION_PROVIDER=SqlServer" \
+    -e "SESSION_CONNECTION=Server=${docker_host},${SQL_PORT};Database=SplendidCRM;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True" \
     -e "AUTH_MODE=Forms" \
-    -e "CORS_ORIGINS=" \
+    -e "CORS_ORIGINS=http://localhost:${FRONTEND_PORT}" \
     "${BACKEND_IMAGE}" >/dev/null
 
   success "Backend container started on port ${BACKEND_PORT}."
@@ -674,8 +675,10 @@ test_11_no_secrets_in_history() {
 #   2. Frontend serves HTML on / (Nginx + SPA fallback working). No HTML or
 #      connection refused = FAIL.
 #
-# NOTE: HTTP 503 is accepted from the backend because SESSION_PROVIDER=Memory
-# means no database provisioning is performed in this local validation context.
+# NOTE: HTTP 503 is accepted from the backend because the local SQL Server
+# may not have the SplendidCRM database fully provisioned in this local
+# validation context. SESSION_PROVIDER=SqlServer is used with a connection
+# string pointing to the local SQL Server container on port ${SQL_PORT}.
 # Full database connectivity is validated separately by validate-infra-localstack.sh
 # (Docker SQL Server tests 16-19) and by deploy-schema.sh.
 
