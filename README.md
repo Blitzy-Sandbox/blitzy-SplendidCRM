@@ -231,18 +231,21 @@ infrastructure/
 │   ├── prod/                   Production environment (2048 CPU, 4096MB, 2–10 tasks)
 │   └── localstack/             LocalStack validation (local state, endpoint overrides)
 └── modules/
-    └── common/                 Shared resource definitions
+    └── common/                 Shared resource definitions (14 files)
+        ├── alb.tf              Internal ALB with 7 listener rules
+        ├── cloudwatch.tf       CloudWatch log group and stream
+        ├── data.tf             Common data sources (caller identity, region)
         ├── ecr.tf              2× ECR repositories (backend, frontend)
         ├── ecs-fargate.tf      ECS cluster, 2× task definitions, 2× services
-        ├── alb.tf              Internal ALB with 7 listener rules
-        ├── rds.tf              RDS SQL Server instance
-        ├── security-groups.tf  4× security groups (ALB, Backend, Frontend, RDS)
         ├── iam.tf              3× IAM roles with least-privilege policies
         ├── kms.tf              KMS Customer Managed Key for secrets encryption
+        ├── locals.tf           Local values for naming and computed references
+        ├── main.tf             Module organization and provider requirements
+        ├── outputs.tf          10 required outputs
+        ├── rds.tf              RDS SQL Server instance
         ├── secrets.tf          6× Secrets Manager + 8× Parameter Store entries
-        ├── cloudwatch.tf       CloudWatch log group and stream
-        ├── variables.tf        Module input variables
-        └── outputs.tf          10 required outputs
+        ├── security-groups.tf  4× security groups (ALB, Backend, Frontend, RDS)
+        └── variables.tf        Module input variables
 ```
 
 ### LocalStack Validation

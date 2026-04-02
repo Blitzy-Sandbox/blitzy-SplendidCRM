@@ -8,8 +8,8 @@
 #           AWS ECR, tags, and pushes both images. This is the primary CI/CD
 #           image delivery script for the SplendidCRM containerization pipeline.
 #
-# Usage:    IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 ./scripts/build-and-push.sh
-#           IMAGE_TAG=abc123 AWS_ACCOUNT_ID=123456789012 AWS_REGION=us-west-2 bash scripts/build-and-push.sh
+# Usage:    IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-dev ./scripts/build-and-push.sh
+#           IMAGE_TAG=abc123 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-staging AWS_REGION=us-west-2 bash scripts/build-and-push.sh
 #           ./scripts/build-and-push.sh --help
 #
 # Required Environment Variables:
@@ -17,6 +17,10 @@
 #                     Applied to both backend and frontend images.
 #   AWS_ACCOUNT_ID  — AWS account ID for constructing ECR registry URIs
 #                     (e.g., 123456789012).
+#   NAME_PREFIX     — Terraform name_prefix value for the target environment
+#                     (e.g., splendidcrm-dev, splendidcrm-staging, splendidcrm-prod).
+#                     Used to construct ECR repository names matching Terraform's
+#                     ACME naming convention: ${NAME_PREFIX}-backend, ${NAME_PREFIX}-frontend.
 #
 # Optional Environment Variables:
 #   AWS_REGION      — AWS region for ECR (default: us-east-2, ACME standard).
@@ -35,9 +39,9 @@
 #   8. Verification (aws ecr describe-images)
 #   9. Summary and exit
 #
-# ECR Repository Names (must match Terraform resource names):
-#   splendidcrm-backend   — ASP.NET Core 10 backend (Kestrel, port 8080)
-#   splendidcrm-frontend  — React 19 / Nginx frontend (port 80)
+# ECR Repository Names (constructed from NAME_PREFIX to match Terraform):
+#   ${NAME_PREFIX}-backend   — ASP.NET Core 10 backend (Kestrel, port 8080)
+#   ${NAME_PREFIX}-frontend  — React 19 / Nginx frontend (port 80)
 #
 # Exit Codes:
 #   0 — All phases completed successfully: build, validation, push, verify.
@@ -53,9 +57,10 @@
 # CRITICAL Constraints:
 #   - Local validation is MANDATORY before push — no skip flag exists.
 #   - All 12 local Docker validation tests must pass before any ECR push.
-#   - IMAGE_TAG and AWS_ACCOUNT_ID are REQUIRED — no defaults provided.
+#   - IMAGE_TAG, AWS_ACCOUNT_ID, and NAME_PREFIX are REQUIRED — no defaults provided.
 #   - AWS_REGION defaults to us-east-2 (ACME standard region).
-#   - ECR repository names match Terraform: splendidcrm-backend, splendidcrm-frontend.
+#   - ECR repository names are constructed as ${NAME_PREFIX}-backend and
+#     ${NAME_PREFIX}-frontend, matching Terraform's ACME naming convention.
 #   - Images remain locally after push for debugging — no cleanup performed.
 #
 # Note: This script MUST be run from the repository root directory.
@@ -103,8 +108,8 @@ usage() {
 SplendidCRM CI/CD — Docker Image Build, Validate, and Push to ECR
 
 Usage:
-  IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 ./scripts/build-and-push.sh
-  IMAGE_TAG=abc123 AWS_ACCOUNT_ID=123456789012 AWS_REGION=us-west-2 bash scripts/build-and-push.sh
+  IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-dev ./scripts/build-and-push.sh
+  IMAGE_TAG=abc123 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-staging AWS_REGION=us-west-2 bash scripts/build-and-push.sh
   ./scripts/build-and-push.sh --help
 
 Required Environment Variables:
@@ -113,6 +118,10 @@ Required Environment Variables:
 
   AWS_ACCOUNT_ID  AWS account ID for constructing ECR registry URIs
                   (e.g., 123456789012).
+
+  NAME_PREFIX     Terraform name_prefix value for the target environment
+                  (e.g., splendidcrm-dev, splendidcrm-staging, splendidcrm-prod).
+                  Constructs ECR repo names: ${NAME_PREFIX}-backend, ${NAME_PREFIX}-frontend.
 
 Optional Environment Variables:
   AWS_REGION      AWS region for ECR (default: us-east-2, ACME standard).
@@ -131,9 +140,9 @@ Phase Sequence:
   8. Verify pushed images exist in ECR
   9. Print summary with full ECR URIs
 
-ECR Repository Names:
-  splendidcrm-backend   ASP.NET Core 10 backend (Kestrel, port 8080)
-  splendidcrm-frontend  React 19 / Nginx frontend (port 80)
+ECR Repository Names (constructed from NAME_PREFIX, matching Terraform):
+  ${NAME_PREFIX}-backend   ASP.NET Core 10 backend (Kestrel, port 8080)
+  ${NAME_PREFIX}-frontend  React 19 / Nginx frontend (port 80)
 
 CRITICAL:
   - ALL 12 local validation tests must pass before any ECR push.
@@ -141,14 +150,14 @@ CRITICAL:
   - Images remain locally after push for debugging.
 
 Examples:
-  # Build, validate, and push with a semantic version tag
-  IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 ./scripts/build-and-push.sh
+  # Build, validate, and push with a semantic version tag (dev environment)
+  IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-dev ./scripts/build-and-push.sh
 
-  # Build, validate, and push with a commit SHA tag
-  IMAGE_TAG=$(git rev-parse --short HEAD) AWS_ACCOUNT_ID=123456789012 ./scripts/build-and-push.sh
+  # Build, validate, and push with a commit SHA tag (staging environment)
+  IMAGE_TAG=$(git rev-parse --short HEAD) AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-staging ./scripts/build-and-push.sh
 
-  # Use a different AWS region
-  IMAGE_TAG=latest AWS_ACCOUNT_ID=123456789012 AWS_REGION=us-west-2 ./scripts/build-and-push.sh
+  # Use a different AWS region (prod environment)
+  IMAGE_TAG=latest AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-prod AWS_REGION=us-west-2 ./scripts/build-and-push.sh
 HELPEOF
 }
 
@@ -174,6 +183,7 @@ done
 # ${VAR:?message} exits with code 1 and prints message if VAR is unset or empty.
 readonly IMAGE_TAG="${IMAGE_TAG:?ERROR: IMAGE_TAG environment variable is required. Set it to the Docker image version tag (e.g., v1.0.0, latest, commit SHA).}"
 readonly AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:?ERROR: AWS_ACCOUNT_ID environment variable is required. Set it to the 12-digit AWS account ID for ECR.}"
+readonly NAME_PREFIX="${NAME_PREFIX:?ERROR: NAME_PREFIX environment variable is required. Set it to the Terraform name_prefix value for the target environment (e.g., splendidcrm-dev, splendidcrm-staging, splendidcrm-prod).}"
 
 # Optional: AWS_REGION defaults to us-east-2 (ACME standard region).
 readonly AWS_REGION="${AWS_REGION:-us-east-2}"
@@ -182,11 +192,14 @@ readonly AWS_REGION="${AWS_REGION:-us-east-2}"
 # Format: <account-id>.dkr.ecr.<region>.amazonaws.com
 readonly ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-# ECR repository names — must match Terraform resource names in
-# infrastructure/modules/common/ecr.tf to ensure tag/push targets the
-# correct repositories provisioned by Terraform.
-readonly BACKEND_REPO="splendidcrm-backend"
-readonly FRONTEND_REPO="splendidcrm-frontend"
+# ECR repository names — constructed from NAME_PREFIX to match Terraform's
+# ACME naming convention in infrastructure/modules/common/ecr.tf:
+#   name = "${var.name_prefix}-backend"
+#   name = "${var.name_prefix}-frontend"
+# This ensures tag/push targets the correct repositories provisioned by
+# Terraform for the target environment.
+readonly BACKEND_REPO="${NAME_PREFIX}-backend"
+readonly FRONTEND_REPO="${NAME_PREFIX}-frontend"
 
 # Local image names (local tag applied during docker build)
 readonly BACKEND_LOCAL_TAG="${BACKEND_REPO}:${IMAGE_TAG}"
@@ -216,8 +229,11 @@ echo ""
 info "Configuration:"
 info "  IMAGE_TAG:      ${IMAGE_TAG}"
 info "  AWS_ACCOUNT_ID: ${AWS_ACCOUNT_ID}"
+info "  NAME_PREFIX:    ${NAME_PREFIX}"
 info "  AWS_REGION:     ${AWS_REGION}"
 info "  ECR_REGISTRY:   ${ECR_REGISTRY}"
+info "  Backend repo:   ${BACKEND_REPO}"
+info "  Frontend repo:  ${FRONTEND_REPO}"
 info "  Backend image:  ${BACKEND_ECR_URI}"
 info "  Frontend image: ${FRONTEND_ECR_URI}"
 echo ""
@@ -370,9 +386,10 @@ echo ""
 # Phase 7: Tag and Push
 # =============================================================================
 # Tag both locally-built images with their full ECR URIs, then push to ECR.
-# ECR repository names must match Terraform-provisioned resources:
-#   splendidcrm-backend  → infrastructure/modules/common/ecr.tf
-#   splendidcrm-frontend → infrastructure/modules/common/ecr.tf
+# ECR repository names are constructed from NAME_PREFIX to match
+# Terraform-provisioned resources in infrastructure/modules/common/ecr.tf:
+#   ${NAME_PREFIX}-backend  (e.g., splendidcrm-dev-backend)
+#   ${NAME_PREFIX}-frontend (e.g., splendidcrm-dev-frontend)
 
 info "Phase 7: Tagging and pushing images to ECR..."
 echo ""

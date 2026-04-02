@@ -235,8 +235,8 @@ curl http://localhost:5000/api/health
 
 | Endpoint Pattern | Description |
 |---|---|
-| `/Rest.svc/*` | CRM REST API (152 endpoints) |
-| `/Administration/Rest.svc/*` | Admin REST API (65 endpoints) |
+| `/Rest.svc/*` | CRM REST API (82 endpoints) |
+| `/Administration/Rest.svc/*` | Admin REST API (58 endpoints) |
 | `/hubs/chat` | SignalR ChatHub |
 | `/hubs/twilio` | SignalR TwilioHub |
 | `/hubs/phoneburner` | SignalR PhoneBurnerHub |
@@ -297,8 +297,8 @@ The proxy rules configured in `vite.config.ts` route API requests to the backend
 
 | URL Pattern | Target | Description |
 |---|---|---|
-| `/Rest.svc/**` | `http://localhost:5000` | CRM REST API — 152 endpoints |
-| `/Administration/Rest.svc/**` | `http://localhost:5000` | Admin API — 65 endpoints |
+| `/Rest.svc/**` | `http://localhost:5000` | CRM REST API — 82 endpoints |
+| `/Administration/Rest.svc/**` | `http://localhost:5000` | Admin API — 58 endpoints |
 | `/hubs/**` | `http://localhost:5000` (WebSocket) | SignalR hub connections (`ws: true`) |
 | `/api/**` | `http://localhost:5000` | Health check and utility endpoints |
 | `/App_Themes/**` | `http://localhost:5000` | Theme CSS and assets |
@@ -898,12 +898,17 @@ scripts/validate-infra-localstack.sh
 
 | Category | Count | Tests |
 |---|---|---|
-| LocalStack resource verification | 15 | ECR repos, ECS cluster, task definitions, services, ALB, target groups, listener rules, security groups, IAM roles, KMS key, Secrets Manager, Parameter Store, RDS, CloudWatch log group, CloudWatch stream |
-| Idempotency | 1 | Second `terraform plan` shows zero changes |
-| Clean teardown | 1 | `terraform destroy` completes with no orphaned resources |
-| Docker SQL Server schema | 4 | DB creation, ≥218 tables, ≥583 views, ≥890 procedures |
+| LocalStack resource verification (Tests 01–15) | 15 | ECR repos, ECS cluster, task definitions, services, ALB, target groups, listener rules, security groups, IAM roles, KMS key, Secrets Manager, Parameter Store, RDS, CloudWatch log group, CloudWatch stream |
+| Docker SQL Server schema (Tests 16–19) | 4 | DB creation, ≥218 tables, ≥583 views, ≥890 procedures |
 
-> **Note:** All 19 tests must pass before targeting real AWS environments (dev, staging, prod).
+In addition to the 19 numbered tests, the script performs two unnumbered validation phases:
+
+| Validation Phase | Description |
+|---|---|
+| Idempotency check | Second `terraform plan` shows zero changes (run after Tests 01–15) |
+| Clean teardown | `terraform destroy` completes with no orphaned resources (run after all tests) |
+
+> **Note:** All 19 numbered tests plus both validation phases must pass before targeting real AWS environments (dev, staging, prod).
 
 ### Schema Deployment Validation
 
@@ -927,7 +932,7 @@ The `deploy-schema.sh` script performs the following steps:
 ### Prerequisites
 
 - AWS CLI v2 configured with IAM credentials that have `ecr:GetAuthorizationToken`, `ecr:BatchCheckLayerAvailability`, `ecr:PutImage`, and related permissions
-- ECR repositories must exist (created by Terraform): `splendidcrm-backend` and `splendidcrm-frontend`
+- ECR repositories must exist (created by Terraform): `${NAME_PREFIX}-backend` and `${NAME_PREFIX}-frontend` (e.g., `splendidcrm-dev-backend`, `splendidcrm-dev-frontend` for dev environment)
 - All 12 local Docker validation tests (Section 15) must pass
 
 ### Manual ECR Push
@@ -937,29 +942,36 @@ The `deploy-schema.sh` script performs the following steps:
 export AWS_ACCOUNT_ID="123456789012"
 export AWS_REGION="us-east-2"
 export IMAGE_TAG="v1.0.0"
+export NAME_PREFIX="splendidcrm-dev"  # Must match Terraform name_prefix for target environment
 export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 # Authenticate with ECR
 aws ecr get-login-password --region ${AWS_REGION} | \
   docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-# Tag images
-docker tag splendidcrm-backend:latest ${ECR_REGISTRY}/splendidcrm-backend:${IMAGE_TAG}
-docker tag splendidcrm-frontend:latest ${ECR_REGISTRY}/splendidcrm-frontend:${IMAGE_TAG}
+# Tag images (repo names match Terraform: ${NAME_PREFIX}-backend, ${NAME_PREFIX}-frontend)
+docker tag splendidcrm-backend:latest ${ECR_REGISTRY}/${NAME_PREFIX}-backend:${IMAGE_TAG}
+docker tag splendidcrm-frontend:latest ${ECR_REGISTRY}/${NAME_PREFIX}-frontend:${IMAGE_TAG}
 
 # Push
-docker push ${ECR_REGISTRY}/splendidcrm-backend:${IMAGE_TAG}
-docker push ${ECR_REGISTRY}/splendidcrm-frontend:${IMAGE_TAG}
+docker push ${ECR_REGISTRY}/${NAME_PREFIX}-backend:${IMAGE_TAG}
+docker push ${ECR_REGISTRY}/${NAME_PREFIX}-frontend:${IMAGE_TAG}
 ```
 
 ### Automated Push (Recommended)
 
 ```bash
-# Build, validate, and push in one step
-IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 scripts/build-and-push.sh
+# Build, validate, and push in one step (dev environment)
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-dev scripts/build-and-push.sh
+
+# For staging
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-staging scripts/build-and-push.sh
+
+# For production
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-prod scripts/build-and-push.sh
 ```
 
-This script builds both images, runs all 12 validation tests, then pushes to ECR. It aborts immediately if any validation test fails.
+This script builds both images, runs all 12 validation tests, then pushes to ECR. It aborts immediately if any validation test fails. The `NAME_PREFIX` must match the `name_prefix` Terraform variable for the target environment to ensure ECR repository names align (e.g., `splendidcrm-dev-backend`, `splendidcrm-dev-frontend`).
 
 ### Image Tagging Conventions
 
@@ -996,8 +1008,8 @@ Both backend and frontend services are deployed behind a **single internal Appli
 
 | Priority | Path Pattern | Target | Request Types |
 |---|---|---|---|
-| 1 | `/Rest.svc/*` | Backend | 152 main REST API endpoints |
-| 2 | `/Administration/Rest.svc/*` | Backend | 65 admin REST API endpoints |
+| 1 | `/Rest.svc/*` | Backend | 82 main REST API endpoints |
+| 2 | `/Administration/Rest.svc/*` | Backend | 58 admin REST API endpoints |
 | 3 | `/hubs/*` | Backend | SignalR WebSocket hubs (chat, twilio, phoneburner) |
 | 4 | `/api/*` | Backend | Health check and utility endpoints |
 | 5 | `/App_Themes/*` | Backend | Theme CSS/images served by ASP.NET Core static files |
