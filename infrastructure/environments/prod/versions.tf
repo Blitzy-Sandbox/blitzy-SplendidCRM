@@ -10,7 +10,7 @@
 #   - Workspace naming: {app}-{env} → splendidcrm-prod
 #   - Assume role: acme-tfe-assume-role for TFE→AWS cross-account access
 #   - Default tags: 14 mandatory tags for cost allocation and compliance
-#   - Region: us-east-2 (matches VPC tag acme-dev-vpc-use2)
+#   - Region: us-east-2 (matches VPC tag acme-prod-vpc-use2)
 # -----------------------------------------------------------------------------
 
 terraform {
@@ -52,7 +52,7 @@ terraform {
 # The provider uses cross-account assume_role via the standard ACME TFE role.
 # The role ARN is constructed dynamically from var.account_id to support
 # multiple AWS accounts without hardcoded values. Region is us-east-2 to
-# match the ACME development VPC (acme-dev-vpc-use2).
+# match the ACME production VPC (acme-prod-vpc-use2).
 #
 # Default tags are applied automatically to ALL resources created by this
 # provider, ensuring ACME compliance for cost allocation, ownership tracking,

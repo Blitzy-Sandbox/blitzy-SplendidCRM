@@ -8,7 +8,7 @@
 # -----------------------------------------------------------------------------
 # VPC Discovery
 # -----------------------------------------------------------------------------
-# "acme-dev-vpc-use2" is the ACME development VPC name tag in us-east-2.
+# "acme-prod-vpc-use2" is the ACME production VPC name tag in us-east-2.
 # ACME naming convention: {company}-{env}-vpc-{region_short}
 # Consumed by main.tf as:
 #   data.aws_vpc.main.id         → vpc_id
@@ -17,7 +17,7 @@
 data "aws_vpc" "main" {
   filter {
     name   = "tag:Name"
-    values = ["acme-dev-vpc-use2"]
+    values = ["acme-prod-vpc-use2"]
   }
 }
 
