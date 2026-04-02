@@ -370,13 +370,16 @@ resource "aws_ssm_parameter" "log_level" {
 # Must be provided together with DUO_INTEGRATION_KEY and DUO_SECRET_KEY
 # secrets for Duo 2FA to function. Stored as a parameter (not a secret)
 # because the API hostname is not a credential.
-# Default: empty string (Duo 2FA disabled).
+# Default: "not-configured" — sentinel value indicating Duo 2FA is disabled.
+# AWS SSM Parameter Store requires value length >= 1 (empty string is not
+# permitted by the AWS API), so "not-configured" is used as the default.
+# Operators replace this with the actual Duo API hostname when enabling 2FA.
 # Maps to appsettings.json key: Duo.ApiHostname
 # -----------------------------------------------------------------------------
 resource "aws_ssm_parameter" "duo_api_hostname" {
   name        = "/splendidcrm/${var.environment}/duo-api-hostname"
   type        = "String"
-  value       = ""
+  value       = "not-configured"
   description = "Duo Security API hostname"
 
   tags = {
@@ -395,14 +398,20 @@ resource "aws_ssm_parameter" "duo_api_hostname" {
 # string — the frontend and backend share the same ALB DNS name, so
 # CORS is not needed. API_BASE_URL in the frontend is also empty for
 # same-origin cookie architecture.
-# Default: empty string (same-origin ALB deployment).
+# Default: "not-configured" — sentinel value for same-origin ALB deployment.
+# AWS SSM Parameter Store requires value length >= 1 (empty string is not
+# permitted by the AWS API), so "not-configured" is used as the default.
+# When both frontend and backend are behind the same ALB, no CORS headers
+# are needed and "not-configured" will not match any real Origin header.
+# Operators replace this with actual origin URLs when cross-origin access
+# is required (e.g., "https://app.example.com,https://admin.example.com").
 # Maps to appsettings.json key: Cors.AllowedOrigins
 # -----------------------------------------------------------------------------
 resource "aws_ssm_parameter" "cors_origins" {
   name        = "/splendidcrm/${var.environment}/cors-origins"
   type        = "String"
-  value       = ""
-  description = "CORS allowed origins (empty for same-origin ALB)"
+  value       = "not-configured"
+  description = "CORS allowed origins (not-configured for same-origin ALB)"
 
   tags = {
     Name = "${var.name_prefix}-ssm-cors-origins"

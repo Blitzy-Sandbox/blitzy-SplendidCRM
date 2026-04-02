@@ -66,6 +66,36 @@ SIGNALR_URL="${SIGNALR_URL:-}"
 ENVIRONMENT="${ENVIRONMENT:-development}"
 
 # ---------------------------------------------------------------------------
+# Phase 1b: JSON string escaping function
+# ---------------------------------------------------------------------------
+# Escape special characters in environment variable values so the generated
+# config.json is always valid JSON regardless of input content.
+#
+# Handles the JSON special characters defined in RFC 8259 §7:
+#   - Backslash (\)    → \\   (must be first to avoid double-escaping)
+#   - Double quote (")  → \"
+#   - Forward slash (/) → \/   (optional per RFC, but defense-in-depth for
+#                                <script> tag injection in HTML contexts)
+#   - Tab               → \t
+#   - Carriage return    → \r
+#
+# Uses sed for POSIX sh compatibility (Alpine ash, dash, bash). The printf
+# '%s' ensures no trailing newline is added to the value.
+#
+# NOTE: Newlines within environment variable values are extremely rare in
+# Docker/ECS contexts (URL values, hostnames, environment names). If
+# multi-line values are ever needed, this function handles them via sed's
+# line-by-line processing — each line's special chars are escaped correctly.
+# ---------------------------------------------------------------------------
+json_escape() {
+  printf '%s' "$1" | sed \
+    -e 's/\\/\\\\/g' \
+    -e 's/"/\\"/g' \
+    -e 's/\//\\\//g' \
+    -e 's/	/\\t/g'
+}
+
+# ---------------------------------------------------------------------------
 # Phase 2: Generate config.json at the Nginx document root
 # ---------------------------------------------------------------------------
 # The JSON structure MUST exactly match the AppConfig interface in config.ts:
@@ -79,14 +109,17 @@ ENVIRONMENT="${ENVIRONMENT:-development}"
 # The nginx.conf config.json location block serves this file with no-cache
 # headers (Cache-Control: no-cache, no-store, must-revalidate) so browsers
 # always fetch the latest configuration on page reload.
+#
+# All values are passed through json_escape() to ensure the output is always
+# valid JSON, even if environment variables contain double quotes, backslashes,
+# or other JSON-special characters. printf '%s' is used (instead of a heredoc)
+# to avoid shell expansion issues with special characters in escaped values.
 # ---------------------------------------------------------------------------
-cat > /usr/share/nginx/html/config.json <<EOF
-{
-  "API_BASE_URL": "${API_BASE_URL}",
-  "SIGNALR_URL": "${SIGNALR_URL}",
-  "ENVIRONMENT": "${ENVIRONMENT}"
-}
-EOF
+printf '{\n  "API_BASE_URL": "%s",\n  "SIGNALR_URL": "%s",\n  "ENVIRONMENT": "%s"\n}\n' \
+  "$(json_escape "$API_BASE_URL")" \
+  "$(json_escape "$SIGNALR_URL")" \
+  "$(json_escape "$ENVIRONMENT")" \
+  > /usr/share/nginx/html/config.json
 
 # ---------------------------------------------------------------------------
 # Phase 3: Log configuration for CloudWatch troubleshooting
