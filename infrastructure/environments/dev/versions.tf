@@ -1,0 +1,93 @@
+# -----------------------------------------------------------------------------
+# Terraform Cloud Backend & Provider Configuration — Dev Environment
+# -----------------------------------------------------------------------------
+# This file configures the ACME enterprise Terraform Cloud (TFE) backend,
+# required Terraform and provider versions, and the AWS provider with
+# cross-account assume_role access and 14 ACME-standard default tags.
+#
+# ACME Standards:
+#   - Backend: Terraform Cloud at tfe.acme.com (NOT S3 or local)
+#   - Workspace naming: {app}-{env} → splendidcrm-dev
+#   - Assume role: acme-tfe-assume-role for TFE→AWS cross-account access
+#   - Default tags: 14 mandatory tags for cost allocation and compliance
+#   - Region: us-east-2 (matches VPC tag acme-dev-vpc-use2)
+# -----------------------------------------------------------------------------
+
+terraform {
+  # ---------------------------------------------------------------------------
+  # ACME Terraform Cloud Backend
+  # ---------------------------------------------------------------------------
+  # All ACME infrastructure state is managed by Terraform Enterprise at
+  # tfe.acme.com. This ensures state locking, audit trail, and policy
+  # enforcement across all environments. The workspace name follows the
+  # ACME convention: {application}-{environment}.
+  # ---------------------------------------------------------------------------
+  cloud {
+    hostname     = "tfe.acme.com"
+    organization = "acme"
+
+    workspaces {
+      name = "splendidcrm-dev"
+    }
+  }
+
+  # Terraform CLI version constraint — requires 1.12.x or newer for cloud
+  # block support and latest provider compatibility
+  required_version = ">= 1.12.0"
+
+  # ---------------------------------------------------------------------------
+  # Required Providers
+  # ---------------------------------------------------------------------------
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 6.0.0"
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# AWS Provider Configuration
+# -----------------------------------------------------------------------------
+# The provider uses cross-account assume_role via the standard ACME TFE role.
+# The role ARN is constructed dynamically from var.account_id to support
+# multiple AWS accounts without hardcoded values. Region is us-east-2 to
+# match the ACME development VPC (acme-dev-vpc-use2).
+#
+# Default tags are applied automatically to ALL resources created by this
+# provider, ensuring ACME compliance for cost allocation, ownership tracking,
+# and operational reporting.
+# -----------------------------------------------------------------------------
+provider "aws" {
+  region = "us-east-2"
+
+  assume_role {
+    role_arn = "arn:aws:iam::${var.account_id}:role/acme-tfe-assume-role"
+  }
+
+  default_tags {
+    tags = {
+      # Admin tags — environment classification and management tracking
+      "admin:environment"         = var.environment
+      "admin:managed_by"          = "terraform"
+      "admin:terraform_workspace" = "splendidcrm-dev"
+
+      # FinOps tags — cost allocation and budget tracking
+      "finops:portfolio"    = var.portfolio
+      "finops:cost_center"  = var.cost_center
+      "finops:budget_owner" = var.owner_email
+
+      # Ops tags — operational ownership and service catalog
+      "ops:owner"       = var.owner_email
+      "ops:application" = "splendidcrm"
+      "ops:component"   = var.name_prefix
+      "ops:environment" = var.environment
+      "ops:managed_by"  = "terraform"
+      "ops:repository"  = "splendidcrm"
+      "ops:team"        = "CRM Engineering"
+
+      # Global managed_by tag — top-level IaC indicator
+      "managed_by" = "terraform"
+    }
+  }
+}
