@@ -144,6 +144,15 @@ module "common" {
   # valid ACM certificate ARN in real AWS environments (dev/staging/prod).
   # ---------------------------------------------------------------------------
   certificate_arn = var.certificate_arn
+
+  # ---------------------------------------------------------------------------
+  # Monitoring / Alerting Configuration
+  # ---------------------------------------------------------------------------
+  # Empty string disables alarm actions — alarms still change state but send
+  # no notifications. LocalStack does not support SNS delivery; this ensures
+  # alarm resources are created for validation without delivery failures.
+  # ---------------------------------------------------------------------------
+  alarm_sns_arn = ""
 }
 
 # =============================================================================

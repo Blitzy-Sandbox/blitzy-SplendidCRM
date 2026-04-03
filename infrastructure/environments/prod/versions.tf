@@ -67,27 +67,27 @@ provider "aws" {
 
   default_tags {
     tags = {
-      # Admin tags — environment classification and management tracking
-      "admin:environment"         = var.environment
-      "admin:managed_by"          = "terraform"
-      "admin:terraform_workspace" = "splendidcrm-prod"
+      # Admin tags — environment classification
+      "admin:environment" = var.environment
 
       # FinOps tags — cost allocation and budget tracking
-      "finops:portfolio"    = var.portfolio
-      "finops:cost_center"  = var.cost_center
-      "finops:budget_owner" = var.owner_email
+      "finops:portfolio"   = var.portfolio
+      "finops:costcenter"  = var.cost_center
+      "finops:owner"       = var.owner_email
+      "finops:application" = "splendidcrm"
 
-      # Ops tags — operational ownership and service catalog
-      "ops:owner"       = var.owner_email
-      "ops:application" = "splendidcrm"
-      "ops:component"   = var.name_prefix
-      "ops:environment" = var.environment
-      "ops:managed_by"  = "terraform"
-      "ops:repository"  = "splendidcrm"
-      "ops:team"        = "CRM Engineering"
+      # Global managed_by tag — IaC provenance indicator (AFT = Account Factory for Terraform)
+      "managed_by" = "AFT"
 
-      # Global managed_by tag — top-level IaC indicator
-      "managed_by" = "terraform"
+      # Ops tags — backup and DR schedule placeholders (required by ACME Sentinel)
+      "ops:backupschedule1" = "none"
+      "ops:backupschedule2" = "none"
+      "ops:backupschedule3" = "none"
+      "ops:backupschedule4" = "none"
+      "ops:drschedule1"     = "none"
+      "ops:drschedule2"     = "none"
+      "ops:drschedule3"     = "none"
+      "ops:drschedule4"     = "none"
     }
   }
 }

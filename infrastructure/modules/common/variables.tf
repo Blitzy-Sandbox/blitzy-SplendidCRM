@@ -301,3 +301,18 @@ variable "certificate_arn" {
   description = "ACM certificate ARN for HTTPS listener on the ALB. Set to empty string to disable HTTPS listener (HTTP-only mode for LocalStack testing)."
   default     = ""
 }
+
+# -----------------------------------------------------------------------------
+# Phase 9: Monitoring / Alerting Variables
+# -----------------------------------------------------------------------------
+# Optional SNS topic ARN for CloudWatch alarm notifications. When empty
+# (default), alarms still change state (ALARM/OK/INSUFFICIENT_DATA) but send
+# no notifications. This allows safe deployment in LocalStack and dev
+# environments without requiring an SNS topic to be pre-created.
+# -----------------------------------------------------------------------------
+
+variable "alarm_sns_arn" {
+  type        = string
+  description = "ARN of the SNS topic for CloudWatch alarm notifications. Empty string disables alarm actions (alarms still trigger state changes but send no notifications)."
+  default     = ""
+}

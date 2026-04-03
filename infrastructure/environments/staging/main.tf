@@ -133,6 +133,15 @@ module "common" {
   # provide a certificate.
   # ---------------------------------------------------------------------------
   certificate_arn = var.certificate_arn
+
+  # ---------------------------------------------------------------------------
+  # Monitoring / Alerting Configuration
+  # ---------------------------------------------------------------------------
+  # Empty string disables alarm actions — alarms still change state but send
+  # no notifications. Set to a valid SNS topic ARN to enable CloudWatch alarm
+  # notifications for operational alerting.
+  # ---------------------------------------------------------------------------
+  alarm_sns_arn = ""
 }
 
 # =============================================================================

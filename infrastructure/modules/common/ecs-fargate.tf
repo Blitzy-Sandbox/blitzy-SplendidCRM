@@ -339,8 +339,8 @@ resource "aws_ecs_task_definition" "frontend" {
   family                   = "${var.name_prefix}-frontend-task"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = var.task_cpu
-  memory                   = var.task_memory
+  cpu                      = floor(var.task_cpu / 2)
+  memory                   = floor(var.task_memory / 2)
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.frontend_task.arn
 
