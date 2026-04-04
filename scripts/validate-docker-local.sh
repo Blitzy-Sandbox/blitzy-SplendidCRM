@@ -385,6 +385,22 @@ start_test_containers() {
 
   if [ "${sql_ready}" = true ]; then
     success "SQL Server ready on port ${SQL_PORT} (${elapsed}s)."
+
+    # ── Schema Provisioning ──────────────────────────────────────────
+    # Deploy SplendidCRM schema against the local test SQL container.
+    # This must run BEFORE the backend starts so /api/health returns 200
+    # instead of 503 (DB not connected).
+    info "Provisioning SplendidCRM schema via deploy-schema.sh..."
+    if env DB_HOST=localhost \
+          DB_PORT="${SQL_PORT}" \
+          SA_PASSWORD="${SA_PASSWORD}" \
+          bash scripts/deploy-schema.sh; then
+      success "Schema provisioned successfully — backend should return HTTP 200."
+    else
+      warn "Schema provisioning failed — backend may still return HTTP 503."
+    fi
+    # ────────────────────────────────────────────────────────────────
+
   else
     warn "SQL Server did not become ready within ${max_wait}s — backend tests may fail."
   fi
