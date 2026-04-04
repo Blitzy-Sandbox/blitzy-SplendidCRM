@@ -235,8 +235,8 @@ curl http://localhost:5000/api/health
 
 | Endpoint Pattern | Description |
 |---|---|
-| `/Rest.svc/*` | CRM REST API (152 endpoints) |
-| `/Administration/Rest.svc/*` | Admin REST API (65 endpoints) |
+| `/Rest.svc/*` | CRM REST API (82 endpoints) |
+| `/Administration/Rest.svc/*` | Admin REST API (58 endpoints) |
 | `/hubs/chat` | SignalR ChatHub |
 | `/hubs/twilio` | SignalR TwilioHub |
 | `/hubs/phoneburner` | SignalR PhoneBurnerHub |
@@ -297,8 +297,8 @@ The proxy rules configured in `vite.config.ts` route API requests to the backend
 
 | URL Pattern | Target | Description |
 |---|---|---|
-| `/Rest.svc/**` | `http://localhost:5000` | CRM REST API — 152 endpoints |
-| `/Administration/Rest.svc/**` | `http://localhost:5000` | Admin API — 65 endpoints |
+| `/Rest.svc/**` | `http://localhost:5000` | CRM REST API — 82 endpoints |
+| `/Administration/Rest.svc/**` | `http://localhost:5000` | Admin API — 58 endpoints |
 | `/hubs/**` | `http://localhost:5000` (WebSocket) | SignalR hub connections (`ws: true`) |
 | `/api/**` | `http://localhost:5000` | Health check and utility endpoints |
 | `/App_Themes/**` | `http://localhost:5000` | Theme CSS and assets |
@@ -613,3 +613,454 @@ MobX decorator support requires **both** of the following:
 
 - The `.npmrc` file contains `legacy-peer-deps=true` to handle peer dependency conflicts from older BPMN packages (`bpmn-js` 1.3.3 and `bpmn-js-properties-panel` 0.13.1)
 - These warnings are expected and do not affect functionality
+
+---
+
+## 13. Docker and Container Prerequisites
+
+This section covers the additional tools required for Prompt 3 — containerizing the SplendidCRM backend and frontend, provisioning AWS infrastructure via Terraform, and validating deployments against LocalStack.
+
+| Tool | Version | Purpose |
+|---|---|---|
+| Docker Engine | Latest stable (24.x+) | Container image builds and local testing |
+| Docker Compose | v2.x (ships with Docker) | Multi-container orchestration (optional) |
+| Terraform | >= 1.12.x | Infrastructure-as-Code provisioning |
+| AWS CLI | v2 | ECR authentication, resource verification |
+| LocalStack Pro | 4.14.0 | AWS service emulation for infrastructure validation |
+| sqlcmd | Latest (mssql-tools18) | SQL Server schema provisioning against RDS |
+
+### Docker Engine Installation
+
+**Linux:**
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+```
+
+> **Note:** Log out and back in (or run `newgrp docker`) for group membership to take effect.
+
+**macOS:**
+
+Install Docker Desktop from [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+
+### Docker Verification
+
+```bash
+docker --version   # Expected: Docker version 24.x+
+docker info         # Should show server running
+docker run hello-world   # Should pull and run the hello-world image
+```
+
+---
+
+## 14. Terraform and AWS Infrastructure Setup
+
+### Terraform Installation
+
+**Linux (AMD64):**
+
+```bash
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt-get update && sudo apt-get install terraform
+```
+
+**macOS:**
+
+```bash
+brew install hashicorp/tap/terraform
+```
+
+**Verify:**
+
+```bash
+terraform version   # Expected: >= 1.12.x
+```
+
+### AWS CLI v2 Installation
+
+**Linux:**
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && sudo ./aws/install
+```
+
+**macOS:**
+
+```bash
+brew install awscli
+```
+
+**Verify:**
+
+```bash
+aws --version   # Expected: aws-cli/2.x.x
+```
+
+### LocalStack Pro Installation
+
+```bash
+# Install via pip
+pip install localstack==4.14.0
+
+# Or via CLI binary
+curl -Lo localstack-cli-4.14.0-linux-amd64-onefile.tar.gz \
+  https://github.com/localstack/localstack-cli/releases/download/v4.14.0/localstack-cli-4.14.0-linux-amd64-onefile.tar.gz
+sudo tar xvzf localstack-cli-*.tar.gz -C /usr/local/bin
+
+# Set auth token (required for Pro features)
+export LOCALSTACK_AUTH_TOKEN="your-token-here"
+
+# Start LocalStack
+localstack start -d
+
+# Verify
+localstack status
+curl http://localhost:4566/_localstack/health
+```
+
+### Terraform Cloud Authentication
+
+For deploying to **dev**, **staging**, or **prod** environments, Terraform Cloud (ACME private instance) is required:
+
+- **Terraform Enterprise host:** `tfe.acme.com`
+- **Workspace naming convention:** `splendidcrm-{env}` (e.g., `splendidcrm-dev`, `splendidcrm-staging`, `splendidcrm-prod`)
+- **Authenticate:** `terraform login tfe.acme.com`
+
+> **Note:** The **localstack** environment uses a local state backend — no Terraform Cloud authentication is needed for local validation.
+
+### Terraform Directory Structure
+
+```
+infrastructure/
+├── environments/
+│   ├── dev/          # Dev environment (tfe.acme.com backend)
+│   ├── staging/      # Staging environment (tfe.acme.com backend)
+│   ├── prod/         # Production environment (tfe.acme.com backend)
+│   └── localstack/   # LocalStack validation (local state backend)
+└── modules/
+    └── common/       # Shared Terraform modules (14 .tf files)
+```
+
+- All environments share the same `modules/common/` module
+- Environment-specific differences are isolated to `*.auto.tfvars` and `locals.tf` files
+- The LocalStack environment uses a `local` state backend (no Terraform Cloud)
+
+---
+
+## 15. Docker Build and Run
+
+### Building Docker Images
+
+```bash
+# Build backend image (multi-stage: .NET 10 SDK build → Alpine runtime)
+docker build -f Dockerfile.backend -t splendidcrm-backend:latest .
+
+# Build frontend image (multi-stage: Node 20 build → Nginx Alpine)
+docker build -f Dockerfile.frontend -t splendidcrm-frontend:latest .
+```
+
+> **Note:** The build context is the repository root (`.`) for both images. This is required because the backend Dockerfile accesses `SplendidCRM.sln`, `src/`, and `SplendidCRM/App_Themes/` / `SplendidCRM/Include/` from the repo root. The frontend Dockerfile accesses `SplendidCRM/React/` including the `ckeditor5-custom-build/` local dependency.
+
+**Image Size Targets:**
+
+| Image | Target Size | Contents |
+|---|---|---|
+| Backend (`splendidcrm-backend`) | ≤ 500MB | ASP.NET 10.0 Alpine runtime + ICU + OpenSSL + published app + App_Themes + Include |
+| Frontend (`splendidcrm-frontend`) | ≤ 100MB | Nginx Alpine + static `dist/` files + `config.json` entrypoint |
+
+### Running Backend Container Locally
+
+```bash
+docker run -d --name splendidcrm-backend \
+  -p 8080:8080 \
+  -e "ConnectionStrings__SplendidCRM=Server=host.docker.internal,1433;Database=SplendidCRM;User Id=sa;Password=YourStrong!Password;TrustServerCertificate=True" \
+  -e ASPNETCORE_ENVIRONMENT=Development \
+  -e SESSION_PROVIDER=Memory \
+  -e AUTH_MODE=Forms \
+  -e CORS_ORIGINS="" \
+  -e SPLENDID_JOB_SERVER=local-docker \
+  splendidcrm-backend:latest
+```
+
+> **Important:** The backend Kestrel server listens on port **8080** inside the container (not 5000). This is set via `ASPNETCORE_URLS=http://+:8080` in the Dockerfile. The local development port (5000) is only used when running outside Docker.
+
+**Health check:**
+
+```bash
+curl http://localhost:8080/api/health
+# Expected: HTTP 200 with JSON { "status": "Healthy", ... }
+```
+
+> **Note:** `host.docker.internal` resolves to the host machine on Docker Desktop (macOS/Windows). On Linux, use `--network host` or the container's bridge IP instead.
+
+### Running Frontend Container Locally
+
+```bash
+docker run -d --name splendidcrm-frontend \
+  -p 3000:80 \
+  -e API_BASE_URL="" \
+  -e SIGNALR_URL="" \
+  -e ENVIRONMENT=development \
+  splendidcrm-frontend:latest
+```
+
+- Frontend Nginx listens on port **80** inside the container (mapped to host port 3000 above)
+- `docker-entrypoint.sh` writes `config.json` from environment variables before starting Nginx
+- `API_BASE_URL=""` means same-origin — used in ALB deployments where both services share one DNS name
+- For local testing with separate containers, set `API_BASE_URL=http://localhost:8080`
+
+**Health check:**
+
+```bash
+curl http://localhost:3000/health
+# Expected: HTTP 200 with body "ok"
+```
+
+**SPA fallback test:**
+
+```bash
+curl -s http://localhost:3000/some/random/path | head -5
+# Expected: Returns index.html content (SPA client-side routing)
+```
+
+### Local Docker Validation
+
+Run the full 12-test validation suite to verify both Docker images before pushing to ECR:
+
+```bash
+scripts/validate-docker-local.sh
+```
+
+**All 12 tests:**
+
+| # | Test | Expected Result |
+|---|---|---|
+| 1 | Backend image builds successfully | Exit code 0 |
+| 2 | Frontend image builds successfully | Exit code 0 |
+| 3 | Backend image size ≤ 500MB | `docker image inspect` size check |
+| 4 | Frontend image size ≤ 100MB | `docker image inspect` size check |
+| 5 | Backend health check | `GET /api/health` → HTTP 200 |
+| 6 | Frontend health check | `GET /health` → HTTP 200 |
+| 7 | Frontend config.json injection | Environment variables written to `/config.json` |
+| 8 | Frontend SPA fallback | Non-file paths return `index.html` |
+| 9 | Source maps blocked | `GET /*.map` → HTTP 404 |
+| 10 | No `*.map` files in frontend image | `docker run ... find / -name '*.map'` returns empty |
+| 11 | No secrets in Docker image history | `docker history` shows no connection strings or passwords |
+| 12 | End-to-end reachability test | Both backend and frontend containers respond to HTTP requests |
+
+> **CRITICAL:** ALL 12 tests must pass before any ECR push. The `build-and-push.sh` script enforces this automatically.
+
+---
+
+## 16. LocalStack Infrastructure Validation
+
+### Starting LocalStack
+
+```bash
+# Ensure LOCALSTACK_AUTH_TOKEN is set
+export LOCALSTACK_AUTH_TOKEN="your-token-here"
+
+# Start LocalStack Pro
+localstack start -d
+
+# Verify health
+curl http://localhost:4566/_localstack/health
+```
+
+### Running Terraform Against LocalStack
+
+```bash
+cd infrastructure/environments/localstack
+
+# Initialize Terraform (local state backend)
+terraform init
+
+# Plan
+terraform plan -out=tfplan
+
+# Apply
+terraform apply tfplan
+```
+
+> **CRITICAL:** Always use `infrastructure/environments/localstack/` for autonomous and local validation operations. NEVER run `terraform init`, `terraform plan`, or `terraform apply` from the `dev/`, `staging/`, or `prod/` environment directories without Terraform Cloud (`tfe.acme.com`) access. The localstack environment uses a `local` state backend and LocalStack endpoint overrides (`http://localhost:4566` for all AWS services).
+
+### Running Infrastructure Validation
+
+```bash
+# Run the full 19-test infrastructure validation suite
+scripts/validate-infra-localstack.sh
+```
+
+**Test categories:**
+
+| Category | Count | Tests |
+|---|---|---|
+| LocalStack resource verification (Tests 01–15) | 15 | ECR repos, ECS cluster, task definitions, services, ALB, target groups, listener rules, security groups, IAM roles, KMS key, Secrets Manager, Parameter Store, RDS, CloudWatch log group, CloudWatch stream |
+| Docker SQL Server schema (Tests 16–19) | 4 | DB creation, ≥218 tables, ≥583 views, ≥890 procedures |
+
+In addition to the 19 numbered tests, the script performs two unnumbered validation phases:
+
+| Validation Phase | Description |
+|---|---|
+| Idempotency check | Second `terraform plan` shows zero changes (run after Tests 01–15) |
+| Clean teardown | `terraform destroy` completes with no orphaned resources (run after all tests) |
+
+> **Note:** All 19 numbered tests plus both validation phases must pass before targeting real AWS environments (dev, staging, prod).
+
+### Schema Deployment Validation
+
+```bash
+# Deploy schema to local Docker SQL Server
+DB_HOST=localhost SA_PASSWORD="YourStrong!Password" scripts/deploy-schema.sh
+```
+
+The `deploy-schema.sh` script performs the following steps:
+
+1. Creates the `SplendidCRM` database if it does not exist
+2. Generates `Build.sql` from `SQL Scripts Community/` subdirectories in dependency order
+3. Executes `Build.sql` against the database (with `-t 600` timeout, no `-b` flag — idempotent DDL scripts produce non-fatal warnings that are safe to ignore)
+4. Creates the `SplendidSessions` table for ASP.NET Core distributed SQL session support
+5. Validates schema counts: ≥218 tables, ≥583 views, ≥890 stored procedures
+
+---
+
+## 17. ECR Image Push
+
+### Prerequisites
+
+- AWS CLI v2 configured with IAM credentials that have `ecr:GetAuthorizationToken`, `ecr:BatchCheckLayerAvailability`, `ecr:PutImage`, and related permissions
+- ECR repositories must exist (created by Terraform): `${NAME_PREFIX}-backend` and `${NAME_PREFIX}-frontend` (e.g., `splendidcrm-dev-backend`, `splendidcrm-dev-frontend` for dev environment)
+- All 12 local Docker validation tests (Section 15) must pass
+
+### Manual ECR Push
+
+```bash
+# Set variables
+export AWS_ACCOUNT_ID="123456789012"
+export AWS_REGION="us-east-2"
+export IMAGE_TAG="v1.0.0"
+export NAME_PREFIX="splendidcrm-dev"  # Must match Terraform name_prefix for target environment
+export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+# Authenticate with ECR
+aws ecr get-login-password --region ${AWS_REGION} | \
+  docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+# Tag images (repo names match Terraform: ${NAME_PREFIX}-backend, ${NAME_PREFIX}-frontend)
+docker tag splendidcrm-backend:latest ${ECR_REGISTRY}/${NAME_PREFIX}-backend:${IMAGE_TAG}
+docker tag splendidcrm-frontend:latest ${ECR_REGISTRY}/${NAME_PREFIX}-frontend:${IMAGE_TAG}
+
+# Push
+docker push ${ECR_REGISTRY}/${NAME_PREFIX}-backend:${IMAGE_TAG}
+docker push ${ECR_REGISTRY}/${NAME_PREFIX}-frontend:${IMAGE_TAG}
+```
+
+### Automated Push (Recommended)
+
+```bash
+# Build, validate, and push in one step (dev environment)
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-dev scripts/build-and-push.sh
+
+# For staging
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-staging scripts/build-and-push.sh
+
+# For production
+IMAGE_TAG=v1.0.0 AWS_ACCOUNT_ID=123456789012 NAME_PREFIX=splendidcrm-prod scripts/build-and-push.sh
+```
+
+This script builds both images, runs all 12 validation tests, then pushes to ECR. It aborts immediately if any validation test fails. The `NAME_PREFIX` must match the `name_prefix` Terraform variable for the target environment to ensure ECR repository names align (e.g., `splendidcrm-dev-backend`, `splendidcrm-dev-frontend`).
+
+### Image Tagging Conventions
+
+| Convention | Example | Usage |
+|---|---|---|
+| Semantic version | `v1.0.0` | Release builds |
+| Git commit SHA | `abc1234` | CI/CD builds |
+| `latest` | `latest` | Local development only — **NEVER** use in production |
+
+---
+
+## 18. Container Architecture
+
+### Port Configuration
+
+| Service | Container Port | Protocol | Notes |
+|---|---|---|---|
+| Backend (Kestrel) | 8080 | HTTP | Set via `ASPNETCORE_URLS=http://+:8080` in Dockerfile |
+| Frontend (Nginx) | 80 | HTTP | Standard Nginx listen port |
+| SQL Server (RDS) | 1433 | TCP | Standard SQL Server port |
+
+> **CRITICAL (G2):** Port 8080 must be consistent across all 5 locations:
+> 1. `Dockerfile.backend` — `ENV ASPNETCORE_URLS=http://+:8080` and `EXPOSE 8080`
+> 2. `infrastructure/modules/common/ecs-fargate.tf` — `containerPort: 8080`
+> 3. `infrastructure/modules/common/alb.tf` — backend target group port 8080
+> 4. `infrastructure/modules/common/security-groups.tf` — ALB→Backend inbound rule port 8080
+> 5. ECS task definition `containerPort` in task definition JSON
+>
+> A mismatch at any single point causes ECS health check failure and infinite task restart loops.
+
+### ALB Path-Based Routing
+
+Both backend and frontend services are deployed behind a **single internal Application Load Balancer (ALB)**. Path-based listener rules route requests to the appropriate ECS service:
+
+| Priority | Path Pattern | Target | Request Types |
+|---|---|---|---|
+| 1 | `/Rest.svc/*` | Backend | 82 main REST API endpoints |
+| 2 | `/Administration/Rest.svc/*` | Backend | 58 admin REST API endpoints |
+| 3 | `/hubs/*` | Backend | SignalR WebSocket hubs (chat, twilio, phoneburner) |
+| 4 | `/api/*` | Backend | Health check and utility endpoints |
+| 5 | `/App_Themes/*` | Backend | Theme CSS/images served by ASP.NET Core static files |
+| 6 | `/Include/*` | Backend | Shared JS utilities served by ASP.NET Core static files |
+| Default | `/*` | Frontend | React SPA with Nginx `try_files` fallback |
+
+The default rule catches all paths not matched by higher-priority rules and routes them to the frontend Nginx container, which serves `index.html` for SPA client-side routing.
+
+### Runtime config.json Injection
+
+The frontend container generates `/usr/share/nginx/html/config.json` at startup from environment variables:
+
+- `docker-entrypoint.sh` reads `API_BASE_URL`, `SIGNALR_URL`, and `ENVIRONMENT` from the container environment
+- Writes them as a JSON object to `config.json` before starting Nginx
+- The React SPA's `config-loader.js` reads this file synchronously before React initialization
+
+| Environment | `API_BASE_URL` Value | Reason |
+|---|---|---|
+| ECS/ALB deployment | `""` (empty string) | Same-origin — both services share one ALB DNS name |
+| Local Docker (separate containers) | `"http://localhost:8080"` | Cross-origin — containers on separate ports |
+| Local development (no Docker) | `"http://localhost:5000"` | Vite dev server proxy handles routing |
+
+The same Docker image is used across all environments — only injected configuration changes.
+
+### Same-Origin Cookie Architecture (G8)
+
+- Both frontend and backend are behind the **same ALB DNS name** — this is mandatory
+- `API_BASE_URL` is empty string in ECS deployments (same-origin XHR requests)
+- Session cookies (Forms authentication) work because both services share the same origin
+- CORS configuration is not needed when both services share the same origin
+- Separate DNS names or separate ALBs are **prohibited** — they break cookie-based session authentication
+
+### Environment-Specific Sizing
+
+| Environment | Task CPU | Task Memory | Ephemeral Storage | Min Tasks | Max Tasks |
+|---|---|---|---|---|---|
+| Dev | 512 | 1024 MB | 21 GB | 1 | 4 |
+| Staging | 1024 | 2048 MB | 30 GB | 2 | 6 |
+| Production | 2048 | 4096 MB | 50 GB | 2 | 10 |
+
+- Frontend tasks use the same sizing as backend tasks (ACME standard: uniform per environment)
+- Auto-scaling target: 70% CPU and 70% Memory utilization
+
+### Security Notes
+
+- **Source maps:** Deleted during Docker build AND blocked by Nginx (`*.map` → HTTP 404) — defense-in-depth (G5)
+- **Secrets:** Injected via AWS Secrets Manager (encrypted with KMS Customer Managed Key), never baked into images
+- **Image history:** `docker history` must show no connection strings, passwords, or API keys
+- **IAM roles:** Follow least-privilege — scoped to specific secret names (`splendidcrm/*`) and parameter paths (`/splendidcrm/*`)
+- **Security groups:** 4 security groups enforce layered network policy:
+  - VPC CIDR → ALB (ports 80/443)
+  - ALB → Backend (port 8080) and Frontend (port 80)
+  - Backend → RDS (port 1433) and AWS APIs (HTTPS 443)
+  - No direct access from ALB to RDS

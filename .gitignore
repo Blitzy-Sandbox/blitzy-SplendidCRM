@@ -5,3 +5,11 @@ Build.sql
 Manifest.xml
 Parameters.xml
 CreateLogin.sql
+
+# Terraform state files — may contain sensitive data (secrets, connection strings,
+# resource ARNs). Must never be committed to version control.
+*.tfstate
+*.tfstate.backup
+
+# Terraform working directory — contains provider binaries and local state cache.
+.terraform/

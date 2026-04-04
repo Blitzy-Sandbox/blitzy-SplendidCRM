@@ -1,0 +1,124 @@
+# ==============================================================================
+# Dockerfile.backend — Multi-Stage .NET 10 Backend Docker Image
+# ==============================================================================
+# Builds the SplendidCRM ASP.NET Core backend as a production-ready Alpine
+# container image. Uses a two-stage build to separate SDK tooling from the
+# minimal runtime, targeting ≤500 MB final image size.
+#
+# Build context: repository root
+#   docker build -f Dockerfile.backend -t splendidcrm-backend .
+#
+# Stage 1 (build):  .NET 10 SDK — NuGet restore, compile, publish
+# Stage 2 (runtime): ASP.NET 10 Alpine — ICU, OpenSSL, Kestrel on port 8080
+#
+# Guardrails addressed:
+#   G1 — Alpine native dependencies (icu-libs, icu-data-full, openssl-libs-static)
+#   G2 — Kestrel port 8080 (ENV + EXPOSE, consistent with ECS/ALB/SG)
+#
+# Static asset handling:
+#   Program.cs resolves theme/include assets via:
+#     Path.GetFullPath(Path.Combine(ContentRootPath, "..", "..", "SplendidCRM"))
+#   With WORKDIR /app → ContentRootPath = /app → ../../SplendidCRM = /SplendidCRM
+#   Therefore App_Themes and Include are copied to /SplendidCRM/ (container root).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build — .NET 10 SDK for NuGet restore and publish
+# ------------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Layer-optimized NuGet restore: copy only project files so that the restore
+# layer is cached as long as .csproj contents are unchanged. Source code changes
+# do not invalidate this cache layer.
+#
+# The Web project transitively restores SplendidCRM.Core via its ProjectReference
+# (src/SplendidCRM.Web/SplendidCRM.Web.csproj → ../SplendidCRM.Core/SplendidCRM.Core.csproj).
+# Project-level restore is used instead of solution-level restore to avoid
+# copying test project files into the build stage.
+COPY src/SplendidCRM.Core/SplendidCRM.Core.csproj src/SplendidCRM.Core/
+COPY src/SplendidCRM.Web/SplendidCRM.Web.csproj src/SplendidCRM.Web/
+RUN dotnet restore src/SplendidCRM.Web/SplendidCRM.Web.csproj
+
+# Copy application source code only — src/ directory contains SplendidCRM.Core
+# (78+ business logic classes) and SplendidCRM.Web (controllers, hubs, services,
+# middleware, configuration providers). Excludes tests/, SplendidCRM/React/,
+# SQL Scripts Community/, and all other non-build directories.
+COPY src/ src/
+
+# Publish the web project in Release configuration. Output is a self-contained
+# set of assemblies, configuration files, and runtime assets at /app/publish.
+# --no-restore skips the redundant restore since it was completed above.
+RUN dotnet publish src/SplendidCRM.Web/SplendidCRM.Web.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore
+
+# ------------------------------------------------------------------------------
+# Stage 2: Runtime — ASP.NET 10 Alpine for minimal production image
+# ------------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+
+# G1: Install Alpine native dependencies required by Microsoft.Data.SqlClient 6.1.4.
+#
+# icu-libs + icu-data-full:
+#   ICU (International Components for Unicode) globalization libraries. Required
+#   because Microsoft.Data.SqlClient performs culture-dependent string operations.
+#   Without ICU, SqlClient throws PlatformNotSupportedException on Alpine.
+#
+# openssl-libs-static:
+#   OpenSSL libraries for TLS/SSL connections to SQL Server. Required for
+#   encrypted connections via Microsoft.Data.SqlClient's TLS handshake.
+RUN apk add --no-cache \
+    icu-libs \
+    icu-data-full \
+    openssl-libs-static
+
+# G1: Disable Alpine's default globalization invariant mode. When set to true
+# (Alpine default), .NET uses a minimal globalization implementation that lacks
+# culture-specific formatting and collation — breaking SqlClient operations.
+# Setting to false activates the full ICU library installed above.
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+# G2: Configure Kestrel to listen on port 8080 on all network interfaces.
+# CRITICAL — This port value must be identical in all 5 locations:
+#   1. ENV ASPNETCORE_URLS (this Dockerfile — here)
+#   2. EXPOSE directive (this Dockerfile — below)
+#   3. ECS task definition containerPort (infrastructure/modules/common/ecs-fargate.tf)
+#   4. ALB backend target group port (infrastructure/modules/common/alb.tf)
+#   5. Backend security group inbound rule (infrastructure/modules/common/security-groups.tf)
+# A mismatch at any single point causes ECS health check failure and infinite
+# task restart loops.
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+# Set working directory for the published application. ContentRootPath resolves
+# to this directory (/app) at runtime.
+WORKDIR /app
+
+# Copy the published .NET application from the build stage. This includes all
+# compiled assemblies, appsettings.json files, and runtime dependencies.
+COPY --from=build /app/publish .
+
+# Copy static assets to /SplendidCRM/ at the container filesystem root.
+#
+# Program.cs (line 517) resolves the SplendidCRM root directory as:
+#   Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "SplendidCRM"))
+# With ContentRootPath = /app:
+#   /app → ../../SplendidCRM → /SplendidCRM
+#
+# App_Themes: 7 theme directories (Arctic, Atlantic, Mobile, Pacific, Seven, Six, Sugar)
+# containing CSS stylesheets, chart palette XMLs, and image assets.
+# Served by ASP.NET Core UseStaticFiles middleware at /App_Themes/* via ALB routing.
+COPY SplendidCRM/App_Themes /SplendidCRM/App_Themes
+
+# Include: 5 asset directories (Silverlight, charts, images, javascript, jqPlot)
+# containing JavaScript utilities, chart libraries, and legacy browser assets.
+# Served by ASP.NET Core UseStaticFiles middleware at /Include/* via ALB routing.
+COPY SplendidCRM/Include /SplendidCRM/Include
+
+# Start the ASP.NET Core application. Kestrel binds to port 8080 (ASPNETCORE_URLS).
+# Health check endpoint: GET /api/health (AllowAnonymous) returns JSON with
+# status, machineName, sqlVersion, timestamp, and initialized flag.
+# ECS and ALB health checks target this endpoint to verify container readiness.
+ENTRYPOINT ["dotnet", "SplendidCRM.Web.dll"]
