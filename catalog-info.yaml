@@ -1,0 +1,33 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: blitzy-SplendidCRM
+  description: "SplendidCRM modernization — .NET Framework 4.8 to .NET 10 backend migration plus React 19/Vite 6 SPA modernization"
+  tags:
+    - csharp
+    - typescript
+    - web-app
+    - complete
+  labels:
+    blitzy.com/status: complete
+    blitzy.com/language: csharp
+  annotations:
+    github.com/project-slug: Blitzy-Sandbox/blitzy-SplendidCRM
+    backstage.io/source-location: url:https://github.com/Blitzy-Sandbox/blitzy-SplendidCRM/tree/main/
+  links:
+    - url: https://github.com/Blitzy-Sandbox/blitzy-SplendidCRM
+      title: GitHub Repository
+    - url: https://github.com/Blitzy-Sandbox/blitzy-SplendidCRM/pull/1
+      title: "PR #1: Backend — .NET Framework to .NET 10"
+      icon: github
+    - url: https://github.com/Blitzy-Sandbox/blitzy-SplendidCRM/pull/3
+      title: "PR #3: Frontend — React 19 + Vite 6 SPA"
+      icon: github
+    - url: https://github.com/Blitzy-Sandbox/blitzy-SplendidCRM/tree/main/blitzy/documentation
+      title: Blitzy Documentation
+      icon: docs
+spec:
+  type: website
+  lifecycle: production
+  owner: blitzy-sandbox
+  system: blitzy-sandbox-projects
