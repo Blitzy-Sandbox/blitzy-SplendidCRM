@@ -5,11 +5,9 @@ metadata:
   description: "SplendidCRM modernization — .NET Framework 4.8 to .NET 10 backend migration plus React 19/Vite 6 SPA modernization"
   tags:
     - csharp
-    - typescript
     - web-app
-    - complete
+    - refactor
   labels:
-    blitzy.com/status: complete
     blitzy.com/language: csharp
   annotations:
     github.com/project-slug: Blitzy-Sandbox/blitzy-SplendidCRM
