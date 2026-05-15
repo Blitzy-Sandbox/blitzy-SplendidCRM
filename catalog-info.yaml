@@ -6,8 +6,12 @@ metadata:
     plus React 19/Vite 6 SPA modernization
   tags:
   - csharp
+  - dotnet
+  - frontend
+  - migration
   - modernization
   - refactor
+  - typescript
   - web-app
   labels:
     blitzy.com/language: csharp
